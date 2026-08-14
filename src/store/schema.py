@@ -8,10 +8,12 @@ for the write/read rules that make this leakage-free.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from enum import Enum
 
 from pydantic import BaseModel, ConfigDict, model_validator
+
+from src.devig.convert import american_to_decimal, decimal_to_implied_prob
 
 
 class Market(str, Enum):
@@ -25,16 +27,6 @@ class Side(str, Enum):
     AWAY = "away"
     OVER = "over"
     UNDER = "under"
-
-
-def american_to_decimal(price_american: int) -> float:
-    if price_american > 0:
-        return 1 + price_american / 100
-    return 1 + 100 / (-price_american)
-
-
-def decimal_to_implied_prob(price_decimal: float) -> float:
-    return 1 / price_decimal
 
 
 class OddsSnapshot(BaseModel):
@@ -65,7 +57,7 @@ class OddsSnapshot(BaseModel):
     implied_prob_raw: float
 
     @model_validator(mode="after")
-    def _check_consistency(self) -> "OddsSnapshot":
+    def _check_consistency(self) -> OddsSnapshot:
         if self.capture_time.tzinfo is None:
             raise ValueError("capture_time must be tz-aware (use UTC)")
         if self.event_start_time.tzinfo is None:
@@ -105,7 +97,7 @@ class OddsSnapshot(BaseModel):
         side: Side,
         price_american: int,
         line: float | None = None,
-    ) -> "OddsSnapshot":
+    ) -> OddsSnapshot:
         """Build a snapshot from an American price, deriving decimal + implied prob."""
         decimal = american_to_decimal(price_american)
         return cls(
@@ -127,4 +119,4 @@ class OddsSnapshot(BaseModel):
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)

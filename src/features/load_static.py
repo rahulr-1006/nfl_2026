@@ -5,6 +5,10 @@ lines plus final scores, back to 1999. It has no intraday snapshots — that's
 what the live collector (src/collect/) exists to capture, starting this
 season. This module only backs the backtester's settlement join and the
 market baseline.
+
+nflverse's `spread_line` column uses the opposite sign convention from a
+sportsbook-posted side line: use home_spread_line() below to convert it
+before passing to src/store/settlement.settle(), never the raw column.
 """
 
 from __future__ import annotations
@@ -23,6 +27,20 @@ def load_schedules(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
     path = out_dir / f"schedules_{min(seasons)}_{max(seasons)}.parquet"
     df.write_parquet(path)
     return path
+
+
+def home_spread_line(spread_line: float) -> float:
+    """Convert nflverse's spread_line into the sportsbook side-line
+    convention that OddsSnapshot.line / settlement.settle() expect.
+
+    nflverse signs spread_line as the home team's projected margin
+    (positive = home favored, e.g. +7.5 means home projected to win by
+    7.5). A sportsbook-posted side line does the opposite (negative =
+    favored, e.g. -7.5 to bet the home favorite). They're the same number
+    with flipped sign -- this function is that flip, named so the
+    conversion can't be silently skipped or gotten backwards again.
+    """
+    return -float(spread_line)
 
 
 if __name__ == "__main__":
