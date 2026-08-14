@@ -1,0 +1,74 @@
+"""Collector configuration.
+
+Everything The Odds API's free-tier budget forces us to make a decision
+about is env-configurable; the rest (sport key, cadence numbers taken
+straight from the blueprint, file locations) is hardcoded. This is a
+single-provider personal project, not a framework — no plugin config.
+"""
+
+from __future__ import annotations
+
+import os
+from collections.abc import Mapping
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class Config:
+    api_key: str
+    sport_key: str = "americanfootball_nfl"
+    regions: str = "eu"  # Pinnacle lives here; "us" would double credit cost for nothing
+    markets: str = "h2h,spreads,totals"
+    reduced_markets: str = "spreads,totals"  # budget-tight fallback: drop moneyline first
+    odds_format: str = "american"
+    season: int = 2026
+    monthly_budget: int = 500
+    safety_reserve_credits: int = 20
+    dense_window_hours: float = 48.0
+    dense_interval_minutes: float = 30.0
+    sparse_interval_minutes: float = 60.0
+    min_interval_minutes: float = 15.0
+    tick_minutes: float = 5.0
+    budget_period_days: int = 30
+    budget_period_anchor: date | None = None
+    max_consecutive_failures: int = 20
+    request_timeout_seconds: float = 15.0
+    store_root: Path = Path("data/snapshots")
+    schedule_path: Path | None = None
+    state_path: Path = Path("data/collect_state.json")
+
+    @property
+    def resolved_schedule_path(self) -> Path:
+        if self.schedule_path is not None:
+            return self.schedule_path
+        return Path("data/static") / f"schedules_{self.season}_{self.season}.parquet"
+
+
+def load_config(env: Mapping[str, str] | None = None) -> Config:
+    """Build a Config from environment variables (or an injected mapping for tests).
+
+    Does not call load_dotenv() itself, so it stays a pure function of its
+    input — callers that want .env support (src/collect/run.py) load the
+    .env file once before calling this.
+    """
+    src = env if env is not None else os.environ
+
+    api_key = src.get("ODDS_API_KEY")
+    if not api_key:
+        raise ValueError("ODDS_API_KEY is not set (add it to .env or the environment)")
+
+    anchor_str = src.get("COLLECT_BUDGET_PERIOD_ANCHOR")
+    anchor = date.fromisoformat(anchor_str) if anchor_str else None
+
+    return Config(
+        api_key=api_key,
+        regions=src.get("ODDS_API_REGIONS", "eu"),
+        markets=src.get("ODDS_API_MARKETS", "h2h,spreads,totals"),
+        season=int(src.get("COLLECT_SEASON", "2026")),
+        monthly_budget=int(src.get("ODDS_API_MONTHLY_BUDGET", "500")),
+        safety_reserve_credits=int(src.get("COLLECT_SAFETY_RESERVE_CREDITS", "20")),
+        tick_minutes=float(src.get("COLLECT_TICK_MINUTES", "5")),
+        budget_period_anchor=anchor,
+    )
