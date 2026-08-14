@@ -14,6 +14,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence
 
+import pandas as pd
 from scipy.optimize import brentq
 
 
@@ -136,3 +137,16 @@ DEVIG_METHODS = {
 def compare_methods(raw_probs: Sequence[float]) -> dict[str, DevigResult]:
     """Run all four methods on the same market. This is the Part B.2 deliverable table."""
     return {name: fn(raw_probs) for name, fn in DEVIG_METHODS.items()}
+
+
+def compare_methods_table(raw_probs: Sequence[float]) -> pd.DataFrame:
+    """compare_methods() as a DataFrame -- one row per method, one p_i column
+    per side -- for the Part B.2 write-up ("a table showing how the four
+    methods disagree on the same market").
+    """
+    results = compare_methods(raw_probs)
+    rows = [
+        {"method": name, **{f"p_{i}": p for i, p in enumerate(result.probabilities)}}
+        for name, result in results.items()
+    ]
+    return pd.DataFrame(rows).set_index("method")

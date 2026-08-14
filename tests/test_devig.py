@@ -3,6 +3,7 @@ import pytest
 from src.devig.methods import (
     DEVIG_METHODS,
     compare_methods,
+    compare_methods_table,
     devig_additive,
     devig_multiplicative,
     devig_power,
@@ -88,3 +89,11 @@ def test_compare_methods_returns_all_four():
     assert set(results.keys()) == {"multiplicative", "additive", "power", "shin"}
     for result in results.values():
         assert sum(result.probabilities) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_compare_methods_table_has_one_row_per_method_and_sums_to_one():
+    table = compare_methods_table(LOPSIDED)
+    assert set(table.index) == {"multiplicative", "additive", "power", "shin"}
+    assert list(table.columns) == ["p_0", "p_1"]
+    row_sums = table["p_0"] + table["p_1"]
+    assert (row_sums.round(6) == 1.0).all()
