@@ -195,7 +195,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "smserror",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_smserror"
     },
     {
@@ -208,7 +208,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "alertrecord",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_alertrecord"
     },
     {
@@ -437,6 +437,18 @@
       "norm_label": "_payout()",
       "community_name": "Side",
       "id": "src_backtest_engine_payout"
+    },
+    {
+      "label": "_resolve_side_and_line()",
+      "file_type": "code",
+      "source_file": "src/collect/transform.py",
+      "source_location": "L150",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "_resolve_side_and_line()",
+      "community_name": "Side",
+      "id": "src_collect_transform_resolve_side_and_line"
     },
     {
       "label": "home_spread_line()",
@@ -1653,13 +1665,37 @@
     {
       "label": "main()",
       "file_type": "code",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L132",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_demo_pipeline_main",
+      "community": 2,
+      "community_name": "pit_store.py",
+      "norm_label": "main()"
+    },
+    {
+      "label": "_step()",
+      "file_type": "code",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L69",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_demo_pipeline_step",
+      "community": 2,
+      "community_name": "pit_store.py",
+      "norm_label": "_step()"
+    },
+    {
+      "label": "main()",
+      "file_type": "code",
       "source_file": "src/notify/monitor_run.py",
       "source_location": "L80",
       "_callable": true,
       "_origin": "ast",
       "community": 2,
       "norm_label": "main()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_monitor_run_main"
     },
     {
@@ -1671,7 +1707,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "run()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_monitor_run_run"
     },
     {
@@ -1683,7 +1719,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_escape_for_applescript()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_escape_for_applescript"
     },
     {
@@ -1695,7 +1731,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "send_message()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_send_message"
     },
     {
@@ -1707,7 +1743,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_alert_key()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_alert_key"
     },
     {
@@ -1719,7 +1755,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "find_positive_ev_spots()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_find_positive_ev_spots"
     },
     {
@@ -1731,7 +1767,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "format_alert_message()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_format_alert_message"
     },
     {
@@ -1743,7 +1779,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_latest_two_sided_pinnacle()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_latest_two_sided_pinnacle"
     },
     {
@@ -1755,7 +1791,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "load_alert_state()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_load_alert_state"
     },
     {
@@ -1767,7 +1803,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "new_or_improved_spots()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_new_or_improved_spots"
     },
     {
@@ -1779,7 +1815,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "record_alerts()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_record_alerts"
     },
     {
@@ -1791,68 +1827,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "save_alert_state()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_save_alert_state"
-    },
-    {
-      "label": "apply_bankroll_caps()",
-      "file_type": "code",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L48",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "apply_bankroll_caps()",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_apply_bankroll_caps"
-    },
-    {
-      "label": "expected_value()",
-      "file_type": "code",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L21",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "expected_value()",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_expected_value"
-    },
-    {
-      "label": "fractional_kelly()",
-      "file_type": "code",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L41",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "fractional_kelly()",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_fractional_kelly"
-    },
-    {
-      "label": "kelly_fraction()",
-      "file_type": "code",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L27",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "kelly_fraction()",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_kelly_fraction"
-    },
-    {
-      "label": "_validate()",
-      "file_type": "code",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L14",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "_validate()",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_validate"
     },
     {
       "label": "_snapshot()",
@@ -1863,7 +1839,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_snapshot()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_snapshot"
     },
     {
@@ -1875,7 +1851,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_find_positive_ev_spots_empty_store_returns_empty_frame()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_find_positive_ev_spots_empty_store_returns_empty_frame"
     },
     {
@@ -1887,7 +1863,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_find_positive_ev_spots_flags_a_book_beating_pinnacle_fair()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_find_positive_ev_spots_flags_a_book_beating_pinnacle_fair"
     },
     {
@@ -1899,7 +1875,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_find_positive_ev_spots_ignores_books_with_no_edge()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_find_positive_ev_spots_ignores_books_with_no_edge"
     },
     {
@@ -1911,7 +1887,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_find_positive_ev_spots_ignores_non_execution_books()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_find_positive_ev_spots_ignores_non_execution_books"
     },
     {
@@ -1923,7 +1899,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_format_alert_message_names_the_bet_and_book()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_format_alert_message_names_the_bet_and_book"
     },
     {
@@ -1935,7 +1911,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_new_or_improved_spots_dedupes_unchanged_and_keeps_improved()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_new_or_improved_spots_dedupes_unchanged_and_keeps_improved"
     },
     {
@@ -1947,7 +1923,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_record_alerts_adds_new_keys_and_preserves_existing()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan_test_record_alerts_adds_new_keys_and_preserves_existing"
     },
     {
@@ -1959,7 +1935,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_seed_store()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_seed_store"
     },
     {
@@ -1971,7 +1947,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "_snapshot()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_snapshot"
     },
     {
@@ -1983,7 +1959,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_run_does_not_record_a_spot_whose_send_failed()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_test_run_does_not_record_a_spot_whose_send_failed"
     },
     {
@@ -1995,7 +1971,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_run_does_not_send_or_record_when_phone_not_configured()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_test_run_does_not_send_or_record_when_phone_not_configured"
     },
     {
@@ -2007,7 +1983,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_run_returns_zero_when_no_spots_found()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_test_run_returns_zero_when_no_spots_found"
     },
     {
@@ -2019,212 +1995,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_run_sends_and_records_alert_when_phone_configured()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run_test_run_sends_and_records_alert_when_phone_configured"
-    },
-    {
-      "label": "test_apply_bankroll_caps_clips_large_stake_to_max_bet()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L73",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_apply_bankroll_caps_clips_large_stake_to_max_bet()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_apply_bankroll_caps_clips_large_stake_to_max_bet"
-    },
-    {
-      "label": "test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L91",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger"
-    },
-    {
-      "label": "test_apply_bankroll_caps_passes_through_stake_within_bounds()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L78",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_apply_bankroll_caps_passes_through_stake_within_bounds()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_apply_bankroll_caps_passes_through_stake_within_bounds"
-    },
-    {
-      "label": "test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L82",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up"
-    },
-    {
-      "label": "test_apply_bankroll_caps_returns_zero_for_negative_stake()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L86",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_apply_bankroll_caps_returns_zero_for_negative_stake()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_apply_bankroll_caps_returns_zero_for_negative_stake"
-    },
-    {
-      "label": "test_expected_value_breakeven_is_zero()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L26",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_expected_value_breakeven_is_zero()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_expected_value_breakeven_is_zero"
-    },
-    {
-      "label": "test_expected_value_hand_computed()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L16",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_expected_value_hand_computed()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_expected_value_hand_computed"
-    },
-    {
-      "label": "test_expected_value_negative_edge()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L21",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_expected_value_negative_edge()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_expected_value_negative_edge"
-    },
-    {
-      "label": "test_fractional_kelly_custom_k()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L60",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_fractional_kelly_custom_k()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_fractional_kelly_custom_k"
-    },
-    {
-      "label": "test_fractional_kelly_default_is_midpoint_of_blueprint_range()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L55",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_fractional_kelly_default_is_midpoint_of_blueprint_range()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_fractional_kelly_default_is_midpoint_of_blueprint_range"
-    },
-    {
-      "label": "test_fractional_kelly_rejects_invalid_k()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L66",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_fractional_kelly_rejects_invalid_k()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_fractional_kelly_rejects_invalid_k"
-    },
-    {
-      "label": "test_full_pipeline_negative_edge_produces_no_bet()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L102",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_full_pipeline_negative_edge_produces_no_bet()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_full_pipeline_negative_edge_produces_no_bet"
-    },
-    {
-      "label": "test_full_pipeline_positive_edge_hits_the_two_percent_cap()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L95",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_full_pipeline_positive_edge_hits_the_two_percent_cap()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_full_pipeline_positive_edge_hits_the_two_percent_cap"
-    },
-    {
-      "label": "test_kelly_fraction_hand_computed()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L31",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_kelly_fraction_hand_computed()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_kelly_fraction_hand_computed"
-    },
-    {
-      "label": "test_kelly_fraction_negative_when_no_edge()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L36",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_kelly_fraction_negative_when_no_edge()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_kelly_fraction_negative_when_no_edge"
-    },
-    {
-      "label": "test_kelly_fraction_rejects_decimal_odds_at_or_below_one()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L48",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_kelly_fraction_rejects_decimal_odds_at_or_below_one()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_kelly_fraction_rejects_decimal_odds_at_or_below_one"
-    },
-    {
-      "label": "test_kelly_fraction_rejects_invalid_probability()",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L41",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_kelly_fraction_rejects_invalid_probability()",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing_test_kelly_fraction_rejects_invalid_probability"
     },
     {
       "label": "test_send_message_invokes_osascript_with_escaped_text()",
@@ -2235,7 +2007,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_send_message_invokes_osascript_with_escaped_text()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_sms_test_send_message_invokes_osascript_with_escaped_text"
     },
     {
@@ -2247,7 +2019,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_send_message_raises_sms_error_on_process_failure()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_sms_test_send_message_raises_sms_error_on_process_failure"
     },
     {
@@ -2259,7 +2031,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_send_message_raises_sms_error_on_timeout()",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_sms_test_send_message_raises_sms_error_on_timeout"
     },
     {
@@ -2417,18 +2189,6 @@
       "norm_label": "match_event()",
       "community_name": "props.py",
       "id": "src_collect_transform_match_event"
-    },
-    {
-      "label": "_resolve_side_and_line()",
-      "file_type": "code",
-      "source_file": "src/collect/transform.py",
-      "source_location": "L150",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 3,
-      "norm_label": "_resolve_side_and_line()",
-      "community_name": "props.py",
-      "id": "src_collect_transform_resolve_side_and_line"
     },
     {
       "label": "_preseason_event()",
@@ -2797,10 +2557,10 @@
       "source_location": "L62",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_store_prop_settlement_build_player_stats_index",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "build_player_stats_index()"
+      "norm_label": "build_player_stats_index()",
+      "id": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "label": "normalize_player_name()",
@@ -2809,10 +2569,10 @@
       "source_location": "L50",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_store_prop_settlement_normalize_player_name",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "normalize_player_name()"
+      "norm_label": "normalize_player_name()",
+      "id": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "label": "settle_prop()",
@@ -2821,10 +2581,10 @@
       "source_location": "L85",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_store_prop_settlement_settle_prop",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "settle_prop()"
+      "norm_label": "settle_prop()",
+      "id": "src_store_prop_settlement_settle_prop"
     },
     {
       "label": "settle_prop_snapshots()",
@@ -2833,10 +2593,10 @@
       "source_location": "L102",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_store_prop_settlement_settle_prop_snapshots",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "settle_prop_snapshots()"
+      "norm_label": "settle_prop_snapshots()",
+      "id": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "label": "_prop_row()",
@@ -2845,10 +2605,10 @@
       "source_location": "L85",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_prop_row",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "_prop_row()"
+      "norm_label": "_prop_row()",
+      "id": "tests_test_prop_settlement_prop_row"
     },
     {
       "label": "test_build_player_stats_index_keys_by_game_and_player()",
@@ -2857,10 +2617,10 @@
       "source_location": "L62",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_build_player_stats_index_keys_by_game_and_player",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_build_player_stats_index_keys_by_game_and_player()"
+      "norm_label": "test_build_player_stats_index_keys_by_game_and_player()",
+      "id": "tests_test_prop_settlement_test_build_player_stats_index_keys_by_game_and_player"
     },
     {
       "label": "test_build_player_stats_index_skips_rows_with_no_player_name()",
@@ -2869,10 +2629,10 @@
       "source_location": "L68",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_build_player_stats_index_skips_rows_with_no_player_name",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_build_player_stats_index_skips_rows_with_no_player_name()"
+      "norm_label": "test_build_player_stats_index_skips_rows_with_no_player_name()",
+      "id": "tests_test_prop_settlement_test_build_player_stats_index_skips_rows_with_no_player_name"
     },
     {
       "label": "test_normalize_player_name_applies_known_nickname_overrides()",
@@ -2881,10 +2641,10 @@
       "source_location": "L132",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_normalize_player_name_applies_known_nickname_overrides",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_normalize_player_name_applies_known_nickname_overrides()"
+      "norm_label": "test_normalize_player_name_applies_known_nickname_overrides()",
+      "id": "tests_test_prop_settlement_test_normalize_player_name_applies_known_nickname_overrides"
     },
     {
       "label": "test_normalize_player_name_strips_punctuation()",
@@ -2893,10 +2653,10 @@
       "source_location": "L128",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_normalize_player_name_strips_punctuation",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_normalize_player_name_strips_punctuation()"
+      "norm_label": "test_normalize_player_name_strips_punctuation()",
+      "id": "tests_test_prop_settlement_test_normalize_player_name_strips_punctuation"
     },
     {
       "label": "test_settle_prop_exact_push_on_a_whole_number_line()",
@@ -2905,10 +2665,10 @@
       "source_location": "L48",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_exact_push_on_a_whole_number_line",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_exact_push_on_a_whole_number_line()"
+      "norm_label": "test_settle_prop_exact_push_on_a_whole_number_line()",
+      "id": "tests_test_prop_settlement_test_settle_prop_exact_push_on_a_whole_number_line"
     },
     {
       "label": "test_settle_prop_over_loses_when_actual_is_under_line()",
@@ -2917,10 +2677,10 @@
       "source_location": "L40",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_over_loses_when_actual_is_under_line",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_over_loses_when_actual_is_under_line()"
+      "norm_label": "test_settle_prop_over_loses_when_actual_is_under_line()",
+      "id": "tests_test_prop_settlement_test_settle_prop_over_loses_when_actual_is_under_line"
     },
     {
       "label": "test_settle_prop_over_wins_when_actual_exceeds_line()",
@@ -2929,10 +2689,10 @@
       "source_location": "L36",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_over_wins_when_actual_exceeds_line",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_over_wins_when_actual_exceeds_line()"
+      "norm_label": "test_settle_prop_over_wins_when_actual_exceeds_line()",
+      "id": "tests_test_prop_settlement_test_settle_prop_over_wins_when_actual_exceeds_line"
     },
     {
       "label": "test_settle_prop_rejects_non_over_under_side()",
@@ -2941,10 +2701,10 @@
       "source_location": "L54",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_rejects_non_over_under_side",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_rejects_non_over_under_side()"
+      "norm_label": "test_settle_prop_rejects_non_over_under_side()",
+      "id": "tests_test_prop_settlement_test_settle_prop_rejects_non_over_under_side"
     },
     {
       "label": "test_settle_prop_snapshots_grades_matched_players()",
@@ -2953,10 +2713,10 @@
       "source_location": "L95",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_snapshots_grades_matched_players()"
+      "norm_label": "test_settle_prop_snapshots_grades_matched_players()",
+      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players"
     },
     {
       "label": "test_settle_prop_snapshots_leaves_missing_stat_value_as_none()",
@@ -2965,10 +2725,10 @@
       "source_location": "L113",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_snapshots_leaves_missing_stat_value_as_none()"
+      "norm_label": "test_settle_prop_snapshots_leaves_missing_stat_value_as_none()",
+      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none"
     },
     {
       "label": "test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped()",
@@ -2977,10 +2737,10 @@
       "source_location": "L106",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped()"
+      "norm_label": "test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped()",
+      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped"
     },
     {
       "label": "test_settle_prop_snapshots_matches_despite_punctuation_difference()",
@@ -2989,10 +2749,10 @@
       "source_location": "L136",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_snapshots_matches_despite_punctuation_difference()"
+      "norm_label": "test_settle_prop_snapshots_matches_despite_punctuation_difference()",
+      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference"
     },
     {
       "label": "test_settle_prop_snapshots_matches_via_nickname_override()",
@@ -3001,10 +2761,10 @@
       "source_location": "L146",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_snapshots_matches_via_nickname_override()"
+      "norm_label": "test_settle_prop_snapshots_matches_via_nickname_override()",
+      "id": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override"
     },
     {
       "label": "test_settle_prop_under_wins_when_actual_is_below_line()",
@@ -3013,46 +2773,10 @@
       "source_location": "L44",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_prop_settlement_test_settle_prop_under_wins_when_actual_is_below_line",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_settle_prop_under_wins_when_actual_is_below_line()"
-    },
-    {
-      "label": "compare_to_baseline()",
-      "file_type": "code",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L47",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "compare_to_baseline()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_compare_to_baseline"
-    },
-    {
-      "label": "fit_calibrated_model()",
-      "file_type": "code",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L25",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "fit_calibrated_model()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_fit_calibrated_model"
-    },
-    {
-      "label": "predict_calibrated_proba()",
-      "file_type": "code",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L43",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "predict_calibrated_proba()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_predict_calibrated_proba"
+      "norm_label": "test_settle_prop_under_wins_when_actual_is_below_line()",
+      "id": "tests_test_prop_settlement_test_settle_prop_under_wins_when_actual_is_below_line"
     },
     {
       "label": "brier_score()",
@@ -3061,7 +2785,7 @@
       "source_location": "L22",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "brier_score()",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_brier_score"
@@ -3073,7 +2797,7 @@
       "source_location": "L30",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "log_loss()",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_log_loss"
@@ -3085,7 +2809,7 @@
       "source_location": "L70",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "power_analysis()",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_power_analysis"
@@ -3097,7 +2821,7 @@
       "source_location": "L41",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "reliability_curve()",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_reliability_curve"
@@ -3109,106 +2833,10 @@
       "source_location": "L96",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "_validate_same_shape()",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_validate_same_shape"
-    },
-    {
-      "label": "build_training_frame()",
-      "file_type": "code",
-      "source_file": "src/model/train.py",
-      "source_location": "L55",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "build_training_frame()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_build_training_frame"
-    },
-    {
-      "label": "fit_win_probability_model()",
-      "file_type": "code",
-      "source_file": "src/model/train.py",
-      "source_location": "L93",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "fit_win_probability_model()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_fit_win_probability_model"
-    },
-    {
-      "label": "predict_home_win_proba()",
-      "file_type": "code",
-      "source_file": "src/model/train.py",
-      "source_location": "L103",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "predict_home_win_proba()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_predict_home_win_proba"
-    },
-    {
-      "label": "time_based_split()",
-      "file_type": "code",
-      "source_file": "src/model/train.py",
-      "source_location": "L79",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "time_based_split()",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_time_based_split"
-    },
-    {
-      "label": "_synthetic_feature_frame()",
-      "file_type": "code",
-      "source_file": "tests/test_calibration.py",
-      "source_location": "L12",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "_synthetic_feature_frame()",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration_synthetic_feature_frame"
-    },
-    {
-      "label": "test_compare_to_baseline_ranks_by_brier_score()",
-      "file_type": "code",
-      "source_file": "tests/test_calibration.py",
-      "source_location": "L74",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "test_compare_to_baseline_ranks_by_brier_score()",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration_test_compare_to_baseline_ranks_by_brier_score"
-    },
-    {
-      "label": "test_fit_calibrated_model_does_not_refit_the_base_model()",
-      "file_type": "code",
-      "source_file": "tests/test_calibration.py",
-      "source_location": "L56",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "test_fit_calibrated_model_does_not_refit_the_base_model()",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration_test_fit_calibrated_model_does_not_refit_the_base_model"
-    },
-    {
-      "label": "test_fit_calibrated_model_outputs_valid_probabilities()",
-      "file_type": "code",
-      "source_file": "tests/test_calibration.py",
-      "source_location": "L43",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "test_fit_calibrated_model_outputs_valid_probabilities()",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration_test_fit_calibrated_model_outputs_valid_probabilities"
     },
     {
       "label": "test_brier_score_hand_computed()",
@@ -3217,7 +2845,7 @@
       "source_location": "L10",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_brier_score_hand_computed()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_brier_score_hand_computed"
@@ -3229,7 +2857,7 @@
       "source_location": "L17",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_brier_score_perfect_predictions_are_zero()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_brier_score_perfect_predictions_are_zero"
@@ -3241,7 +2869,7 @@
       "source_location": "L21",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_brier_score_rejects_mismatched_shapes()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_brier_score_rejects_mismatched_shapes"
@@ -3253,7 +2881,7 @@
       "source_location": "L33",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_log_loss_clips_extreme_probabilities_instead_of_blowing_up()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_log_loss_clips_extreme_probabilities_instead_of_blowing_up"
@@ -3265,7 +2893,7 @@
       "source_location": "L26",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_log_loss_hand_computed()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_log_loss_hand_computed"
@@ -3277,7 +2905,7 @@
       "source_location": "L40",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_log_loss_rejects_mismatched_shapes()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_log_loss_rejects_mismatched_shapes"
@@ -3289,7 +2917,7 @@
       "source_location": "L89",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_power_analysis_hand_computed()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_power_analysis_hand_computed"
@@ -3301,7 +2929,7 @@
       "source_location": "L104",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_power_analysis_matches_blueprint_claim_small_edges_need_thousands()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_power_analysis_matches_blueprint_claim_small_edges_need_thousands"
@@ -3313,7 +2941,7 @@
       "source_location": "L113",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_power_analysis_rejects_invalid_inputs()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_power_analysis_rejects_invalid_inputs"
@@ -3325,7 +2953,7 @@
       "source_location": "L96",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_power_analysis_smaller_effect_needs_more_bets()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_power_analysis_smaller_effect_needs_more_bets"
@@ -3337,7 +2965,7 @@
       "source_location": "L76",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_reliability_curve_averages_multiple_observations_in_same_bin()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_reliability_curve_averages_multiple_observations_in_same_bin"
@@ -3349,7 +2977,7 @@
       "source_location": "L45",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_reliability_curve_bins_single_observations_correctly()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_reliability_curve_bins_single_observations_correctly"
@@ -3361,7 +2989,7 @@
       "source_location": "L62",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_reliability_curve_boundary_value_one_lands_in_last_bin()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_reliability_curve_boundary_value_one_lands_in_last_bin"
@@ -3373,7 +3001,7 @@
       "source_location": "L68",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_reliability_curve_empty_bins_kept_with_nan_not_dropped()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_reliability_curve_empty_bins_kept_with_nan_not_dropped"
@@ -3385,10 +3013,454 @@
       "source_location": "L84",
       "_callable": true,
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_reliability_curve_requires_at_least_one_observation()",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate_test_reliability_curve_requires_at_least_one_observation"
+    },
+    {
+      "label": "apply_bankroll_caps()",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L48",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "apply_bankroll_caps()",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_apply_bankroll_caps"
+    },
+    {
+      "label": "expected_value()",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L21",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "expected_value()",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_expected_value"
+    },
+    {
+      "label": "fractional_kelly()",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L41",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "fractional_kelly()",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_fractional_kelly"
+    },
+    {
+      "label": "kelly_fraction()",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L27",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "kelly_fraction()",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_kelly_fraction"
+    },
+    {
+      "label": "_validate()",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L14",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "_validate()",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_validate"
+    },
+    {
+      "label": "test_apply_bankroll_caps_clips_large_stake_to_max_bet()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L73",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_apply_bankroll_caps_clips_large_stake_to_max_bet()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_apply_bankroll_caps_clips_large_stake_to_max_bet"
+    },
+    {
+      "label": "test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L91",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_apply_bankroll_caps_never_exceeds_bankroll_even_if_max_bet_is_larger"
+    },
+    {
+      "label": "test_apply_bankroll_caps_passes_through_stake_within_bounds()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L78",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_apply_bankroll_caps_passes_through_stake_within_bounds()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_apply_bankroll_caps_passes_through_stake_within_bounds"
+    },
+    {
+      "label": "test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L82",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_apply_bankroll_caps_returns_zero_below_min_bet_rather_than_rounding_up"
+    },
+    {
+      "label": "test_apply_bankroll_caps_returns_zero_for_negative_stake()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L86",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_apply_bankroll_caps_returns_zero_for_negative_stake()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_apply_bankroll_caps_returns_zero_for_negative_stake"
+    },
+    {
+      "label": "test_expected_value_breakeven_is_zero()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L26",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_expected_value_breakeven_is_zero()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_expected_value_breakeven_is_zero"
+    },
+    {
+      "label": "test_expected_value_hand_computed()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L16",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_expected_value_hand_computed()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_expected_value_hand_computed"
+    },
+    {
+      "label": "test_expected_value_negative_edge()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L21",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_expected_value_negative_edge()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_expected_value_negative_edge"
+    },
+    {
+      "label": "test_fractional_kelly_custom_k()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L60",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_fractional_kelly_custom_k()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_fractional_kelly_custom_k"
+    },
+    {
+      "label": "test_fractional_kelly_default_is_midpoint_of_blueprint_range()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L55",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_fractional_kelly_default_is_midpoint_of_blueprint_range()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_fractional_kelly_default_is_midpoint_of_blueprint_range"
+    },
+    {
+      "label": "test_fractional_kelly_rejects_invalid_k()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L66",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_fractional_kelly_rejects_invalid_k()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_fractional_kelly_rejects_invalid_k"
+    },
+    {
+      "label": "test_full_pipeline_negative_edge_produces_no_bet()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L102",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_full_pipeline_negative_edge_produces_no_bet()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_full_pipeline_negative_edge_produces_no_bet"
+    },
+    {
+      "label": "test_full_pipeline_positive_edge_hits_the_two_percent_cap()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L95",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_full_pipeline_positive_edge_hits_the_two_percent_cap()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_full_pipeline_positive_edge_hits_the_two_percent_cap"
+    },
+    {
+      "label": "test_kelly_fraction_hand_computed()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L31",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_kelly_fraction_hand_computed()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_kelly_fraction_hand_computed"
+    },
+    {
+      "label": "test_kelly_fraction_negative_when_no_edge()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L36",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_kelly_fraction_negative_when_no_edge()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_kelly_fraction_negative_when_no_edge"
+    },
+    {
+      "label": "test_kelly_fraction_rejects_decimal_odds_at_or_below_one()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L48",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_kelly_fraction_rejects_decimal_odds_at_or_below_one()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_kelly_fraction_rejects_decimal_odds_at_or_below_one"
+    },
+    {
+      "label": "test_kelly_fraction_rejects_invalid_probability()",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L41",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_kelly_fraction_rejects_invalid_probability()",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing_test_kelly_fraction_rejects_invalid_probability"
+    },
+    {
+      "label": "market_baseline()",
+      "file_type": "code",
+      "source_file": "src/model/baseline.py",
+      "source_location": "L17",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "market_baseline()",
+      "community_name": "market_baseline",
+      "id": "src_model_baseline_market_baseline"
+    },
+    {
+      "label": "compare_to_baseline()",
+      "file_type": "code",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L47",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "compare_to_baseline()",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_compare_to_baseline"
+    },
+    {
+      "label": "fit_calibrated_model()",
+      "file_type": "code",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L25",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "fit_calibrated_model()",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_fit_calibrated_model"
+    },
+    {
+      "label": "predict_calibrated_proba()",
+      "file_type": "code",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L43",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "predict_calibrated_proba()",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_predict_calibrated_proba"
+    },
+    {
+      "label": "build_training_frame()",
+      "file_type": "code",
+      "source_file": "src/model/train.py",
+      "source_location": "L55",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "build_training_frame()",
+      "community_name": "market_baseline",
+      "id": "src_model_train_build_training_frame"
+    },
+    {
+      "label": "fit_win_probability_model()",
+      "file_type": "code",
+      "source_file": "src/model/train.py",
+      "source_location": "L93",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "fit_win_probability_model()",
+      "community_name": "market_baseline",
+      "id": "src_model_train_fit_win_probability_model"
+    },
+    {
+      "label": "predict_home_win_proba()",
+      "file_type": "code",
+      "source_file": "src/model/train.py",
+      "source_location": "L103",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "predict_home_win_proba()",
+      "community_name": "market_baseline",
+      "id": "src_model_train_predict_home_win_proba"
+    },
+    {
+      "label": "time_based_split()",
+      "file_type": "code",
+      "source_file": "src/model/train.py",
+      "source_location": "L79",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "time_based_split()",
+      "community_name": "market_baseline",
+      "id": "src_model_train_time_based_split"
+    },
+    {
+      "label": "test_default_method_is_shin()",
+      "file_type": "code",
+      "source_file": "tests/test_baseline.py",
+      "source_location": "L12",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_default_method_is_shin()",
+      "community_name": "market_baseline",
+      "id": "tests_test_baseline_test_default_method_is_shin"
+    },
+    {
+      "label": "test_side_index_selects_the_right_side()",
+      "file_type": "code",
+      "source_file": "tests/test_baseline.py",
+      "source_location": "L21",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_side_index_selects_the_right_side()",
+      "community_name": "market_baseline",
+      "id": "tests_test_baseline_test_side_index_selects_the_right_side"
+    },
+    {
+      "label": "test_symmetric_market_gives_half_regardless_of_method()",
+      "file_type": "code",
+      "source_file": "tests/test_baseline.py",
+      "source_location": "L7",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_symmetric_market_gives_half_regardless_of_method()",
+      "community_name": "market_baseline",
+      "id": "tests_test_baseline_test_symmetric_market_gives_half_regardless_of_method"
+    },
+    {
+      "label": "_synthetic_feature_frame()",
+      "file_type": "code",
+      "source_file": "tests/test_calibration.py",
+      "source_location": "L12",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "_synthetic_feature_frame()",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration_synthetic_feature_frame"
+    },
+    {
+      "label": "test_compare_to_baseline_ranks_by_brier_score()",
+      "file_type": "code",
+      "source_file": "tests/test_calibration.py",
+      "source_location": "L74",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_compare_to_baseline_ranks_by_brier_score()",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration_test_compare_to_baseline_ranks_by_brier_score"
+    },
+    {
+      "label": "test_fit_calibrated_model_does_not_refit_the_base_model()",
+      "file_type": "code",
+      "source_file": "tests/test_calibration.py",
+      "source_location": "L56",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_fit_calibrated_model_does_not_refit_the_base_model()",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration_test_fit_calibrated_model_does_not_refit_the_base_model"
+    },
+    {
+      "label": "test_fit_calibrated_model_outputs_valid_probabilities()",
+      "file_type": "code",
+      "source_file": "tests/test_calibration.py",
+      "source_location": "L43",
+      "_callable": true,
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_fit_calibrated_model_outputs_valid_probabilities()",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration_test_fit_calibrated_model_outputs_valid_probabilities"
     },
     {
       "label": "_pbp_fixture()",
@@ -3399,7 +3471,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "_pbp_fixture()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_pbp_fixture"
     },
     {
@@ -3411,7 +3483,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "_plays()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_plays"
     },
     {
@@ -3423,7 +3495,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "_schedule_fixture()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_schedule_fixture"
     },
     {
@@ -3435,7 +3507,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "_synthetic_feature_frame()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_synthetic_feature_frame"
     },
     {
@@ -3447,7 +3519,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_build_training_frame_drops_ties_and_first_week_rows()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_test_build_training_frame_drops_ties_and_first_week_rows"
     },
     {
@@ -3459,7 +3531,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_fit_win_probability_model_outputs_valid_probabilities()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_test_fit_win_probability_model_outputs_valid_probabilities"
     },
     {
@@ -3471,7 +3543,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_market_prob_home_matches_baseline_directly()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_test_market_prob_home_matches_baseline_directly"
     },
     {
@@ -3483,7 +3555,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "test_time_based_split_partitions_by_season_without_overlap()",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_train_test_time_based_split_partitions_by_season_without_overlap"
     },
     {
@@ -3781,10 +3853,10 @@
       "source_location": "L87",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_collect_props_historical_backfill_historical_props",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "backfill_historical_props()"
+      "norm_label": "backfill_historical_props()",
+      "id": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "label": "find_historical_event_id()",
@@ -3793,10 +3865,10 @@
       "source_location": "L50",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_collect_props_historical_find_historical_event_id",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "find_historical_event_id()"
+      "norm_label": "find_historical_event_id()",
+      "id": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "label": "pull_historical_prop_snapshot()",
@@ -3805,10 +3877,22 @@
       "source_location": "L65",
       "_callable": true,
       "_origin": "ast",
-      "id": "src_collect_props_historical_pull_historical_prop_snapshot",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "pull_historical_prop_snapshot()"
+      "norm_label": "pull_historical_prop_snapshot()",
+      "id": "src_collect_props_historical_pull_historical_prop_snapshot"
+    },
+    {
+      "label": "make_synthetic_snapshots()",
+      "file_type": "code",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L74",
+      "_callable": true,
+      "_origin": "ast",
+      "id": "src_demo_pipeline_make_synthetic_snapshots",
+      "community": 6,
+      "community_name": "OddsApiClient",
+      "norm_label": "make_synthetic_snapshots()"
     },
     {
       "label": "_response()",
@@ -3997,10 +4081,10 @@
       "source_location": "L17",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_historical_event_payload",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "_historical_event_payload()"
+      "norm_label": "_historical_event_payload()",
+      "id": "tests_test_collect_props_historical_historical_event_payload"
     },
     {
       "label": "test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint()",
@@ -4009,10 +4093,10 @@
       "source_location": "L112",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint()"
+      "norm_label": "test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint()",
+      "id": "tests_test_collect_props_historical_test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint"
     },
     {
       "label": "test_backfill_historical_props_records_api_failures_without_raising()",
@@ -4021,10 +4105,10 @@
       "source_location": "L127",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_backfill_historical_props_records_api_failures_without_raising",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_backfill_historical_props_records_api_failures_without_raising()"
+      "norm_label": "test_backfill_historical_props_records_api_failures_without_raising()",
+      "id": "tests_test_collect_props_historical_test_backfill_historical_props_records_api_failures_without_raising"
     },
     {
       "label": "test_backfill_historical_props_writes_snapshots_for_found_games()",
@@ -4033,10 +4117,10 @@
       "source_location": "L89",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_backfill_historical_props_writes_snapshots_for_found_games()"
+      "norm_label": "test_backfill_historical_props_writes_snapshots_for_found_games()",
+      "id": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games"
     },
     {
       "label": "test_find_historical_event_id_matches_on_team_names()",
@@ -4045,10 +4129,10 @@
       "source_location": "L43",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_find_historical_event_id_matches_on_team_names",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_find_historical_event_id_matches_on_team_names()"
+      "norm_label": "test_find_historical_event_id_matches_on_team_names()",
+      "id": "tests_test_collect_props_historical_test_find_historical_event_id_matches_on_team_names"
     },
     {
       "label": "test_find_historical_event_id_returns_none_when_not_found()",
@@ -4057,10 +4141,10 @@
       "source_location": "L58",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_find_historical_event_id_returns_none_when_not_found",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_find_historical_event_id_returns_none_when_not_found()"
+      "norm_label": "test_find_historical_event_id_returns_none_when_not_found()",
+      "id": "tests_test_collect_props_historical_test_find_historical_event_id_returns_none_when_not_found"
     },
     {
       "label": "test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser()",
@@ -4069,10 +4153,10 @@
       "source_location": "L72",
       "_callable": true,
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser()"
+      "norm_label": "test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser()",
+      "id": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser"
     },
     {
       "label": "clv_movement_report()",
@@ -4133,18 +4217,6 @@
       "norm_label": "decimal_to_implied_prob()",
       "community_name": "PointInTimeStore",
       "id": "src_devig_convert_decimal_to_implied_prob"
-    },
-    {
-      "label": "market_baseline()",
-      "file_type": "code",
-      "source_file": "src/model/baseline.py",
-      "source_location": "L17",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "market_baseline()",
-      "community_name": "PointInTimeStore",
-      "id": "src_model_baseline_market_baseline"
     },
     {
       "label": "._filter()",
@@ -4241,42 +4313,6 @@
       "norm_label": ".from_american()",
       "community_name": "PointInTimeStore",
       "id": "src_store_schema_oddssnapshot_from_american"
-    },
-    {
-      "label": "test_default_method_is_shin()",
-      "file_type": "code",
-      "source_file": "tests/test_baseline.py",
-      "source_location": "L12",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "test_default_method_is_shin()",
-      "community_name": "PointInTimeStore",
-      "id": "tests_test_baseline_test_default_method_is_shin"
-    },
-    {
-      "label": "test_side_index_selects_the_right_side()",
-      "file_type": "code",
-      "source_file": "tests/test_baseline.py",
-      "source_location": "L21",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "test_side_index_selects_the_right_side()",
-      "community_name": "PointInTimeStore",
-      "id": "tests_test_baseline_test_side_index_selects_the_right_side"
-    },
-    {
-      "label": "test_symmetric_market_gives_half_regardless_of_method()",
-      "file_type": "code",
-      "source_file": "tests/test_baseline.py",
-      "source_location": "L7",
-      "_callable": true,
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "test_symmetric_market_gives_half_regardless_of_method()",
-      "community_name": "PointInTimeStore",
-      "id": "tests_test_baseline_test_symmetric_market_gives_half_regardless_of_method"
     },
     {
       "label": "test_american_to_implied_prob_matches_decimal_round_trip()",
@@ -5031,6 +5067,17 @@
       "id": "src_backtest_engine_py_series"
     },
     {
+      "label": "load_static.py",
+      "file_type": "code",
+      "source_file": "src/features/load_static.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "load_static.py",
+      "community_name": "Side",
+      "id": "src_features_load_static"
+    },
+    {
       "label": "schema.py",
       "file_type": "code",
       "source_file": "src/store/schema.py",
@@ -5216,6 +5263,17 @@
       "norm_label": "fair probability for `side`, devigged from `book`'s most recent two-sided quote...",
       "community_name": "Side",
       "id": "src_backtest_engine_rationale_89"
+    },
+    {
+      "label": "Pull free static nflverse data (schedules + closing lines) into data/static/.\u2026",
+      "file_type": "rationale",
+      "source_file": "src/features/load_static.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 0,
+      "norm_label": "pull free static nflverse data (schedules + closing lines) into data/static/....",
+      "community_name": "Side",
+      "id": "src_features_load_static_rationale_1"
     },
     {
       "label": "Convert nflverse's spread_line into the sportsbook side-line convention that\u2026",
@@ -5427,17 +5485,6 @@
       "id": "src_collect_scheduler_py_runtimeerror"
     },
     {
-      "label": "load_static.py",
-      "file_type": "code",
-      "source_file": "src/features/load_static.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 1,
-      "norm_label": "load_static.py",
-      "community_name": "scheduler.py",
-      "id": "src_features_load_static"
-    },
-    {
       "label": "Path",
       "file_type": "code",
       "source_file": "",
@@ -5568,17 +5615,6 @@
       "norm_label": "wraps _tick(ctx) so one unexpected bug in a single poll never kills a long-...",
       "community_name": "scheduler.py",
       "id": "src_collect_scheduler_rationale_63"
-    },
-    {
-      "label": "Pull free static nflverse data (schedules + closing lines) into data/static/.\u2026",
-      "file_type": "rationale",
-      "source_file": "src/features/load_static.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 1,
-      "norm_label": "pull free static nflverse data (schedules + closing lines) into data/static/....",
-      "community_name": "scheduler.py",
-      "id": "src_features_load_static_rationale_1"
     },
     {
       "label": "Fetch nflverse schedules (scores + closing lines) and cache as parquet.",
@@ -5793,6 +5829,17 @@
       "id": "src_model_init"
     },
     {
+      "label": "demo_pipeline.py",
+      "file_type": "code",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_demo_pipeline",
+      "community": 2,
+      "community_name": "pit_store.py",
+      "norm_label": "demo_pipeline.py"
+    },
+    {
       "label": "monitor_run.py",
       "file_type": "code",
       "source_file": "src/notify/monitor_run.py",
@@ -5800,7 +5847,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "monitor_run.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_monitor_run"
     },
     {
@@ -5811,7 +5858,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "sms.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms"
     },
     {
@@ -5822,7 +5869,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "runtimeerror",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_py_runtimeerror"
     },
     {
@@ -5833,7 +5880,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "live_scan.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan"
     },
     {
@@ -5844,7 +5891,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "dataframe",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_py_dataframe"
     },
     {
@@ -5855,7 +5902,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "datetime",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_py_datetime"
     },
     {
@@ -5866,7 +5913,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "path",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_py_path"
     },
     {
@@ -5877,19 +5924,19 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "series",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_py_series"
     },
     {
-      "label": "sizing.py",
+      "label": "pit_store.py",
       "file_type": "code",
-      "source_file": "src/signal/sizing.py",
+      "source_file": "src/store/pit_store.py",
       "source_location": "L1",
       "_origin": "ast",
       "community": 2,
-      "norm_label": "sizing.py",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing"
+      "norm_label": "pit_store.py",
+      "community_name": "pit_store.py",
+      "id": "src_store_pit_store"
     },
     {
       "label": "test_live_scan.py",
@@ -5899,7 +5946,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_live_scan.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_live_scan"
     },
     {
@@ -5910,19 +5957,8 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_monitor_run.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_monitor_run"
-    },
-    {
-      "label": "test_sizing.py",
-      "file_type": "code",
-      "source_file": "tests/test_sizing.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "test_sizing.py",
-      "community_name": "test_live_scan.py",
-      "id": "tests_test_sizing"
     },
     {
       "label": "test_sms.py",
@@ -5932,8 +5968,19 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "test_sms.py",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "tests_test_sms"
+    },
+    {
+      "label": "End-to-end pipeline demo: pull -> store -> compare -> decide -> notify. `make\u2026",
+      "file_type": "rationale",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "id": "src_demo_pipeline_rationale_1",
+      "community": 2,
+      "community_name": "pit_store.py",
+      "norm_label": "end-to-end pipeline demo: pull -> store -> compare -> decide -> notify. `make..."
     },
     {
       "label": "Live +EV monitor entrypoint: `python -m src.notify.monitor_run`. Meant to be\u2026",
@@ -5943,7 +5990,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "live +ev monitor entrypoint: `python -m src.notify.monitor_run`. meant to be...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_monitor_run_rationale_1"
     },
     {
@@ -5954,7 +6001,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "one scan-and-alert cycle. returns the number of alerts actually sent. never...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_monitor_run_rationale_36"
     },
     {
@@ -5965,7 +6012,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "sms/imessage alerts via macos messages.app. no third-party account, no api key:...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_rationale_1"
     },
     {
@@ -5976,7 +6023,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "applescript/messages.app failed to send.",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_rationale_24"
     },
     {
@@ -5987,7 +6034,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "applescript string literals only need backslash and double-quote escaped --...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_rationale_28"
     },
     {
@@ -5998,7 +6045,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "send `text` to `phone_number` via messages.app. raises smserror on any failure...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_notify_sms_rationale_38"
     },
     {
@@ -6009,7 +6056,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "live +ev scanner: compare execution-book prices against pinnacle's fair value,...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_rationale_1"
     },
     {
@@ -6020,7 +6067,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "keep only spots that are brand new, or whose edge has grown by at least...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_rationale_166"
     },
     {
@@ -6031,7 +6078,7 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "one row per event: pinnacle's most recent home+away american prices, both from...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_rationale_40"
     },
     {
@@ -6042,63 +6089,19 @@
       "_origin": "ast",
       "community": 2,
       "norm_label": "one row per (event, side, book) where `book`'s latest moneyline price beats...",
-      "community_name": "test_live_scan.py",
+      "community_name": "pit_store.py",
       "id": "src_signal_live_scan_rationale_70"
     },
     {
-      "label": "Expected value and Kelly bet sizing (blueprint Part B.4). Full Kelly is too\u2026",
+      "label": "Append-only, point-in-time odds store. This is the leakage guard for the whole\u2026",
       "file_type": "rationale",
-      "source_file": "src/signal/sizing.py",
+      "source_file": "src/store/pit_store.py",
       "source_location": "L1",
       "_origin": "ast",
       "community": 2,
-      "norm_label": "expected value and kelly bet sizing (blueprint part b.4). full kelly is too...",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_rationale_1"
-    },
-    {
-      "label": "EV of a unit bet at fair win probability p and decimal odds d.",
-      "file_type": "rationale",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L22",
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "ev of a unit bet at fair win probability p and decimal odds d.",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_rationale_22"
-    },
-    {
-      "label": "Full Kelly fraction of bankroll. Can be negative when the price is bad at this\u2026",
-      "file_type": "rationale",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L28",
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "full kelly fraction of bankroll. can be negative when the price is bad at this...",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_rationale_28"
-    },
-    {
-      "label": "k * full Kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the\u2026",
-      "file_type": "rationale",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L42",
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "k * full kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the...",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_rationale_42"
-    },
-    {
-      "label": "Clip a dollar stake to [min_bet, min(max_bet, bankroll)]. Below min_bet --\u2026",
-      "file_type": "rationale",
-      "source_file": "src/signal/sizing.py",
-      "source_location": "L51",
-      "_origin": "ast",
-      "community": 2,
-      "norm_label": "clip a dollar stake to [min_bet, min(max_bet, bankroll)]. below min_bet --...",
-      "community_name": "test_live_scan.py",
-      "id": "src_signal_sizing_rationale_51"
+      "norm_label": "append-only, point-in-time odds store. this is the leakage guard for the whole...",
+      "community_name": "pit_store.py",
+      "id": "src_store_pit_store_rationale_1"
     },
     {
       "label": "notify/__init__.py",
@@ -6739,6 +6742,17 @@
       "id": "src_collect_props"
     },
     {
+      "label": "props_historical.py",
+      "file_type": "code",
+      "source_file": "src/collect/props_historical.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "props.py",
+      "norm_label": "props_historical.py",
+      "id": "src_collect_props_historical"
+    },
+    {
       "label": "datetime",
       "file_type": "code",
       "source_file": "",
@@ -6913,6 +6927,17 @@
       "norm_label": "build a matchresult straight from the odds api event, no nflverse schedule...",
       "community_name": "props.py",
       "id": "src_collect_preseason_rationale_68"
+    },
+    {
+      "label": "Historical player-prop odds backfill for backtesting. **Blocked on paid\u2026",
+      "file_type": "rationale",
+      "source_file": "src/collect/props_historical.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 3,
+      "community_name": "props.py",
+      "norm_label": "historical player-prop odds backfill for backtesting. **blocked on paid...",
+      "id": "src_collect_props_historical_rationale_1"
     },
     {
       "label": "Player-prop odds collection. **Prepped, not active.** Live-checked 2026-08-17\u2026",
@@ -7206,10 +7231,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "dataframe",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "dataframe"
+      "norm_label": "dataframe",
+      "id": "dataframe"
     },
     {
       "label": "Outcome",
@@ -7217,10 +7242,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "outcome",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "outcome"
+      "norm_label": "outcome",
+      "id": "outcome"
     },
     {
       "label": "Side",
@@ -7228,10 +7253,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "side",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "side"
+      "norm_label": "side",
+      "id": "side"
     },
     {
       "label": "prop_settlement.py",
@@ -7239,10 +7264,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "src_store_prop_settlement",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "prop_settlement.py"
+      "norm_label": "prop_settlement.py",
+      "id": "src_store_prop_settlement"
     },
     {
       "label": "test_prop_settlement.py",
@@ -7250,10 +7275,10 @@
       "source_file": "tests/test_prop_settlement.py",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "tests_test_prop_settlement",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "test_prop_settlement.py"
+      "norm_label": "test_prop_settlement.py",
+      "id": "tests_test_prop_settlement"
     },
     {
       "label": "Settlement for player-prop (Over/Under) bets against nflverse's per-player game\u2026",
@@ -7261,10 +7286,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "src_store_prop_settlement_rationale_1",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "settlement for player-prop (over/under) bets against nflverse's per-player game..."
+      "norm_label": "settlement for player-prop (over/under) bets against nflverse's per-player game...",
+      "id": "src_store_prop_settlement_rationale_1"
     },
     {
       "label": "Batch-grade prop-shaped rows (event_id/game_id, player_name, prop_stat, side,\u2026",
@@ -7272,10 +7297,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L103",
       "_origin": "ast",
-      "id": "src_store_prop_settlement_rationale_103",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "batch-grade prop-shaped rows (event_id/game_id, player_name, prop_stat, side,..."
+      "norm_label": "batch-grade prop-shaped rows (event_id/game_id, player_name, prop_stat, side,...",
+      "id": "src_store_prop_settlement_rationale_103"
     },
     {
       "label": "Collapse punctuation/whitespace differences between an odds book's player name\u2026",
@@ -7283,10 +7308,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L51",
       "_origin": "ast",
-      "id": "src_store_prop_settlement_rationale_51",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "collapse punctuation/whitespace differences between an odds book's player name..."
+      "norm_label": "collapse punctuation/whitespace differences between an odds book's player name...",
+      "id": "src_store_prop_settlement_rationale_51"
     },
     {
       "label": "(game_id, player_display_name) -> {stat_column: value}, from nflreadpy's\u2026",
@@ -7294,10 +7319,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L63",
       "_origin": "ast",
-      "id": "src_store_prop_settlement_rationale_63",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "(game_id, player_display_name) -> {stat_column: value}, from nflreadpy's..."
+      "norm_label": "(game_id, player_display_name) -> {stat_column: value}, from nflreadpy's...",
+      "id": "src_store_prop_settlement_rationale_63"
     },
     {
       "label": "Grade a single Over/Under prop bet. Pushes are real for integer-valued stats\u2026",
@@ -7305,10 +7330,10 @@
       "source_file": "src/store/prop_settlement.py",
       "source_location": "L86",
       "_origin": "ast",
-      "id": "src_store_prop_settlement_rationale_86",
       "community": 35,
       "community_name": "test_prop_settlement.py",
-      "norm_label": "grade a single over/under prop bet. pushes are real for integer-valued stats..."
+      "norm_label": "grade a single over/under prop bet. pushes are real for integer-valued stats...",
+      "id": "src_store_prop_settlement_rationale_86"
     },
     {
       "label": "datetime",
@@ -7333,67 +7358,12 @@
       "id": "src_store_prop_settlement_py_dataframe"
     },
     {
-      "label": "CalibratedClassifierCV",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "calibratedclassifiercv",
-      "community_name": "test_evaluate.py",
-      "id": "calibratedclassifiercv"
-    },
-    {
-      "label": "calibration.py",
-      "file_type": "code",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "calibration.py",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration"
-    },
-    {
-      "label": "DataFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "dataframe",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_py_dataframe"
-    },
-    {
-      "label": "Pipeline",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "pipeline",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_py_pipeline"
-    },
-    {
-      "label": "Series",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "series",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_py_series"
-    },
-    {
       "label": "evaluate.py",
       "file_type": "code",
       "source_file": "src/model/evaluate.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "evaluate.py",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate"
@@ -7404,7 +7374,7 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "dataframe",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_py_dataframe"
@@ -7415,76 +7385,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "ndarray",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_py_ndarray"
-    },
-    {
-      "label": "train.py",
-      "file_type": "code",
-      "source_file": "src/model/train.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "train.py",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train"
-    },
-    {
-      "label": "DataFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "dataframe",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_py_dataframe"
-    },
-    {
-      "label": "ndarray",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "ndarray",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_py_ndarray"
-    },
-    {
-      "label": "Pipeline",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "pipeline",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_train_py_pipeline"
-    },
-    {
-      "label": "test_calibration.py",
-      "file_type": "code",
-      "source_file": "tests/test_calibration.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "test_calibration.py",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration"
-    },
-    {
-      "label": "DataFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "dataframe",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_calibration_py_dataframe"
     },
     {
       "label": "test_evaluate.py",
@@ -7492,65 +7396,10 @@
       "source_file": "tests/test_evaluate.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "test_evaluate.py",
       "community_name": "test_evaluate.py",
       "id": "tests_test_evaluate"
-    },
-    {
-      "label": "test_train.py",
-      "file_type": "code",
-      "source_file": "tests/test_train.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "test_train.py",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_train"
-    },
-    {
-      "label": "DataFrame",
-      "file_type": "code",
-      "source_file": "",
-      "source_location": "",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "dataframe",
-      "community_name": "test_evaluate.py",
-      "id": "tests_test_train_py_dataframe"
-    },
-    {
-      "label": "Calibration layer (blueprint Part E): Platt scaling / isotonic regression on\u2026",
-      "file_type": "rationale",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "calibration layer (blueprint part e): platt scaling / isotonic regression on...",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_rationale_1"
-    },
-    {
-      "label": "`method`: \"isotonic\" (non-parametric, flexible, can overfit a small calibration\u2026",
-      "file_type": "rationale",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L26",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "`method`: \"isotonic\" (non-parametric, flexible, can overfit a small calibration...",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_rationale_26"
-    },
-    {
-      "label": "`predictions` maps a label (e.g. \"raw_model\", \"calibrated_model\",\u2026",
-      "file_type": "rationale",
-      "source_file": "src/model/calibration.py",
-      "source_location": "L48",
-      "_origin": "ast",
-      "community": 4,
-      "norm_label": "`predictions` maps a label (e.g. \"raw_model\", \"calibrated_model\",...",
-      "community_name": "test_evaluate.py",
-      "id": "src_model_calibration_rationale_48"
     },
     {
       "label": "Model evaluation (blueprint Part B.5). \"This section is where you prove you are\u2026",
@@ -7558,7 +7407,7 @@
       "source_file": "src/model/evaluate.py",
       "source_location": "L1",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "model evaluation (blueprint part b.5). \"this section is where you prove you are...",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_rationale_1"
@@ -7569,7 +7418,7 @@
       "source_file": "src/model/evaluate.py",
       "source_location": "L23",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "mean((p - y)^2). lower is better.",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_rationale_23"
@@ -7580,7 +7429,7 @@
       "source_file": "src/model/evaluate.py",
       "source_location": "L31",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "-mean(y*log(p) + (1-y)*log(1-p)). p is clipped away from exactly 0/1 so a...",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_rationale_31"
@@ -7591,7 +7440,7 @@
       "source_file": "src/model/evaluate.py",
       "source_location": "L42",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "bin predicted probabilities into n_bins equal-width [0, 1] bins and compare...",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_rationale_42"
@@ -7602,10 +7451,307 @@
       "source_file": "src/model/evaluate.py",
       "source_location": "L71",
       "_origin": "ast",
-      "community": 4,
+      "community": 38,
       "norm_label": "required sample size (one-sample z-test) to detect a mean clv of...",
       "community_name": "test_evaluate.py",
       "id": "src_model_evaluate_rationale_71"
+    },
+    {
+      "label": "sizing.py",
+      "file_type": "code",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "sizing.py",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing"
+    },
+    {
+      "label": "test_sizing.py",
+      "file_type": "code",
+      "source_file": "tests/test_sizing.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "test_sizing.py",
+      "community_name": "test_sizing.py",
+      "id": "tests_test_sizing"
+    },
+    {
+      "label": "Expected value and Kelly bet sizing (blueprint Part B.4). Full Kelly is too\u2026",
+      "file_type": "rationale",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "expected value and kelly bet sizing (blueprint part b.4). full kelly is too...",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_rationale_1"
+    },
+    {
+      "label": "EV of a unit bet at fair win probability p and decimal odds d.",
+      "file_type": "rationale",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L22",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "ev of a unit bet at fair win probability p and decimal odds d.",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_rationale_22"
+    },
+    {
+      "label": "Full Kelly fraction of bankroll. Can be negative when the price is bad at this\u2026",
+      "file_type": "rationale",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L28",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "full kelly fraction of bankroll. can be negative when the price is bad at this...",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_rationale_28"
+    },
+    {
+      "label": "k * full Kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the\u2026",
+      "file_type": "rationale",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L42",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "k * full kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the...",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_rationale_42"
+    },
+    {
+      "label": "Clip a dollar stake to [min_bet, min(max_bet, bankroll)]. Below min_bet --\u2026",
+      "file_type": "rationale",
+      "source_file": "src/signal/sizing.py",
+      "source_location": "L51",
+      "_origin": "ast",
+      "community": 39,
+      "norm_label": "clip a dollar stake to [min_bet, min(max_bet, bankroll)]. below min_bet --...",
+      "community_name": "test_sizing.py",
+      "id": "src_signal_sizing_rationale_51"
+    },
+    {
+      "label": "CalibratedClassifierCV",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "calibratedclassifiercv",
+      "community_name": "market_baseline",
+      "id": "calibratedclassifiercv"
+    },
+    {
+      "label": "baseline.py",
+      "file_type": "code",
+      "source_file": "src/model/baseline.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "baseline.py",
+      "community_name": "market_baseline",
+      "id": "src_model_baseline"
+    },
+    {
+      "label": "calibration.py",
+      "file_type": "code",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "calibration.py",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration"
+    },
+    {
+      "label": "DataFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "dataframe",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_py_dataframe"
+    },
+    {
+      "label": "Pipeline",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "pipeline",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_py_pipeline"
+    },
+    {
+      "label": "Series",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "series",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_py_series"
+    },
+    {
+      "label": "train.py",
+      "file_type": "code",
+      "source_file": "src/model/train.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "train.py",
+      "community_name": "market_baseline",
+      "id": "src_model_train"
+    },
+    {
+      "label": "DataFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "dataframe",
+      "community_name": "market_baseline",
+      "id": "src_model_train_py_dataframe"
+    },
+    {
+      "label": "ndarray",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "ndarray",
+      "community_name": "market_baseline",
+      "id": "src_model_train_py_ndarray"
+    },
+    {
+      "label": "Pipeline",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "pipeline",
+      "community_name": "market_baseline",
+      "id": "src_model_train_py_pipeline"
+    },
+    {
+      "label": "test_baseline.py",
+      "file_type": "code",
+      "source_file": "tests/test_baseline.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_baseline.py",
+      "community_name": "market_baseline",
+      "id": "tests_test_baseline"
+    },
+    {
+      "label": "test_calibration.py",
+      "file_type": "code",
+      "source_file": "tests/test_calibration.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_calibration.py",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration"
+    },
+    {
+      "label": "DataFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "dataframe",
+      "community_name": "market_baseline",
+      "id": "tests_test_calibration_py_dataframe"
+    },
+    {
+      "label": "test_train.py",
+      "file_type": "code",
+      "source_file": "tests/test_train.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "test_train.py",
+      "community_name": "market_baseline",
+      "id": "tests_test_train"
+    },
+    {
+      "label": "DataFrame",
+      "file_type": "code",
+      "source_file": "",
+      "source_location": "",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "dataframe",
+      "community_name": "market_baseline",
+      "id": "tests_test_train_py_dataframe"
+    },
+    {
+      "label": "Market baseline (blueprint Part E). \"Your baseline is the devigged Pinnacle\u2026",
+      "file_type": "rationale",
+      "source_file": "src/model/baseline.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "market baseline (blueprint part e). \"your baseline is the devigged pinnacle...",
+      "community_name": "market_baseline",
+      "id": "src_model_baseline_rationale_1"
+    },
+    {
+      "label": "Fair probability for the side at `side_index`, from Pinnacle's raw American\u2026",
+      "file_type": "rationale",
+      "source_file": "src/model/baseline.py",
+      "source_location": "L20",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "fair probability for the side at `side_index`, from pinnacle's raw american...",
+      "community_name": "market_baseline",
+      "id": "src_model_baseline_rationale_20"
+    },
+    {
+      "label": "Calibration layer (blueprint Part E): Platt scaling / isotonic regression on\u2026",
+      "file_type": "rationale",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L1",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "calibration layer (blueprint part e): platt scaling / isotonic regression on...",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_rationale_1"
+    },
+    {
+      "label": "`method`: \"isotonic\" (non-parametric, flexible, can overfit a small calibration\u2026",
+      "file_type": "rationale",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L26",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "`method`: \"isotonic\" (non-parametric, flexible, can overfit a small calibration...",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_rationale_26"
+    },
+    {
+      "label": "`predictions` maps a label (e.g. \"raw_model\", \"calibrated_model\",\u2026",
+      "file_type": "rationale",
+      "source_file": "src/model/calibration.py",
+      "source_location": "L48",
+      "_origin": "ast",
+      "community": 4,
+      "norm_label": "`predictions` maps a label (e.g. \"raw_model\", \"calibrated_model\",...",
+      "community_name": "market_baseline",
+      "id": "src_model_calibration_rationale_48"
     },
     {
       "label": "Model training (blueprint Part E): first outcome model + time-based split.\u2026",
@@ -7615,7 +7761,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "model training (blueprint part e): first outcome model + time-based split....",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "src_model_train_rationale_1"
     },
     {
@@ -7626,7 +7772,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "one row per game: `build_game_features()` output plus the home-win label and...",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "src_model_train_rationale_56"
     },
     {
@@ -7637,7 +7783,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "three-way, out-of-time split: fit the model on `train_seasons`, fit the...",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "src_model_train_rationale_82"
     },
     {
@@ -7648,7 +7794,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "standardized logistic regression on feature_columns -- \"start simple\" per...",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "src_model_train_rationale_94"
     },
     {
@@ -7659,7 +7805,7 @@
       "_origin": "ast",
       "community": 4,
       "norm_label": "calibratedclassifiercv wraps a frozenestimator specifically so the calibration...",
-      "community_name": "test_evaluate.py",
+      "community_name": "market_baseline",
       "id": "tests_test_calibration_rationale_57"
     },
     {
@@ -7756,10 +7902,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "matchresult",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "matchresult"
+      "norm_label": "matchresult",
+      "id": "matchresult"
     },
     {
       "label": "OddsApiClient",
@@ -7767,10 +7913,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "oddsapiclient",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "oddsapiclient"
+      "norm_label": "oddsapiclient",
+      "id": "oddsapiclient"
     },
     {
       "label": "OddsSnapshot",
@@ -7789,10 +7935,10 @@
       "source_file": "",
       "source_location": "",
       "_origin": "ast",
-      "id": "pointintimestore",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "pointintimestore"
+      "norm_label": "pointintimestore",
+      "id": "pointintimestore"
     },
     {
       "label": "Response",
@@ -7850,17 +7996,6 @@
       "id": "src_collect_client_py_runtimeerror"
     },
     {
-      "label": "props_historical.py",
-      "file_type": "code",
-      "source_file": "src/collect/props_historical.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_collect_props_historical",
-      "community": 6,
-      "community_name": "OddsApiClient",
-      "norm_label": "props_historical.py"
-    },
-    {
       "label": "test_collect_client.py",
       "file_type": "code",
       "source_file": "tests/test_collect_client.py",
@@ -7888,10 +8023,10 @@
       "source_file": "tests/test_collect_props_historical.py",
       "source_location": "L1",
       "_origin": "ast",
-      "id": "tests_test_collect_props_historical",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "test_collect_props_historical.py"
+      "norm_label": "test_collect_props_historical.py",
+      "id": "tests_test_collect_props_historical"
     },
     {
       "label": "Thin HTTP wrapper around The Odds API. Talks to The Odds API directly (not\u2026",
@@ -7982,26 +8117,15 @@
       "id": "src_collect_client_rationale_88"
     },
     {
-      "label": "Historical player-prop odds backfill for backtesting. **Blocked on paid\u2026",
-      "file_type": "rationale",
-      "source_file": "src/collect/props_historical.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "id": "src_collect_props_historical_rationale_1",
-      "community": 6,
-      "community_name": "OddsApiClient",
-      "norm_label": "historical player-prop odds backfill for backtesting. **blocked on paid..."
-    },
-    {
       "label": "1 credit. Looks up the historical events list as of `date` and returns the Odds\u2026",
       "file_type": "rationale",
       "source_file": "src/collect/props_historical.py",
       "source_location": "L53",
       "_origin": "ast",
-      "id": "src_collect_props_historical_rationale_53",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "1 credit. looks up the historical events list as of `date` and returns the odds..."
+      "norm_label": "1 credit. looks up the historical events list as of `date` and returns the odds...",
+      "id": "src_collect_props_historical_rationale_53"
     },
     {
       "label": "One historical snapshot (nearest available <= `date`) for one or more markets\u2026",
@@ -8009,10 +8133,10 @@
       "source_file": "src/collect/props_historical.py",
       "source_location": "L73",
       "_origin": "ast",
-      "id": "src_collect_props_historical_rationale_73",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "one historical snapshot (nearest available <= `date`) for one or more markets..."
+      "norm_label": "one historical snapshot (nearest available <= `date`) for one or more markets...",
+      "id": "src_collect_props_historical_rationale_73"
     },
     {
       "label": "`games`: iterable of (match, home_name, away_name, kickoff) --\u2026",
@@ -8020,10 +8144,10 @@
       "source_file": "src/collect/props_historical.py",
       "source_location": "L95",
       "_origin": "ast",
-      "id": "src_collect_props_historical_rationale_95",
       "community": 6,
       "community_name": "OddsApiClient",
-      "norm_label": "`games`: iterable of (match, home_name, away_name, kickoff) --..."
+      "norm_label": "`games`: iterable of (match, home_name, away_name, kickoff) --...",
+      "id": "src_collect_props_historical_rationale_95"
     },
     {
       "label": "BaseModel",
@@ -8092,28 +8216,6 @@
       "id": "src_devig_convert"
     },
     {
-      "label": "baseline.py",
-      "file_type": "code",
-      "source_file": "src/model/baseline.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "baseline.py",
-      "community_name": "PointInTimeStore",
-      "id": "src_model_baseline"
-    },
-    {
-      "label": "pit_store.py",
-      "file_type": "code",
-      "source_file": "src/store/pit_store.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "pit_store.py",
-      "community_name": "PointInTimeStore",
-      "id": "src_store_pit_store"
-    },
-    {
       "label": "DataFrame",
       "file_type": "code",
       "source_file": "",
@@ -8156,17 +8258,6 @@
       "norm_label": "runtimeerror",
       "community_name": "PointInTimeStore",
       "id": "src_store_pit_store_py_runtimeerror"
-    },
-    {
-      "label": "test_baseline.py",
-      "file_type": "code",
-      "source_file": "tests/test_baseline.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "test_baseline.py",
-      "community_name": "PointInTimeStore",
-      "id": "tests_test_baseline"
     },
     {
       "label": "test_convert.py",
@@ -8266,39 +8357,6 @@
       "norm_label": "odds conversion: american <-> decimal <-> implied probability. single source of...",
       "community_name": "PointInTimeStore",
       "id": "src_devig_convert_rationale_1"
-    },
-    {
-      "label": "Market baseline (blueprint Part E). \"Your baseline is the devigged Pinnacle\u2026",
-      "file_type": "rationale",
-      "source_file": "src/model/baseline.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "market baseline (blueprint part e). \"your baseline is the devigged pinnacle...",
-      "community_name": "PointInTimeStore",
-      "id": "src_model_baseline_rationale_1"
-    },
-    {
-      "label": "Fair probability for the side at `side_index`, from Pinnacle's raw American\u2026",
-      "file_type": "rationale",
-      "source_file": "src/model/baseline.py",
-      "source_location": "L20",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "fair probability for the side at `side_index`, from pinnacle's raw american...",
-      "community_name": "PointInTimeStore",
-      "id": "src_model_baseline_rationale_20"
-    },
-    {
-      "label": "Append-only, point-in-time odds store. This is the leakage guard for the whole\u2026",
-      "file_type": "rationale",
-      "source_file": "src/store/pit_store.py",
-      "source_location": "L1",
-      "_origin": "ast",
-      "community": 7,
-      "norm_label": "append-only, point-in-time odds store. this is the leakage guard for the whole...",
-      "community_name": "PointInTimeStore",
-      "id": "src_store_pit_store_rationale_1"
     },
     {
       "label": "The only read path. Returns rows visible at `decision_time`, and nothing later.",
@@ -9085,9 +9143,9 @@
       "source_location": "L112",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "calls",
@@ -9097,9 +9155,9 @@
       "source_location": "L119",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_pull_historical_prop_snapshot"
     },
     {
       "relation": "calls",
@@ -9460,6 +9518,78 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform_match_event",
       "target": "src_collect_transform_unmatchedeventerror"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L136",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_demo_pipeline_step",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L137",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_demo_pipeline_make_synthetic_snapshots",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L144",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_store_pit_store_pointintimestore"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L150",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_signal_live_scan_find_positive_ev_spots"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L159",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_signal_live_scan_format_alert_message"
+    },
+    {
+      "relation": "calls",
+      "context": "call",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L170",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_main",
+      "target": "src_notify_sms_send_message"
     },
     {
       "relation": "calls",
@@ -9925,9 +10055,9 @@
       "source_location": "L114",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_settle_prop_snapshots",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "calls",
@@ -9937,9 +10067,9 @@
       "source_location": "L114",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_settle_prop_snapshots",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "calls",
@@ -11101,9 +11231,9 @@
       "source_location": "L119",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "calls",
@@ -11149,9 +11279,9 @@
       "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_backfill_historical_props_records_api_failures_without_raising",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "calls",
@@ -11161,9 +11291,9 @@
       "source_location": "L100",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "calls",
@@ -11185,9 +11315,9 @@
       "source_location": "L96",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games",
-      "target": "tests_test_collect_props_historical_historical_event_payload",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_historical_event_payload"
     },
     {
       "relation": "calls",
@@ -11221,9 +11351,9 @@
       "source_location": "L53",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_find_historical_event_id_matches_on_team_names",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "calls",
@@ -11245,9 +11375,9 @@
       "source_location": "L64",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_find_historical_event_id_returns_none_when_not_found",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "calls",
@@ -11269,9 +11399,9 @@
       "source_location": "L75",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser",
-      "target": "tests_test_collect_props_historical_historical_event_payload",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_historical_event_payload"
     },
     {
       "relation": "calls",
@@ -11281,9 +11411,9 @@
       "source_location": "L78",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser",
-      "target": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_pull_historical_prop_snapshot"
     },
     {
       "relation": "calls",
@@ -13501,9 +13631,9 @@
       "source_location": "L63",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_build_player_stats_index_keys_by_game_and_player",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "calls",
@@ -13513,9 +13643,9 @@
       "source_location": "L78",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_build_player_stats_index_skips_rows_with_no_player_name",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "calls",
@@ -13525,9 +13655,9 @@
       "source_location": "L133",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_normalize_player_name_applies_known_nickname_overrides",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "calls",
@@ -13537,9 +13667,9 @@
       "source_location": "L129",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_normalize_player_name_strips_punctuation",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "calls",
@@ -13549,9 +13679,9 @@
       "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_exact_push_on_a_whole_number_line",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "calls",
@@ -13561,9 +13691,9 @@
       "source_location": "L41",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_over_loses_when_actual_is_under_line",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "calls",
@@ -13573,9 +13703,9 @@
       "source_location": "L37",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_over_wins_when_actual_exceeds_line",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "calls",
@@ -13585,9 +13715,9 @@
       "source_location": "L56",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_rejects_non_over_under_side",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "calls",
@@ -13597,9 +13727,9 @@
       "source_location": "L102",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "calls",
@@ -13609,9 +13739,9 @@
       "source_location": "L98",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "calls",
@@ -13621,9 +13751,9 @@
       "source_location": "L117",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "calls",
@@ -13633,9 +13763,9 @@
       "source_location": "L118",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "calls",
@@ -13645,9 +13775,9 @@
       "source_location": "L107",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "calls",
@@ -13657,9 +13787,9 @@
       "source_location": "L108",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "calls",
@@ -13669,9 +13799,9 @@
       "source_location": "L141",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "calls",
@@ -13681,9 +13811,9 @@
       "source_location": "L142",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "calls",
@@ -13693,9 +13823,9 @@
       "source_location": "L151",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "calls",
@@ -13705,9 +13835,9 @@
       "source_location": "L152",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "calls",
@@ -13717,9 +13847,9 @@
       "source_location": "L45",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement_test_settle_prop_under_wins_when_actual_is_below_line",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "calls",
@@ -14569,9 +14699,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "datetime",
-      "confidence_score": 1.0
+      "target": "datetime"
     },
     {
       "relation": "references",
@@ -14581,9 +14711,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "matchresult",
-      "confidence_score": 1.0
+      "target": "matchresult"
     },
     {
       "relation": "references",
@@ -14593,9 +14723,9 @@
       "source_location": "L65",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "target": "oddssnapshot",
-      "confidence_score": 1.0
+      "target": "oddssnapshot"
     },
     {
       "relation": "references",
@@ -14608,6 +14738,18 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform_build_schedule_index",
       "target": "src_collect_transform_matchresult"
+    },
+    {
+      "relation": "references",
+      "context": "generic_arg",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L74",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_make_synthetic_snapshots",
+      "target": "oddssnapshot",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -16393,9 +16535,9 @@
       "source_location": "L5",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "imports",
@@ -16405,9 +16547,9 @@
       "source_location": "L5",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "imports",
@@ -16417,9 +16559,9 @@
       "source_location": "L5",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_pull_historical_prop_snapshot"
     },
     {
       "relation": "imports",
@@ -17341,9 +17483,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "imports",
@@ -17353,9 +17495,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "imports",
@@ -17365,9 +17507,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "imports",
@@ -17377,9 +17519,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "imports",
@@ -17917,9 +18059,9 @@
       "source_location": "L37",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "datetime",
-      "confidence_score": 1.0
+      "target": "datetime"
     },
     {
       "relation": "imports_from",
@@ -17929,9 +18071,9 @@
       "source_location": "L39",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_client",
-      "confidence_score": 1.0
+      "target": "src_collect_client"
     },
     {
       "relation": "imports_from",
@@ -17941,9 +18083,9 @@
       "source_location": "L40",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props"
     },
     {
       "relation": "imports_from",
@@ -17953,9 +18095,9 @@
       "source_location": "L41",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_transform",
-      "confidence_score": 1.0
+      "target": "src_collect_transform"
     },
     {
       "relation": "imports_from",
@@ -17965,9 +18107,9 @@
       "source_location": "L42",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_store_pit_store",
-      "confidence_score": 1.0
+      "target": "src_store_pit_store"
     },
     {
       "relation": "imports_from",
@@ -17977,9 +18119,9 @@
       "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_store_schema",
-      "confidence_score": 1.0
+      "target": "src_store_schema"
     },
     {
       "relation": "imports_from",
@@ -18160,6 +18302,66 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform",
       "target": "src_store_schema"
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L48",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "datetime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L53",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_notify_sms",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L54",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_signal_live_scan",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L55",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_store_pit_store",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "imports_from",
+      "context": "import",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L56",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_store_schema",
+      "confidence_score": 1.0
     },
     {
       "relation": "imports_from",
@@ -18349,9 +18551,9 @@
       "source_location": "L37",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_schema",
-      "confidence_score": 1.0
+      "target": "src_store_schema"
     },
     {
       "relation": "imports_from",
@@ -18361,9 +18563,9 @@
       "source_location": "L38",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_settlement",
-      "confidence_score": 1.0
+      "target": "src_store_settlement"
     },
     {
       "relation": "imports_from",
@@ -18673,9 +18875,9 @@
       "source_location": "L1",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "datetime",
-      "confidence_score": 1.0
+      "target": "datetime"
     },
     {
       "relation": "imports_from",
@@ -18685,9 +18887,9 @@
       "source_location": "L10",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_transform",
-      "confidence_score": 1.0
+      "target": "src_collect_transform"
     },
     {
       "relation": "imports_from",
@@ -18697,9 +18899,9 @@
       "source_location": "L11",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_store_pit_store",
-      "confidence_score": 1.0
+      "target": "src_store_pit_store"
     },
     {
       "relation": "imports_from",
@@ -18709,9 +18911,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_client",
-      "confidence_score": 1.0
+      "target": "src_collect_client"
     },
     {
       "relation": "imports_from",
@@ -18721,9 +18923,9 @@
       "source_location": "L5",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "src_collect_props_historical",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical"
     },
     {
       "relation": "imports_from",
@@ -19117,9 +19319,9 @@
       "source_location": "L10",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_schema",
-      "confidence_score": 1.0
+      "target": "src_store_schema"
     },
     {
       "relation": "imports_from",
@@ -19129,9 +19331,9 @@
       "source_location": "L11",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_settlement",
-      "confidence_score": 1.0
+      "target": "src_store_settlement"
     },
     {
       "relation": "imports_from",
@@ -19141,9 +19343,9 @@
       "source_location": "L4",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "src_store_prop_settlement",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement"
     },
     {
       "relation": "imports_from",
@@ -19489,9 +19691,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "oddsapiclient",
-      "confidence_score": 1.0
+      "target": "oddsapiclient"
     },
     {
       "relation": "references",
@@ -19501,9 +19703,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_backfill_historical_props",
-      "target": "pointintimestore",
-      "confidence_score": 1.0
+      "target": "pointintimestore"
     },
     {
       "relation": "references",
@@ -19513,9 +19715,9 @@
       "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_find_historical_event_id",
-      "target": "oddsapiclient",
-      "confidence_score": 1.0
+      "target": "oddsapiclient"
     },
     {
       "relation": "references",
@@ -19525,9 +19727,9 @@
       "source_location": "L65",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "target": "matchresult",
-      "confidence_score": 1.0
+      "target": "matchresult"
     },
     {
       "relation": "references",
@@ -19537,9 +19739,9 @@
       "source_location": "L65",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "target": "oddsapiclient",
-      "confidence_score": 1.0
+      "target": "oddsapiclient"
     },
     {
       "relation": "references",
@@ -19660,6 +19862,18 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform_match_event",
       "target": "src_collect_transform_py_scheduleindex"
+    },
+    {
+      "relation": "references",
+      "context": "parameter_type",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L74",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_make_synthetic_snapshots",
+      "target": "datetime",
+      "confidence_score": 1.0
     },
     {
       "relation": "references",
@@ -19897,9 +20111,9 @@
       "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_build_player_stats_index",
-      "target": "dataframe",
-      "confidence_score": 1.0
+      "target": "dataframe"
     },
     {
       "relation": "references",
@@ -19909,9 +20123,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_settle_prop",
-      "target": "side",
-      "confidence_score": 1.0
+      "target": "side"
     },
     {
       "relation": "references",
@@ -20569,9 +20783,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_settle_prop",
-      "target": "outcome",
-      "confidence_score": 1.0
+      "target": "outcome"
     },
     {
       "relation": "references",
@@ -20581,9 +20795,9 @@
       "source_location": "L102",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_settle_prop_snapshots",
-      "target": "dataframe",
-      "confidence_score": 1.0
+      "target": "dataframe"
     },
     {
       "relation": "references",
@@ -21854,9 +22068,9 @@
       "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "contains",
@@ -21865,9 +22079,9 @@
       "source_location": "L65",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_pull_historical_prop_snapshot"
     },
     {
       "relation": "contains",
@@ -21876,9 +22090,9 @@
       "source_location": "L87",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "contains",
@@ -22055,6 +22269,39 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform",
       "target": "src_collect_transform_event_to_snapshots"
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L132",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_demo_pipeline_main",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L69",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_demo_pipeline_step",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L74",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline",
+      "target": "src_demo_pipeline_make_synthetic_snapshots",
+      "confidence_score": 1.0
     },
     {
       "relation": "contains",
@@ -22646,9 +22893,9 @@
       "source_location": "L102",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "contains",
@@ -22657,9 +22904,9 @@
       "source_location": "L50",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "contains",
@@ -22668,9 +22915,9 @@
       "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "contains",
@@ -22679,9 +22926,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "contains",
@@ -23702,9 +23949,9 @@
       "source_location": "L112",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_backfill_historical_props_counts_missing_games_without_calling_odds_endpoint"
     },
     {
       "relation": "contains",
@@ -23713,9 +23960,9 @@
       "source_location": "L127",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_backfill_historical_props_records_api_failures_without_raising",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_backfill_historical_props_records_api_failures_without_raising"
     },
     {
       "relation": "contains",
@@ -23724,9 +23971,9 @@
       "source_location": "L17",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_historical_event_payload",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_historical_event_payload"
     },
     {
       "relation": "contains",
@@ -23735,9 +23982,9 @@
       "source_location": "L43",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_find_historical_event_id_matches_on_team_names",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_find_historical_event_id_matches_on_team_names"
     },
     {
       "relation": "contains",
@@ -23746,9 +23993,9 @@
       "source_location": "L58",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_find_historical_event_id_returns_none_when_not_found",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_find_historical_event_id_returns_none_when_not_found"
     },
     {
       "relation": "contains",
@@ -23757,9 +24004,9 @@
       "source_location": "L72",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_pull_historical_prop_snapshot_parses_via_the_shared_props_parser"
     },
     {
       "relation": "contains",
@@ -23768,9 +24015,9 @@
       "source_location": "L89",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_collect_props_historical",
-      "target": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games",
-      "confidence_score": 1.0
+      "target": "tests_test_collect_props_historical_test_backfill_historical_props_writes_snapshots_for_found_games"
     },
     {
       "relation": "contains",
@@ -24934,9 +25181,9 @@
       "source_location": "L106",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_unmatched_player_as_none_not_dropped"
     },
     {
       "relation": "contains",
@@ -24945,9 +25192,9 @@
       "source_location": "L113",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_leaves_missing_stat_value_as_none"
     },
     {
       "relation": "contains",
@@ -24956,9 +25203,9 @@
       "source_location": "L128",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_normalize_player_name_strips_punctuation",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_normalize_player_name_strips_punctuation"
     },
     {
       "relation": "contains",
@@ -24967,9 +25214,9 @@
       "source_location": "L132",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_normalize_player_name_applies_known_nickname_overrides",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_normalize_player_name_applies_known_nickname_overrides"
     },
     {
       "relation": "contains",
@@ -24978,9 +25225,9 @@
       "source_location": "L136",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_despite_punctuation_difference"
     },
     {
       "relation": "contains",
@@ -24989,9 +25236,9 @@
       "source_location": "L146",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_matches_via_nickname_override"
     },
     {
       "relation": "contains",
@@ -25000,9 +25247,9 @@
       "source_location": "L36",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_over_wins_when_actual_exceeds_line",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_over_wins_when_actual_exceeds_line"
     },
     {
       "relation": "contains",
@@ -25011,9 +25258,9 @@
       "source_location": "L40",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_over_loses_when_actual_is_under_line",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_over_loses_when_actual_is_under_line"
     },
     {
       "relation": "contains",
@@ -25022,9 +25269,9 @@
       "source_location": "L44",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_under_wins_when_actual_is_below_line",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_under_wins_when_actual_is_below_line"
     },
     {
       "relation": "contains",
@@ -25033,9 +25280,9 @@
       "source_location": "L48",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_exact_push_on_a_whole_number_line",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_exact_push_on_a_whole_number_line"
     },
     {
       "relation": "contains",
@@ -25044,9 +25291,9 @@
       "source_location": "L54",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_rejects_non_over_under_side",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_rejects_non_over_under_side"
     },
     {
       "relation": "contains",
@@ -25055,9 +25302,9 @@
       "source_location": "L62",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_build_player_stats_index_keys_by_game_and_player",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_build_player_stats_index_keys_by_game_and_player"
     },
     {
       "relation": "contains",
@@ -25066,9 +25313,9 @@
       "source_location": "L68",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_build_player_stats_index_skips_rows_with_no_player_name",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_build_player_stats_index_skips_rows_with_no_player_name"
     },
     {
       "relation": "contains",
@@ -25077,9 +25324,9 @@
       "source_location": "L85",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_prop_row",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_prop_row"
     },
     {
       "relation": "contains",
@@ -25088,9 +25335,9 @@
       "source_location": "L95",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "tests_test_prop_settlement",
-      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players",
-      "confidence_score": 1.0
+      "target": "tests_test_prop_settlement_test_settle_prop_snapshots_grades_matched_players"
     },
     {
       "relation": "contains",
@@ -26342,9 +26589,9 @@
       "source_location": "L1",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_rationale_1",
-      "target": "src_collect_props_historical",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical"
     },
     {
       "relation": "rationale_for",
@@ -26353,9 +26600,9 @@
       "source_location": "L53",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_rationale_53",
-      "target": "src_collect_props_historical_find_historical_event_id",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_find_historical_event_id"
     },
     {
       "relation": "rationale_for",
@@ -26364,9 +26611,9 @@
       "source_location": "L73",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_rationale_73",
-      "target": "src_collect_props_historical_pull_historical_prop_snapshot",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_pull_historical_prop_snapshot"
     },
     {
       "relation": "rationale_for",
@@ -26375,9 +26622,9 @@
       "source_location": "L95",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_collect_props_historical_rationale_95",
-      "target": "src_collect_props_historical_backfill_historical_props",
-      "confidence_score": 1.0
+      "target": "src_collect_props_historical_backfill_historical_props"
     },
     {
       "relation": "rationale_for",
@@ -26565,6 +26812,17 @@
       "confidence_score": 1.0,
       "source": "src_collect_transform_rationale_74",
       "target": "src_collect_transform_match_event"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "source_file": "src/demo_pipeline.py",
+      "source_location": "L1",
+      "weight": 1.0,
+      "_origin": "ast",
+      "source": "src_demo_pipeline_rationale_1",
+      "target": "src_demo_pipeline",
+      "confidence_score": 1.0
     },
     {
       "relation": "rationale_for",
@@ -27178,9 +27436,9 @@
       "source_location": "L1",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_rationale_1",
-      "target": "src_store_prop_settlement",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement"
     },
     {
       "relation": "rationale_for",
@@ -27189,9 +27447,9 @@
       "source_location": "L103",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_rationale_103",
-      "target": "src_store_prop_settlement_settle_prop_snapshots",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop_snapshots"
     },
     {
       "relation": "rationale_for",
@@ -27200,9 +27458,9 @@
       "source_location": "L51",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_rationale_51",
-      "target": "src_store_prop_settlement_normalize_player_name",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_normalize_player_name"
     },
     {
       "relation": "rationale_for",
@@ -27211,9 +27469,9 @@
       "source_location": "L63",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_rationale_63",
-      "target": "src_store_prop_settlement_build_player_stats_index",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_build_player_stats_index"
     },
     {
       "relation": "rationale_for",
@@ -27222,9 +27480,9 @@
       "source_location": "L86",
       "weight": 1.0,
       "_origin": "ast",
+      "confidence_score": 1.0,
       "source": "src_store_prop_settlement_rationale_86",
-      "target": "src_store_prop_settlement_settle_prop",
-      "confidence_score": 1.0
+      "target": "src_store_prop_settlement_settle_prop"
     },
     {
       "relation": "rationale_for",
@@ -30700,5 +30958,5 @@
     }
   ],
   "hyperedges": [],
-  "built_at_commit": "a43b4b2380104f40ff880b1b0bf88278406a1ab4"
+  "built_at_commit": "8f4934c1e37e3ec26e74112cd4563eebe259f9a7"
 }
