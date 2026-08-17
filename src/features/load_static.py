@@ -47,6 +47,7 @@ PBP_COLUMNS = [
     "epa",
     "success",
     "wp",
+    "qtr",  # needed for garbage-time exclusion (src/model/features.py) -- wp alone isn't enough, see that module
 ]
 
 

@@ -30,6 +30,10 @@
 - [x] An Elo opponent-adjustment benchmark (§4.5) — sequential, leakage-free by
       construction; beats the EPA-only model on its own and closes ~57% of the gap to
       the market baseline when combined with EPA (`src/model/elo.py`)
+- [x] A garbage-time-filtering ablation (§4.5) — standard nflverse-community
+      convention, verified against a real EPA distribution shift; a negative result
+      (makes the model slightly worse, not better), reported as found rather than
+      discarded (`src/model/features.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -405,6 +409,27 @@ market baseline. Still short of market — expected, and not explained away — 
 result in this project that substantively validates "opponent-adjustment is the modeling
 gap that matters most," rather than asserting it. Full reference run, coefficients, and
 the resulting end-of-2024 rating table: `notebooks/model_backtest_results.ipynb`.
+
+**Garbage-time filtering — a negative result, reported as found.** The standard
+nflverse-community convention excludes plays from the 4th quarter or overtime with win
+probability outside [0.05, 0.95] — the outcome is no longer competitively in doubt, and
+EPA earned there (backups in, prevent defense, clock-killing) arguably doesn't reflect
+true team strength. `src/model/features.py::team_game_epa(..., exclude_garbage_time=True)`
+implements this (requires `qtr`, added to the cached play-by-play schema). Sanity check:
+11.3% of real plays are flagged, with a genuine EPA mean shift (garbage-time plays average
+-0.053 EPA/play vs. 0.013 for competitive snaps) — the filter behaves as intended, not
+degenerately.
+
+**The hypothesis did not hold.** On the same split, filtering makes both the EPA-only and
+EPA+Elo variants slightly *worse* (0.2316→0.2335 and 0.2192→0.2197 respectively), not
+better. Plausible reasons, stated as hypotheses rather than proven: removing ~11% of plays
+shrinks the effective sample behind each team's rolling average (especially costly
+early-season, when the window is already small), and garbage-time EPA — while lower on
+average — is not obviously *wrong*; a genuinely strong team's backups plausibly still
+outperform a weak team's, so the excluded plays likely still carry real signal, just with
+a level shift rather than pure noise. `exclude_garbage_time` stays opt-in, default `False`
+— this negative result is the reason, not an oversight. Full comparison:
+`notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:

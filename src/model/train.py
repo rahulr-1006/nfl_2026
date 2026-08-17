@@ -60,6 +60,7 @@ def build_training_frame(
     schedule: pd.DataFrame,
     window: int | None = None,
     elo_ratings: pd.DataFrame | None = None,
+    exclude_garbage_time: bool = False,
 ) -> pd.DataFrame:
     """One row per game: `build_game_features()` output plus the home-win
     label and the devigged market-consensus probability, with ties and
@@ -73,10 +74,13 @@ def build_training_frame(
     doesn't cover -- shouldn't happen when both come from the same
     schedule, but not assumed.
 
+    `exclude_garbage_time`: see `features.py::team_game_epa` -- defaults to
+    False so the original EPA feature set's numbers stay reproducible.
+
     Ties are rare (9 of 2743 games in 2015-2024) but undefined for a binary
     win label, so they're excluded rather than coded as 0 or 0.5.
     """
-    feats = build_game_features(pbp, schedule, window=window)
+    feats = build_game_features(pbp, schedule, window=window, exclude_garbage_time=exclude_garbage_time)
     outcomes = schedule[["game_id", "home_score", "away_score", "home_moneyline", "away_moneyline"]]
     df = feats.merge(outcomes, on="game_id", how="left")
 
