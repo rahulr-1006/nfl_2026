@@ -87,6 +87,14 @@ results in the paper fill in as the season generates enough data to report on:
       beats logistic regression on EPA-only (0.2300 vs. 0.2316), loses once Elo is
       added (0.2217 vs. 0.2192) — logistic + EPA + Elo (0.2192) stays the best
       model to date. Results: `notebooks/model_backtest_results.ipynb`.
+- [x] QB-level Elo (`src/model/qb_elo.py`) — residual rating isolating QB contribution
+      from team strength: a QB's rating moves on how much the team's actual result
+      over/underperformed the team's *own* pre-game Elo (QB identity ignored), K=8 vs.
+      team Elo's K=20. Uses nflverse's `home_qb_id`/`away_qb_id` (zero missing,
+      2015-2024), no new data pull. **Real, modest improvement:** EPA+Elo+QB (Brier
+      0.2170) beats EPA+Elo (0.2192). Sanity-checked: Mahomes/Brady top the final
+      ratings, late-career Eli Manning/Bortles/Wentz sit at the bottom. Results:
+      `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false

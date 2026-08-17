@@ -54,7 +54,9 @@ FEATURE_COLUMNS = [
 ]
 EPA_FEATURE_COLUMNS = FEATURE_COLUMNS  # backward-compat alias, now that a second feature set (Elo) exists
 ELO_FEATURE_COLUMNS = ["home_pre_elo", "away_pre_elo"]
+QB_FEATURE_COLUMNS = ["home_pre_qb_elo", "away_pre_qb_elo"]
 COMBINED_FEATURE_COLUMNS = FEATURE_COLUMNS + ELO_FEATURE_COLUMNS
+COMBINED_QB_FEATURE_COLUMNS = COMBINED_FEATURE_COLUMNS + QB_FEATURE_COLUMNS
 
 
 def build_training_frame(
@@ -62,6 +64,7 @@ def build_training_frame(
     schedule: pd.DataFrame,
     window: int | None = None,
     elo_ratings: pd.DataFrame | None = None,
+    qb_elo_ratings: pd.DataFrame | None = None,
     exclude_garbage_time: bool = False,
 ) -> pd.DataFrame:
     """One row per game: `build_game_features()` output plus the home-win
@@ -75,6 +78,12 @@ def build_training_frame(
     `away_pre_elo` (see `ELO_FEATURE_COLUMNS`) and drops any row it
     doesn't cover -- shouldn't happen when both come from the same
     schedule, but not assumed.
+
+    `qb_elo_ratings`: optional output of `src/model/qb_elo.py::compute_qb_elo_ratings`,
+    built from the same schedule (and the same `elo_ratings`, since QB Elo
+    reads team Elo as its expectation baseline). When given, merges in
+    `home_pre_qb_elo`/`away_pre_qb_elo` (see `QB_FEATURE_COLUMNS`), same
+    drop-if-uncovered behavior as `elo_ratings`.
 
     `exclude_garbage_time`: see `features.py::team_game_epa` -- defaults to
     False so the original EPA feature set's numbers stay reproducible.
@@ -90,6 +99,9 @@ def build_training_frame(
     if elo_ratings is not None:
         df = df.merge(elo_ratings[["game_id", *ELO_FEATURE_COLUMNS]], on="game_id", how="left")
         required = required + ELO_FEATURE_COLUMNS
+    if qb_elo_ratings is not None:
+        df = df.merge(qb_elo_ratings[["game_id", *QB_FEATURE_COLUMNS]], on="game_id", how="left")
+        required = required + QB_FEATURE_COLUMNS
 
     df = df.dropna(subset=required)
     df = df[df["home_score"] != df["away_score"]].copy()
