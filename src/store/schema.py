@@ -20,6 +20,7 @@ class Market(str, Enum):
     SPREAD = "spread"
     TOTAL = "total"
     MONEYLINE = "moneyline"
+    PLAYER_PROP = "player_prop"
 
 
 class Side(str, Enum):
@@ -50,7 +51,16 @@ class OddsSnapshot(BaseModel):
     book: str
     market: Market
     side: Side
-    line: float | None = None  # spread/total number; None for moneyline
+    line: float | None = None  # spread/total/prop number; None for moneyline
+
+    # Player props only -- None for team-level markets. `player_name` is
+    # whatever the book's API returns (not yet normalized against
+    # nflverse's player_display_name; see src/collect/props.py). `prop_stat`
+    # is the internal stat name a settlement join can use directly (e.g.
+    # "passing_yards"), translated once at ingestion from the provider's
+    # raw market key so downstream code never has to know that mapping.
+    player_name: str | None = None
+    prop_stat: str | None = None
 
     price_american: int
     price_decimal: float
@@ -66,6 +76,13 @@ class OddsSnapshot(BaseModel):
             raise ValueError("moneyline snapshots must not carry a line")
         if self.market != Market.MONEYLINE and self.line is None:
             raise ValueError(f"{self.market} snapshots require a line")
+        has_player_fields = self.player_name is not None or self.prop_stat is not None
+        if self.market == Market.PLAYER_PROP and not (self.player_name and self.prop_stat):
+            raise ValueError("player_prop snapshots require both player_name and prop_stat")
+        if self.market != Market.PLAYER_PROP and has_player_fields:
+            raise ValueError(f"{self.market} snapshots must not carry player_name/prop_stat")
+        if self.market == Market.PLAYER_PROP and self.side not in (Side.OVER, Side.UNDER):
+            raise ValueError(f"player_prop side must be OVER or UNDER, got {self.side}")
 
         expected_decimal = american_to_decimal(self.price_american)
         if abs(expected_decimal - self.price_decimal) > 1e-6:
@@ -97,6 +114,8 @@ class OddsSnapshot(BaseModel):
         side: Side,
         price_american: int,
         line: float | None = None,
+        player_name: str | None = None,
+        prop_stat: str | None = None,
     ) -> OddsSnapshot:
         """Build a snapshot from an American price, deriving decimal + implied prob."""
         decimal = american_to_decimal(price_american)
@@ -112,6 +131,8 @@ class OddsSnapshot(BaseModel):
             market=market,
             side=side,
             line=line,
+            player_name=player_name,
+            prop_stat=prop_stat,
             price_american=price_american,
             price_decimal=decimal,
             implied_prob_raw=decimal_to_implied_prob(decimal),

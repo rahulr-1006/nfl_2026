@@ -125,3 +125,30 @@ def test_event_id_filter(tmp_path):
     visible = store.read_as_of(BASE + timedelta(hours=1), event_id="2026_01_KC_LAC")
     assert len(visible) == 1
     assert visible.iloc[0]["event_id"] == "2026_01_KC_LAC"
+
+
+def test_read_as_of_exposes_new_columns_even_when_no_file_on_disk_has_them(tmp_path):
+    """Regression guard: a schema addition (player_name/prop_stat, added
+    for player props) must be a visible, indexable column immediately --
+    not only once the first snapshot actually using it has been written.
+    Simulates the real situation on 2026-08-17: months of pre-props
+    snapshots already on disk, all missing these columns entirely.
+    """
+    import pandas as pd
+
+    from src.store.pit_store import _COLUMNS
+
+    store = PointInTimeStore(root=tmp_path)
+    old_shape_columns = [c for c in _COLUMNS if c not in ("player_name", "prop_stat")]
+    row = _snap(0).model_dump()
+    row["market"] = row["market"].value
+    row["side"] = row["side"].value
+    old_df = pd.DataFrame([{k: row[k] for k in old_shape_columns}])
+    partition_dir = tmp_path / "capture_date=2026-09-04"
+    partition_dir.mkdir(parents=True)
+    old_df.to_parquet(partition_dir / "old_shape.parquet", index=False)
+
+    visible = store.read_as_of(BASE + timedelta(hours=1))
+    assert "player_name" in visible.columns
+    assert "prop_stat" in visible.columns
+    assert visible["player_name"].isna().all()

@@ -60,14 +60,31 @@ class OddsApiClient:
         self._retry_backoff_seconds = retry_backoff_seconds
 
     def get_odds(self, regions: str, markets: str, odds_format: str = "american") -> OddsApiResponse:
+        """Bulk endpoint: one call returns every event in the sport's
+        current slate. This is what src/collect/scheduler.py polls.
+        """
         url = f"{_BASE_URL}/sports/{self._sport_key}/odds/"
-        params = {
-            "apiKey": self._api_key,
-            "regions": regions,
-            "markets": markets,
-            "oddsFormat": odds_format,
-        }
+        params = {"apiKey": self._api_key, "regions": regions, "markets": markets, "oddsFormat": odds_format}
+        response = self._request(url, params)
+        return self._to_response(events=response.json(), headers=response.headers)
 
+    def get_event_odds(self, event_id: str, regions: str, markets: str, odds_format: str = "american") -> OddsApiResponse:
+        """Per-event endpoint: the only way to reach player-prop markets
+        (src/collect/props.py) -- one call per game, unlike get_odds()'s
+        one call for the whole slate. Cost = unique markets returned x
+        regions, billed per call, so this is meaningfully more expensive
+        per game than the bulk endpoint.
+        """
+        url = f"{_BASE_URL}/sports/{self._sport_key}/events/{event_id}/odds"
+        params = {"apiKey": self._api_key, "regions": regions, "markets": markets, "oddsFormat": odds_format}
+        response = self._request(url, params)
+        return self._to_response(events=[response.json()], headers=response.headers)
+
+    def _request(self, url: str, params: dict) -> requests.Response:
+        """Shared retry/error-handling for both endpoints. Returns the raw
+        successful response; callers interpret the body themselves since
+        get_odds() gets a list and get_event_odds() gets a single object.
+        """
         last_error: Exception | None = None
         for attempt in range(self._max_retries + 1):
             try:
@@ -87,13 +104,16 @@ class OddsApiClient:
                 raise OddsApiError(
                     f"The Odds API returned status={response.status_code}: {response.text[:500]}"
                 )
-
-            return OddsApiResponse(
-                events=response.json(),
-                remaining_credits=_parse_int_header(response.headers, "x-requests-remaining"),
-                used_credits=_parse_int_header(response.headers, "x-requests-used"),
-                last_cost=_parse_int_header(response.headers, "x-requests-last"),
-                fetched_at=datetime.now(UTC),
-            )
+            return response
 
         raise OddsApiError(f"network error calling The Odds API: {last_error}")
+
+    @staticmethod
+    def _to_response(events: list[dict], headers: dict) -> OddsApiResponse:
+        return OddsApiResponse(
+            events=events,
+            remaining_credits=_parse_int_header(headers, "x-requests-remaining"),
+            used_credits=_parse_int_header(headers, "x-requests-used"),
+            last_cost=_parse_int_header(headers, "x-requests-last"),
+            fetched_at=datetime.now(UTC),
+        )
