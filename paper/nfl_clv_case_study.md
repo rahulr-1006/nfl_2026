@@ -40,6 +40,10 @@
 - [x] A QB-level Elo residual rating (§4.5) — isolates QB contribution from team
       strength; a real, modest improvement over EPA+Elo (Brier 0.2192 → 0.2170),
       sanity-checked against known-elite/known-weak QBs (`src/model/qb_elo.py`)
+- [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
+      companion pass-defense Elo, built for player-prop pricing rather than game
+      outcomes; sanity-checked, rates per-target efficiency not volume
+      (`src/model/receiver_elo.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -290,6 +294,49 @@ access. The plan once paid access lands: pull one prop market for one recent sea
 (e.g. `player_pass_yds`, 2024) as a cheap proof of concept before committing further,
 and specifically check whether Pinnacle appears at all, which resolves §3.6's open
 question without waiting for the 2026 season's own props to materialize.
+
+### 3.7 Receiver-level Elo (player-prop pricing infrastructure)
+A different kind of Elo than §4.5's team/QB ratings, built for the same reason props
+(§3.6) were prepped ahead of live data: sports betting books price mainline markets
+(spread/total/moneyline) tightly, but player props get priced faster and with less
+scrutiny -- the more commonly cited source of real mispricing. Team/QB Elo can't speak
+to that; a receiver-level rating can.
+
+**What's not available for free, stated plainly:** true man-to-man coverage matchup
+data -- which specific cornerback was assigned to a given receiver on a given snap --
+isn't in free nflverse play-by-play. That's PFF/NGS charting, paywalled. `defteam` is
+the finest opponent-side grain available for free, so this rates receivers against a
+team-level **pass defense** Elo, not a corner-specific one. Still a real, laggable
+signal: "this receiver is hot, this week's opponent pass defense is Elo-weak" is
+information a book can be slow to fully price into a prop line.
+
+**Design (`src/model/receiver_elo.py`):** unlike team/QB Elo, a receiver has no
+per-game win/loss -- what exists is a sequence of individual targets. So every target
+is its own two-sided Elo match: the targeted receiver vs. the opposing pass defense,
+using the play's `success` flag (standard EPA-success definition, already cached) as
+the binary outcome. This is a legitimate, well-established Elo generalization (any
+repeated pairwise binary contest), not a residual-vs-baseline hack the way QB Elo is.
+K=4, smaller than team Elo's K=20, since a receiver sees many targets per game rather
+than one game-level contest. Leakage-free the same way: plays processed in strict
+chronological order (season, week, game, then nflverse's within-game `play_id`).
+
+**Result, sanity-checked against known players (2015-2024, min 100 targets):**
+top-rated are George Kittle, Amon-Ra St. Brown, Mark Andrews, Tee Higgins, Travis
+Kelce -- elite pass-catching tight ends and possession receivers whose targets are
+disproportionately short, high-percentage completions. **Read this caveat as a finding,
+not a flaw:** the bottom of the list is dominated by receiving-role running backs
+(Ezekiel Elliott, Tony Pollard, Jonathan Taylor) whose targets are often low-value
+checkdowns logged as failed plays even when caught, since `success` is opponent-Elo-
+relative, not an absolute yardage threshold. This rates *per-target efficiency*, not
+volume or big-play ability, and should be read alongside a volume stat (targets/game,
+target share) rather than used alone as a "best receiver" ranking. Full results and the
+companion pass-defense Elo leaderboard: `notebooks/model_backtest_results.ipynb`.
+
+**Not yet wired into anything.** Standalone rating infrastructure -- not fed into the
+game-outcome model (§4.5, since this project isn't betting game outcomes with it), and
+not fed into prop pricing yet either (props are prepped but not live, §3.6). The
+natural next piece, sharing this same play-level Elo mechanic, is a pass-rusher Elo vs.
+pass-protection Elo (sacks/pressures produced) -- deferred, not built this pass.
 
 ---
 
