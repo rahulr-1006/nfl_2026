@@ -134,3 +134,47 @@ def test_fit_win_probability_model_outputs_valid_probabilities():
     assert proba.shape == (len(test),)
     assert np.all((proba >= 0) & (proba <= 1))
     assert list(model.named_steps.keys()) == ["scale", "logit"]
+
+
+def test_fit_win_probability_model_accepts_a_custom_feature_list():
+    # e.g. ELO_FEATURE_COLUMNS or COMBINED_FEATURE_COLUMNS -- the same
+    # feature_columns must be passed to both fit and predict.
+    from src.model.train import ELO_FEATURE_COLUMNS
+
+    df = _synthetic_feature_frame()
+    df["home_pre_elo"] = 1500 + df["home_pre_off_epa"] * 100
+    df["away_pre_elo"] = 1500 + df["away_pre_off_epa"] * 100
+    train, _, test = time_based_split(df, train_seasons=[2020], calib_seasons=[2021], test_seasons=[2022])
+
+    model = fit_win_probability_model(train, feature_columns=ELO_FEATURE_COLUMNS)
+    proba = predict_home_win_proba(model, test, feature_columns=ELO_FEATURE_COLUMNS)
+
+    assert proba.shape == (len(test),)
+    assert np.all((proba >= 0) & (proba <= 1))
+    assert model.named_steps["logit"].coef_.shape == (1, len(ELO_FEATURE_COLUMNS))
+
+
+# --- build_training_frame with elo_ratings ---
+
+
+def test_build_training_frame_merges_elo_ratings_when_given():
+    from src.model.train import ELO_FEATURE_COLUMNS
+
+    df = build_training_frame(_pbp_fixture(), _schedule_fixture())
+    elo_ratings = pd.DataFrame(
+        [{"game_id": "2023_02_B_A", "home_pre_elo": 1520.0, "away_pre_elo": 1480.0}]
+    )
+
+    with_elo = build_training_frame(_pbp_fixture(), _schedule_fixture(), elo_ratings=elo_ratings)
+
+    assert list(df["game_id"]) == list(with_elo["game_id"])  # same rows survive
+    assert set(ELO_FEATURE_COLUMNS).issubset(with_elo.columns)
+    assert with_elo.iloc[0]["home_pre_elo"] == 1520.0
+
+
+def test_build_training_frame_drops_rows_elo_ratings_does_not_cover():
+    # elo_ratings missing the one surviving game entirely -- that row must
+    # be dropped, not silently kept with a NaN elo feature.
+    empty_elo = pd.DataFrame(columns=["game_id", "home_pre_elo", "away_pre_elo"])
+    with_elo = build_training_frame(_pbp_fixture(), _schedule_fixture(), elo_ratings=empty_elo)
+    assert with_elo.empty

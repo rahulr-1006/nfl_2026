@@ -50,14 +50,28 @@ FEATURE_COLUMNS = [
     "away_rest",
     "div_game",
 ]
+EPA_FEATURE_COLUMNS = FEATURE_COLUMNS  # backward-compat alias, now that a second feature set (Elo) exists
+ELO_FEATURE_COLUMNS = ["home_pre_elo", "away_pre_elo"]
+COMBINED_FEATURE_COLUMNS = FEATURE_COLUMNS + ELO_FEATURE_COLUMNS
 
 
-def build_training_frame(pbp: pd.DataFrame, schedule: pd.DataFrame, window: int | None = None) -> pd.DataFrame:
+def build_training_frame(
+    pbp: pd.DataFrame,
+    schedule: pd.DataFrame,
+    window: int | None = None,
+    elo_ratings: pd.DataFrame | None = None,
+) -> pd.DataFrame:
     """One row per game: `build_game_features()` output plus the home-win
     label and the devigged market-consensus probability, with ties and
     missing-feature rows (a team's first game in the cached window, no
     prior-game history to average -- see features.py's leakage guard)
     dropped.
+
+    `elo_ratings`: optional output of `src/model/elo.py::compute_team_elo_ratings`,
+    built from the same schedule. When given, merges in `home_pre_elo`/
+    `away_pre_elo` (see `ELO_FEATURE_COLUMNS`) and drops any row it
+    doesn't cover -- shouldn't happen when both come from the same
+    schedule, but not assumed.
 
     Ties are rare (9 of 2743 games in 2015-2024) but undefined for a binary
     win label, so they're excluded rather than coded as 0 or 0.5.
@@ -66,7 +80,12 @@ def build_training_frame(pbp: pd.DataFrame, schedule: pd.DataFrame, window: int 
     outcomes = schedule[["game_id", "home_score", "away_score", "home_moneyline", "away_moneyline"]]
     df = feats.merge(outcomes, on="game_id", how="left")
 
-    df = df.dropna(subset=["home_score", "away_score", "home_moneyline", "away_moneyline", *FEATURE_COLUMNS])
+    required = ["home_score", "away_score", "home_moneyline", "away_moneyline", *FEATURE_COLUMNS]
+    if elo_ratings is not None:
+        df = df.merge(elo_ratings[["game_id", *ELO_FEATURE_COLUMNS]], on="game_id", how="left")
+        required = required + ELO_FEATURE_COLUMNS
+
+    df = df.dropna(subset=required)
     df = df[df["home_score"] != df["away_score"]].copy()
     df["home_win"] = (df["home_score"] > df["away_score"]).astype(int)
     df["market_prob_home"] = [
@@ -90,15 +109,18 @@ def time_based_split(
     return train, calib, test
 
 
-def fit_win_probability_model(train_df: pd.DataFrame) -> Pipeline:
-    """Standardized logistic regression on FEATURE_COLUMNS -- "start
-    simple" per blueprint Part E, before reaching for a gradient-boosted
-    model.
+def fit_win_probability_model(train_df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS) -> Pipeline:
+    """Standardized logistic regression on `feature_columns` (default:
+    EPA only -- "start simple" per blueprint Part E, before reaching for
+    a gradient-boosted model). Pass `ELO_FEATURE_COLUMNS` or
+    `COMBINED_FEATURE_COLUMNS` for the Elo-only / EPA+Elo variants --
+    whichever list is used here must be passed again to
+    `predict_home_win_proba`, the fitted Pipeline doesn't remember it.
     """
     model = Pipeline([("scale", StandardScaler()), ("logit", LogisticRegression(max_iter=1000))])
-    model.fit(train_df[FEATURE_COLUMNS], train_df["home_win"])
+    model.fit(train_df[feature_columns], train_df["home_win"])
     return model
 
 
-def predict_home_win_proba(model: Pipeline, df: pd.DataFrame) -> np.ndarray:
-    return model.predict_proba(df[FEATURE_COLUMNS])[:, 1]
+def predict_home_win_proba(model: Pipeline, df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS) -> np.ndarray:
+    return model.predict_proba(df[feature_columns])[:, 1]
