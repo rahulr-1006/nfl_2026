@@ -114,6 +114,21 @@ results in the paper fill in as the season generates enough data to report on:
       2026-08-17 and confirmed props aren't posted this far before kickoff
       (see "Player props" below for why, and what to check once they start
       filling in).
+- [x] Receiver-level Elo (`src/model/receiver_elo.py`) — play-level rating for
+      pass-catchers, for player-prop pricing rather than game outcomes. True
+      man-to-man coverage matchup data (which corner covered which receiver)
+      isn't in free nflverse pbp -- that's PFF/NGS charting, paywalled -- so
+      this rates each target as a two-sided Elo match between the receiver
+      and the opposing team's **pass defense** (finest opponent grain
+      available for free), using the play's `success` flag as the binary
+      outcome. K=4 (play-level, many targets/game, vs. team Elo's K=20).
+      **Sanity-checked, and the result is a real caveat, not a bug:** this
+      rates *per-target efficiency*, not volume or big-play ability — elite
+      pass-catching TEs/possession WRs top the list (Kittle, Amon-Ra St.
+      Brown, Andrews, Kelce), receiving-role RBs on low-value checkdowns sit
+      at the bottom (Zeke Elliott, Tony Pollard, Jonathan Taylor). Read
+      alongside a volume stat, not as a standalone "best receiver" ranking.
+      Results: `notebooks/model_backtest_results.ipynb`.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 

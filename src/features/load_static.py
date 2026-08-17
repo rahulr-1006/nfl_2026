@@ -48,6 +48,10 @@ PBP_COLUMNS = [
     "success",
     "wp",
     "qtr",  # needed for garbage-time exclusion (src/model/features.py) -- wp alone isn't enough, see that module
+    "play_id",  # within-game play sequence number -- chronological ordering for src/model/receiver_elo.py
+    "receiver_player_id",
+    "receiver_player_name",
+    "receiving_yards",
 ]
 
 
@@ -60,6 +64,21 @@ def load_pbp(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     df = nfl.load_pbp(seasons=seasons).select(PBP_COLUMNS)
     path = out_dir / f"pbp_{min(seasons)}_{max(seasons)}.parquet"
+    df.write_parquet(path)
+    return path
+
+
+def load_players(out_dir: Path = STATIC_DIR) -> Path:
+    """Fetch nflverse's player ID/position table and cache as parquet.
+
+    `gsis_id` is the same ID format as pbp's `receiver_player_id` and the
+    schedule's `home_qb_id`/`away_qb_id` -- the join key for labeling any
+    player-level rating with a name/position. No season argument: this is
+    nflverse's full all-time player table, not season-scoped.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = nfl.load_players().select(["gsis_id", "display_name", "position", "position_group"])
+    path = out_dir / "players.parquet"
     df.write_parquet(path)
     return path
 
@@ -84,3 +103,4 @@ if __name__ == "__main__":
     seasons = list(range(2015, 2025))
     print(f"wrote {load_schedules(seasons)}")
     print(f"wrote {load_pbp(seasons)}")
+    print(f"wrote {load_players()}")
