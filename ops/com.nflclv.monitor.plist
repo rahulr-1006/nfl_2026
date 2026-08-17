@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nflclv.monitor</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/.venv/bin/python</string>
+        <string>-m</string>
+        <string>src.notify.monitor_run</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026</string>
+
+    <!-- src/notify/monitor_run.py is a single scan-and-exit script, not a
+         daemon -- StartInterval re-launches it every 300s. It only reads
+         local parquet files (no Odds API call), so this cadence costs
+         nothing against the collector's credit budget; it's independent
+         of and won't affect com.nflclv.collector. -->
+    <key>StartInterval</key>
+    <integer>300</integer>
+    <key>RunAtLoad</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/monitor.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/monitor.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
