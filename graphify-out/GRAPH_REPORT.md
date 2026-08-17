@@ -1,16 +1,16 @@
 # Graph Report - nfl_2026  (2026-08-17)
 
 ## Corpus Check
-- 86 files · ~46,041 words
+- 86 files · ~46,665 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 728 nodes · 1917 edges · 35 communities (29 shown, 6 thin omitted)
-- Extraction: 83% EXTRACTED · 17% INFERRED · 0% AMBIGUOUS · INFERRED: 323 edges (avg confidence: 0.5)
+- 743 nodes · 1901 edges · 38 communities (30 shown, 8 thin omitted)
+- Extraction: 85% EXTRACTED · 15% INFERRED · 0% AMBIGUOUS · INFERRED: 287 edges (avg confidence: 0.5)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `81236401`
+- Built from commit: `a43b4b23`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,9 +18,9 @@
 - Side
 - scheduler.py
 - test_live_scan.py
-- test_collect_transform.py
+- props.py
 - test_evaluate.py
-- market_baseline
+- test_clv_metrics.py
 - OddsApiClient
 - PointInTimeStore
 - test_devig.py
@@ -38,22 +38,23 @@
 - CLAUDE.md
 - .claude/CLAUDE.md
 - extraction-spec.md
+- test_prop_settlement.py
+- datetime
+- DataFrame
 
 ## God Nodes (most connected - your core abstractions)
-1. `Side` - 81 edges
-2. `PointInTimeStore` - 75 edges
+1. `PointInTimeStore` - 72 edges
+2. `Side` - 69 edges
 3. `Market` - 60 edges
-4. `OddsApiClient` - 38 edges
-5. `OddsSnapshot` - 33 edges
-6. `Outcome` - 32 edges
-7. `settle()` - 28 edges
+4. `OddsApiClient` - 34 edges
+5. `OddsSnapshot` - 30 edges
+6. `settle()` - 28 edges
+7. `Outcome` - 25 edges
 8. `tick()` - 25 edges
-9. `OddsApiError` - 24 edges
-10. `MatchResult` - 24 edges
+9. `OddsApiResponse` - 23 edges
+10. `OddsApiError` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `test_favorite_and_underdog_decimal_conversion()` --calls--> `american_to_decimal()`  [INFERRED]
-  tests/test_schema.py → src/devig/convert.py
 - `test_event_odds_to_prop_snapshots_parses_over_under_pair()` --uses--> `Market`  [INFERRED]
   tests/test_collect_props.py → src/store/schema.py
 - `test_event_to_snapshots_maps_markets_and_sides()` --uses--> `Market`  [INFERRED]
@@ -62,43 +63,45 @@
   tests/test_live_scan.py → src/store/schema.py
 - `_snapshot()` --uses--> `Market`  [INFERRED]
   tests/test_monitor_run.py → src/store/schema.py
+- `_snap()` --uses--> `Market`  [INFERRED]
+  tests/test_pit_store.py → src/store/schema.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (35 total, 6 thin omitted)
+## Communities (38 total, 8 thin omitted)
 
 ### Community 0 - "Side"
-Cohesion: 0.06
-Nodes (95): BacktestBet, BacktestEngine, BetOrder, DecisionPoint, _latest_fair_prob(), _latest_price(), _parse_kickoffs(), _payout() (+87 more)
+Cohesion: 0.08
+Nodes (77): BacktestBet, BacktestEngine, BetOrder, DecisionPoint, _latest_fair_prob(), _latest_price(), _parse_kickoffs(), _payout() (+69 more)
 
 ### Community 1 - "scheduler.py"
 Cohesion: 0.06
-Nodes (75): BlockingScheduler, date, CollectorState, current_period_end(), decide_poll(), _game_interval_minutes(), load_state(), _minutes_since() (+67 more)
+Nodes (70): BlockingScheduler, date, CollectorState, current_period_end(), decide_poll(), _game_interval_minutes(), load_state(), _minutes_since() (+62 more)
 
 ### Community 2 - "test_live_scan.py"
 Cohesion: 0.06
 Nodes (73): main(), Live +EV monitor entrypoint: `python -m src.notify.monitor_run`. Meant to be…, One scan-and-alert cycle. Returns the number of alerts actually sent. Never…, run(), _escape_for_applescript(), RuntimeError, SMS/iMessage alerts via macOS Messages.app. No third-party account, no API key:…, AppleScript/Messages.app failed to send. (+65 more)
 
-### Community 3 - "test_collect_transform.py"
-Cohesion: 0.17
-Nodes (28): build_team_name_map(), DataFrame, full team name -> abbreviation, restricted to abbrs used in `schedule`., build_schedule_index(), event_to_snapshots(), match_event(), MatchResult, DataFrame (+20 more)
+### Community 3 - "props.py"
+Cohesion: 0.07
+Nodes (72): build_preseason_match(), main(), poll_once(), Preseason dry-run collector: same collection mechanics as the real season…, One poll: fetch, match, transform, write. Returns counts for logging/testing --…, Build a MatchResult straight from the Odds API event, no nflverse schedule…, event_odds_to_prop_snapshots(), main() (+64 more)
 
 ### Community 4 - "test_evaluate.py"
 Cohesion: 0.06
 Nodes (63): CalibratedClassifierCV, compare_to_baseline(), fit_calibrated_model(), predict_calibrated_proba(), DataFrame, Pipeline, Series, Calibration layer (blueprint Part E): Platt scaling / isotonic regression on… (+55 more)
 
-### Community 5 - "market_baseline"
-Cohesion: 0.07
-Nodes (50): model_validator, beat_rate(), bootstrap_ci(), clv_price(), clv_probability(), Closing Line Value metrics (blueprint Part B.3). CLV is measured two ways --…, How far the fair market moved toward your side after you bet. Positive means…, Whether the decimal price you took beats the closing price for the same side.… (+42 more)
+### Community 5 - "test_clv_metrics.py"
+Cohesion: 0.16
+Nodes (20): beat_rate(), bootstrap_ci(), clv_price(), clv_probability(), Closing Line Value metrics (blueprint Part B.3). CLV is measured two ways --…, How far the fair market moved toward your side after you bet. Positive means…, Whether the decimal price you took beats the closing price for the same side.…, Fraction of bets with positive CLV. (+12 more)
 
 ### Community 6 - "OddsApiClient"
-Cohesion: 0.05
-Nodes (89): Response, Session, OddsApiClient, OddsApiError, OddsApiResponse, _parse_int_header(), _parse_iso(), datetime (+81 more)
+Cohesion: 0.07
+Nodes (53): datetime, MatchResult, OddsApiClient, OddsSnapshot, PointInTimeStore, Response, Session, OddsApiClient (+45 more)
 
 ### Community 7 - "PointInTimeStore"
-Cohesion: 0.10
-Nodes (34): BaseModel, LeakageError, PointInTimeStore, DataFrame, datetime, Path, RuntimeError, The only read path. Returns rows visible at `decision_time`, and nothing later. (+26 more)
+Cohesion: 0.06
+Nodes (65): BaseModel, model_validator, clv_movement_report(), DataFrame, datetime, Preseason CLV-movement report: a dry run of the measurement pipeline…, (home_price_american, away_price_american) from a moneyline slice. None if the…, One row per preseason event with at least two distinct capture times: price and… (+57 more)
 
 ### Community 8 - "test_devig.py"
 Cohesion: 0.12
@@ -136,25 +139,29 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
+### Community 35 - "test_prop_settlement.py"
+Cohesion: 0.13
+Nodes (27): DataFrame, Outcome, Side, build_player_stats_index(), normalize_player_name(), Settlement for player-prop (Over/Under) bets against nflverse's per-player game…, Batch-grade prop-shaped rows (event_id/game_id, player_name, prop_stat, side,…, Collapse punctuation/whitespace differences between an odds book's player name… (+19 more)
+
 ## Knowledge Gaps
-- **44 isolated node(s):** `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)`, `Step 1 - Ensure graphify is installed` (+39 more)
+- **44 isolated node(s):** `nfl-clv`, `For /graphify add and --watch`, `For /graphify query`, `For the commit hook and native CLAUDE.md integration`, `For --update and --cluster-only` (+39 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **6 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **8 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PointInTimeStore` connect `PointInTimeStore` to `Side`, `scheduler.py`, `test_live_scan.py`, `market_baseline`, `OddsApiClient`?**
-  _High betweenness centrality (0.196) - this node is a cross-community bridge._
-- **Why does `market_baseline()` connect `market_baseline` to `test_live_scan.py`, `test_evaluate.py`?**
-  _High betweenness centrality (0.129) - this node is a cross-community bridge._
-- **Why does `Side` connect `Side` to `test_live_scan.py`, `test_collect_transform.py`, `market_baseline`, `OddsApiClient`, `PointInTimeStore`?**
-  _High betweenness centrality (0.111) - this node is a cross-community bridge._
-- **Are the 61 inferred relationships involving `Side` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
-  _`Side` has 61 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 50 inferred relationships involving `PointInTimeStore` (e.g. with `BacktestEngine` and `clv_movement_report()`) actually correct?**
-  _`PointInTimeStore` has 50 INFERRED edges - model-reasoned connections that need verification._
+- **Why does `PointInTimeStore` connect `PointInTimeStore` to `Side`, `scheduler.py`, `test_live_scan.py`, `props.py`, `OddsApiClient`?**
+  _High betweenness centrality (0.184) - this node is a cross-community bridge._
+- **Why does `market_baseline()` connect `PointInTimeStore` to `test_live_scan.py`, `test_evaluate.py`?**
+  _High betweenness centrality (0.125) - this node is a cross-community bridge._
+- **Why does `Side` connect `Side` to `test_live_scan.py`, `props.py`, `PointInTimeStore`?**
+  _High betweenness centrality (0.074) - this node is a cross-community bridge._
+- **Are the 46 inferred relationships involving `PointInTimeStore` (e.g. with `BacktestEngine` and `clv_movement_report()`) actually correct?**
+  _`PointInTimeStore` has 46 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 51 inferred relationships involving `Side` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
+  _`Side` has 51 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 42 inferred relationships involving `Market` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
   _`Market` has 42 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 24 inferred relationships involving `OddsApiClient` (e.g. with `main()` and `poll_once()`) actually correct?**
-  _`OddsApiClient` has 24 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 21 inferred relationships involving `OddsApiClient` (e.g. with `main()` and `poll_once()`) actually correct?**
+  _`OddsApiClient` has 21 INFERRED edges - model-reasoned connections that need verification._

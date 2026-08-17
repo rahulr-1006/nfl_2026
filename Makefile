@@ -1,4 +1,4 @@
-.PHONY: venv install test lint collect collect-once preseason-poll preseason-report props-poll \
+.PHONY: venv install test lint demo collect collect-once preseason-poll preseason-report props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status clean
 
@@ -18,6 +18,13 @@ test:
 
 lint:
 	$(PY) -m ruff check src tests
+
+# Walks the whole live pipeline (pull -> store -> compare -> decide ->
+# notify) on made-up odds -- no API call, no credits spent, sends a real
+# (clearly-labeled DEMO) text if ALERT_PHONE_NUMBER is set in .env. See
+# src/demo_pipeline.py for what to tweak.
+demo:
+	$(PY) -m src.demo_pipeline
 
 collect:
 	$(PY) -m src.collect.run
