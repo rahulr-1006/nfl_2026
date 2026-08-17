@@ -289,6 +289,38 @@ determines whether §4.9's live scanner and the CLV backtester can extend to
 props at all, or whether props end up scoped to calibration-only analysis the
 way the historical nflverse odds are (see "Data chronology" above).
 
+### Historical props for backtesting — checked, blocked on paid access
+
+Unlike mainline markets, there is **no free historical source** for player-prop
+odds (nflverse has real player stats, not book prices). The Odds API's paid
+historical endpoint does cover props, from **2023-05-03** onward (`americanfootball_nfl`,
+5-minute snapshot intervals) — confirmed live 2026-08-17 that we're still on the
+free tier (`HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN`, 0 credits charged for the
+rejected call, so checking cost nothing).
+
+- **Cost: 10 × markets × regions per snapshot call**, one point-in-time read per
+  call — not a range. A full season of closing-line-only pulls for even one
+  market is thousands of credits (roughly 285 games × 10-20 credits ≈ 3,000-6,000).
+  Reconstructing intraday movement multiplies further.
+- **Built, not yet runnable:** `src/collect/props_historical.py` —
+  `find_historical_event_id` (1 credit, looks up a past game's Odds API event id
+  by team name), `pull_historical_prop_snapshot` (one market, one game, one
+  point in time), `backfill_historical_props` (orchestrates a caller-chosen list
+  of games — deliberately not "pull everything," since the caller controls
+  exactly how much gets spent). Two new `OddsApiClient` methods
+  (`get_historical_events`, `get_historical_event_odds`) support it.
+- **Unverified against real data**, unlike everything else in this repo — every
+  other module was checked against a live response before being trusted; this
+  one is built against The Odds API's documented response shape only, since
+  there's no way to call it without paid access. Treat the parsing path as
+  needing a real first pull to confirm before relying on it.
+- **Scoped down deliberately:** when paid access lands, start with **one prop
+  market for one recent season** (e.g. `player_pass_yds`, 2024) as a cheap
+  proof of concept — not the full 7-market set, not multiple seasons — and
+  check whether Pinnacle even appears before committing further. There's no
+  Makefile target for this on purpose; picking which games to spend credits on
+  is a deliberate call each time, not a fixed command.
+
 ## Quickstart
 
 ```bash

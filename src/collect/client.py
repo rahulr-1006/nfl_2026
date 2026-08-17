@@ -42,6 +42,10 @@ def _parse_int_header(headers: dict, key: str) -> int | None:
         return None
 
 
+def _parse_iso(value: str) -> datetime:
+    return datetime.fromisoformat(value)
+
+
 class OddsApiClient:
     def __init__(
         self,
@@ -80,6 +84,45 @@ class OddsApiClient:
         response = self._request(url, params)
         return self._to_response(events=[response.json()], headers=response.headers)
 
+    def get_historical_events(self, date: str) -> OddsApiResponse:
+        """Historical events list as of `date` (ISO 8601, e.g.
+        "2024-11-10T18:00:00Z") -- 1 credit per call, the cheap way to
+        discover an Odds API event id for a past game before pulling its
+        historical prop odds. Requires a paid plan (HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN
+        otherwise). `fetched_at` on the returned response is the *requested*
+        date, not wall-clock now -- see get_historical_event_odds for why
+        that distinction matters more there.
+        """
+        url = f"{_BASE_URL}/historical/sports/{self._sport_key}/events"
+        params = {"apiKey": self._api_key, "date": date}
+        response = self._request(url, params)
+        body = response.json()
+        return self._to_response(events=body["data"], headers=response.headers, fetched_at=_parse_iso(body["timestamp"]))
+
+    def get_historical_event_odds(
+        self, event_id: str, date: str, regions: str, markets: str, odds_format: str = "american"
+    ) -> OddsApiResponse:
+        """Historical per-event odds, snapshotted at the nearest available
+        timestamp <= `date` (5-minute intervals; player props specifically
+        only exist from 2023-05-03T05:30:00Z onward). Costs 10x the live
+        per-event rate (10 x markets x regions) and requires a paid plan.
+
+        The response wraps the event under a "data" key alongside the
+        actual snapshot timestamp (which may differ slightly from the
+        requested `date` -- "nearest available", not exact). That real
+        timestamp becomes `fetched_at`/capture_time downstream, never
+        wall-clock now -- getting this wrong would silently corrupt the
+        point-in-time discipline every other part of this project depends
+        on, labeling a 2024 price as though it were captured today.
+        """
+        url = f"{_BASE_URL}/historical/sports/{self._sport_key}/events/{event_id}/odds"
+        params = {"apiKey": self._api_key, "date": date, "regions": regions, "markets": markets, "oddsFormat": odds_format}
+        response = self._request(url, params)
+        body = response.json()
+        return self._to_response(
+            events=[body["data"]], headers=response.headers, fetched_at=_parse_iso(body["timestamp"])
+        )
+
     def _request(self, url: str, params: dict) -> requests.Response:
         """Shared retry/error-handling for both endpoints. Returns the raw
         successful response; callers interpret the body themselves since
@@ -109,11 +152,11 @@ class OddsApiClient:
         raise OddsApiError(f"network error calling The Odds API: {last_error}")
 
     @staticmethod
-    def _to_response(events: list[dict], headers: dict) -> OddsApiResponse:
+    def _to_response(events: list[dict], headers: dict, fetched_at: datetime | None = None) -> OddsApiResponse:
         return OddsApiResponse(
             events=events,
             remaining_credits=_parse_int_header(headers, "x-requests-remaining"),
             used_credits=_parse_int_header(headers, "x-requests-used"),
             last_cost=_parse_int_header(headers, "x-requests-last"),
-            fetched_at=datetime.now(UTC),
+            fetched_at=fetched_at or datetime.now(UTC),
         )

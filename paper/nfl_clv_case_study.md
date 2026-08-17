@@ -259,6 +259,25 @@ re-verification once they do (around 2026-09-02 for the Week 1 opener).
   scheduled service -- per-event calls scale with game count and there is nothing to
   poll most of the season.
 
+**Historical props for backtesting -- checked, blocked on paid access.** Unlike
+mainline markets, there is no free historical source for player-prop odds at all
+(nflverse has real player stats, not book prices). The Odds API's paid historical
+endpoint does cover props, from 2023-05-03T05:30:00Z onward at 5-minute snapshot
+intervals -- confirmed live 2026-08-17 that this project is still on the free tier
+(`HISTORICAL_UNAVAILABLE_ON_FREE_USAGE_PLAN`, 0 credits charged for the rejected
+check). Cost is 10x the live per-event rate (10 x markets x regions per snapshot
+call, one point-in-time read, not a range), so a full season of closing-line-only
+pulls for even a single market runs several thousand credits.
+
+`src/collect/props_historical.py` and two new `OddsApiClient` methods
+(`get_historical_events`, `get_historical_event_odds`) are built against the
+endpoint's documented response shape -- unverified against a real response, unlike
+every other module in this project, since there is no way to call it without paid
+access. The plan once paid access lands: pull one prop market for one recent season
+(e.g. `player_pass_yds`, 2024) as a cheap proof of concept before committing further,
+and specifically check whether Pinnacle appears at all, which resolves §3.6's open
+question without waiting for the 2026 season's own props to materialize.
+
 ---
 
 ## 4. Methodology

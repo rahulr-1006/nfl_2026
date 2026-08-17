@@ -122,3 +122,75 @@ def test_get_event_odds_raises_rate_limit_exceeded_like_get_odds():
 
     with pytest.raises(RateLimitExceeded):
         client.get_event_odds("abc123", "us", "player_pass_yds")
+
+
+# --- historical endpoints (paid plan only; used for player-prop backtesting) ---
+
+
+def test_get_historical_events_unwraps_the_data_key():
+    session = MagicMock()
+    session.get.return_value = _response(
+        json_body={
+            "timestamp": "2024-11-10T17:55:00Z",
+            "previous_timestamp": "2024-11-10T17:50:00Z",
+            "next_timestamp": "2024-11-10T18:00:00Z",
+            "data": [{"id": "hist-abc", "home_team": "Kansas City Chiefs", "away_team": "Los Angeles Chargers"}],
+        }
+    )
+    client = OddsApiClient("key", session=session)
+
+    response = client.get_historical_events("2024-11-10T18:00:00Z")
+
+    assert response.events == [{"id": "hist-abc", "home_team": "Kansas City Chiefs", "away_team": "Los Angeles Chargers"}]
+    # fetched_at must be the snapshot's own timestamp, not wall-clock now
+    assert response.fetched_at.isoformat() == "2024-11-10T17:55:00+00:00"
+
+
+def test_get_historical_events_hits_the_historical_url():
+    session = MagicMock()
+    session.get.return_value = _response(json_body={"timestamp": "2024-11-10T18:00:00Z", "data": []})
+    client = OddsApiClient("key", session=session)
+
+    client.get_historical_events("2024-11-10T18:00:00Z")
+
+    called_url = session.get.call_args[0][0]
+    assert called_url.endswith("/historical/sports/americanfootball_nfl/events")
+
+
+def test_get_historical_event_odds_uses_the_snapshot_timestamp_not_the_requested_date():
+    # The API snaps to the nearest available 5-minute interval, which can
+    # differ from the exact `date` requested -- the real snapshot time,
+    # not the request, must become capture_time downstream.
+    session = MagicMock()
+    session.get.return_value = _response(
+        json_body={
+            "timestamp": "2024-11-10T17:57:00Z",  # a few minutes off from the requested date below
+            "data": {"id": "hist-abc", "bookmakers": []},
+        }
+    )
+    client = OddsApiClient("key", session=session)
+
+    response = client.get_historical_event_odds("hist-abc", "2024-11-10T18:00:00Z", "us", "player_pass_yds")
+
+    assert response.events == [{"id": "hist-abc", "bookmakers": []}]
+    assert response.fetched_at.isoformat() == "2024-11-10T17:57:00+00:00"
+
+
+def test_get_historical_event_odds_hits_the_historical_per_event_url():
+    session = MagicMock()
+    session.get.return_value = _response(json_body={"timestamp": "2024-11-10T18:00:00Z", "data": {}})
+    client = OddsApiClient("key", session=session)
+
+    client.get_historical_event_odds("hist-abc", "2024-11-10T18:00:00Z", "us", "player_pass_yds")
+
+    called_url = session.get.call_args[0][0]
+    assert called_url.endswith("/historical/sports/americanfootball_nfl/events/hist-abc/odds")
+
+
+def test_get_historical_event_odds_raises_rate_limit_exceeded_on_free_plan():
+    session = MagicMock()
+    session.get.return_value = _response(status_code=401)
+    client = OddsApiClient("key", session=session)
+
+    with pytest.raises(RateLimitExceeded):
+        client.get_historical_event_odds("hist-abc", "2024-11-10T18:00:00Z", "us", "player_pass_yds")
