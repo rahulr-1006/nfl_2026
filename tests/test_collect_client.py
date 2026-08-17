@@ -80,3 +80,45 @@ def test_get_odds_recovers_after_transient_network_error():
 
     assert response.events == []
     assert session.get.call_count == 2
+
+
+# --- get_event_odds (per-event endpoint, needed for player props) ---
+
+
+def test_get_event_odds_wraps_the_single_event_object_in_a_list():
+    # The per-event endpoint returns one event dict, not a list -- unlike
+    # get_odds(), whose response is already a list of events. Both must
+    # come back through OddsApiResponse.events as a list for callers to
+    # treat uniformly.
+    session = MagicMock()
+    session.get.return_value = _response(
+        json_body={"id": "abc123", "bookmakers": []},
+        headers={"x-requests-remaining": "440", "x-requests-last": "2"},
+    )
+    client = OddsApiClient("key", session=session)
+
+    response = client.get_event_odds("abc123", "us", "player_pass_yds")
+
+    assert response.events == [{"id": "abc123", "bookmakers": []}]
+    assert response.remaining_credits == 440
+    assert response.last_cost == 2
+
+
+def test_get_event_odds_hits_the_per_event_url():
+    session = MagicMock()
+    session.get.return_value = _response(json_body={"id": "abc123"})
+    client = OddsApiClient("key", session=session)
+
+    client.get_event_odds("abc123", "us", "player_pass_yds")
+
+    called_url = session.get.call_args[0][0]
+    assert called_url.endswith("/sports/americanfootball_nfl/events/abc123/odds")
+
+
+def test_get_event_odds_raises_rate_limit_exceeded_like_get_odds():
+    session = MagicMock()
+    session.get.return_value = _response(status_code=402)
+    client = OddsApiClient("key", session=session)
+
+    with pytest.raises(RateLimitExceeded):
+        client.get_event_odds("abc123", "us", "player_pass_yds")

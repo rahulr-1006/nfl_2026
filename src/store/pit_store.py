@@ -35,6 +35,8 @@ _COLUMNS = [
     "market",
     "side",
     "line",
+    "player_name",
+    "prop_stat",
     "price_american",
     "price_decimal",
     "implied_prob_raw",
@@ -55,6 +57,8 @@ def _to_dataframe(snapshots: Sequence[OddsSnapshot]) -> pd.DataFrame:
             "market": s.market.value,
             "side": s.side.value,
             "line": s.line,
+            "player_name": s.player_name,
+            "prop_stat": s.prop_stat,
             "price_american": s.price_american,
             "price_decimal": s.price_decimal,
             "implied_prob_raw": s.implied_prob_raw,
@@ -124,4 +128,9 @@ class PointInTimeStore:
         if not files:
             return pd.DataFrame(columns=_COLUMNS)
         frames = [pd.read_parquet(f) for f in files]
-        return pd.concat(frames, ignore_index=True)
+        # reindex to the current _COLUMNS, not just the union of whatever
+        # columns happen to already be on disk -- a schema addition (e.g.
+        # player_name/prop_stat) must be visible even before any file using
+        # it has actually been written, or downstream code indexing that
+        # column breaks until the first new-shaped snapshot lands.
+        return pd.concat(frames, ignore_index=True).reindex(columns=_COLUMNS)
