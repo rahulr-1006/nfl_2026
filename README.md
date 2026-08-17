@@ -81,6 +81,12 @@ results in the paper fill in as the season generates enough data to report on:
       shift (not degenerate). **Negative result:** makes both EPA-only and EPA+Elo
       slightly *worse* (0.2316→0.2335, 0.2192→0.2197), not better — reported as
       found. Stays opt-in, default off. Results: `notebooks/model_backtest_results.ipynb`.
+- [x] Gradient-boosted trees (`src/model/train.py::fit_gbm_model`, sklearn
+      `HistGradientBoostingClassifier`, no new dependency) — hyperparameters chosen
+      from a small hand-swept grid, not a first guess. **Mixed result:** slightly
+      beats logistic regression on EPA-only (0.2300 vs. 0.2316), loses once Elo is
+      added (0.2217 vs. 0.2192) — logistic + EPA + Elo (0.2192) stays the best
+      model to date. Results: `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false

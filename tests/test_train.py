@@ -5,6 +5,7 @@ import pytest
 from src.model.baseline import market_baseline
 from src.model.train import (
     build_training_frame,
+    fit_gbm_model,
     fit_win_probability_model,
     predict_home_win_proba,
     time_based_split,
@@ -134,6 +135,24 @@ def test_fit_win_probability_model_outputs_valid_probabilities():
     assert proba.shape == (len(test),)
     assert np.all((proba >= 0) & (proba <= 1))
     assert list(model.named_steps.keys()) == ["scale", "logit"]
+
+
+def test_fit_gbm_model_outputs_valid_probabilities():
+    df = _synthetic_feature_frame()
+    train, _, test = time_based_split(df, train_seasons=[2020], calib_seasons=[2021], test_seasons=[2022])
+    model = fit_gbm_model(train)
+    proba = predict_home_win_proba(model, test)
+    assert proba.shape == (len(test),)
+    assert np.all((proba >= 0) & (proba <= 1))
+
+
+def test_fit_gbm_model_kwargs_override_the_conservative_defaults():
+    df = _synthetic_feature_frame()
+    train, _, _ = time_based_split(df, train_seasons=[2020], calib_seasons=[2021], test_seasons=[2022])
+    model = fit_gbm_model(train, max_iter=5, max_depth=1)
+    assert model.max_iter == 5
+    assert model.max_depth == 1
+    assert model.learning_rate == 0.1  # untouched default still applies
 
 
 def test_fit_win_probability_model_accepts_a_custom_feature_list():
