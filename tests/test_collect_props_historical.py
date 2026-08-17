@@ -100,8 +100,8 @@ def test_backfill_historical_props_writes_snapshots_for_found_games(tmp_path):
     counts = backfill_historical_props(
         client,
         [(MATCH, "Kansas City Chiefs", "Los Angeles Chargers", KICKOFF)],
-        "player_pass_yds",
         store,
+        markets="player_pass_yds",
     )
 
     assert counts == {"found": 1, "missing": 0, "failed": 0, "malformed": 0, "written": 2}
@@ -117,7 +117,7 @@ def test_backfill_historical_props_counts_missing_games_without_calling_odds_end
     store = PointInTimeStore(root=tmp_path / "snapshots")
 
     counts = backfill_historical_props(
-        client, [(MATCH, "Kansas City Chiefs", "Los Angeles Chargers", KICKOFF)], "player_pass_yds", store
+        client, [(MATCH, "Kansas City Chiefs", "Los Angeles Chargers", KICKOFF)], store, markets="player_pass_yds"
     )
 
     assert counts == {"found": 0, "missing": 1, "failed": 0, "malformed": 0, "written": 0}
@@ -134,7 +134,7 @@ def test_backfill_historical_props_records_api_failures_without_raising(tmp_path
     store = PointInTimeStore(root=tmp_path / "snapshots")
 
     counts = backfill_historical_props(
-        client, [(MATCH, "Kansas City Chiefs", "Los Angeles Chargers", KICKOFF)], "player_pass_yds", store
+        client, [(MATCH, "Kansas City Chiefs", "Los Angeles Chargers", KICKOFF)], store, markets="player_pass_yds"
     )
 
     assert counts == {"found": 0, "missing": 0, "failed": 1, "malformed": 0, "written": 0}

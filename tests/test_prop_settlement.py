@@ -3,6 +3,7 @@ import pytest
 
 from src.store.prop_settlement import (
     build_player_stats_index,
+    normalize_player_name,
     settle_prop,
     settle_prop_snapshots,
 )
@@ -64,6 +65,20 @@ def test_build_player_stats_index_keys_by_game_and_player():
     assert index[("2026_01_KC_LAC", "Travis Kelce")]["receptions"] == 6.0
 
 
+def test_build_player_stats_index_skips_rows_with_no_player_name():
+    # Confirmed against real 2024 nflreadpy data: 22 of 18,983 rows that
+    # season have a NaN player_display_name. There's nothing to key or
+    # match on for them -- must be skipped, not crash the whole index.
+    stats = pd.DataFrame(
+        [
+            {"game_id": "2024_10_PHI_DAL", "player_display_name": float("nan"), "receiving_yards": 10.0},
+            {"game_id": "2024_10_PHI_DAL", "player_display_name": "A.J. Brown", "receiving_yards": 62.0},
+        ]
+    )
+    index = build_player_stats_index(stats)
+    assert list(index.keys()) == [("2024_10_PHI_DAL", "A.J. Brown")]
+
+
 # --- settle_prop_snapshots ---
 
 
@@ -102,3 +117,37 @@ def test_settle_prop_snapshots_leaves_missing_stat_value_as_none():
     snapshots = pd.DataFrame([_prop_row("2026_01_KC_LAC", "Patrick Mahomes", "receptions", Side.OVER, 0.5)])
     graded = settle_prop_snapshots(snapshots, PLAYER_STATS)
     assert graded["outcome"].iloc[0] is None
+
+
+# --- normalize_player_name / real book-vs-nflverse mismatches ---
+# Confirmed live 2026-08-18 pulling real historical props (KC/DEN, PHI/DAL,
+# HOU/DET, 2024 week 10) -- these are the actual mismatches found, not
+# hypothetical ones.
+
+
+def test_normalize_player_name_strips_punctuation():
+    assert normalize_player_name("AJ Brown") == normalize_player_name("A.J. Brown")
+
+
+def test_normalize_player_name_applies_known_nickname_overrides():
+    assert normalize_player_name("Kenneth Gainwell") == normalize_player_name("Kenny Gainwell")
+
+
+def test_settle_prop_snapshots_matches_despite_punctuation_difference():
+    stats = pd.DataFrame(
+        [{"game_id": "2024_10_PHI_DAL", "player_display_name": "A.J. Brown", "receiving_yards": 62.0}]
+    )
+    # the odds book sent "AJ Brown" (no periods) -- must still match.
+    snapshots = pd.DataFrame([_prop_row("2024_10_PHI_DAL", "AJ Brown", "receiving_yards", Side.OVER, 55.5)])
+    graded = settle_prop_snapshots(snapshots, stats)
+    assert graded["outcome"].iloc[0] == "win"
+
+
+def test_settle_prop_snapshots_matches_via_nickname_override():
+    stats = pd.DataFrame(
+        [{"game_id": "2024_10_PHI_DAL", "player_display_name": "Kenny Gainwell", "rushing_yards": 22.0}]
+    )
+    # the odds book sent "Kenneth Gainwell" -- nflverse uses "Kenny".
+    snapshots = pd.DataFrame([_prop_row("2024_10_PHI_DAL", "Kenneth Gainwell", "rushing_yards", Side.UNDER, 30.5)])
+    graded = settle_prop_snapshots(snapshots, stats)
+    assert graded["outcome"].iloc[0] == "win"
