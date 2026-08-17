@@ -24,7 +24,18 @@
 - [x] A leakage-free, point-in-time backtesting framework (`src/backtest/engine.py`)
 - [x] A comparative implementation of four probability devigging methods, anchored to Pinnacle (`src/devig/`)
 - [x] A CLV measurement framework with bootstrap confidence intervals (`src/clv/metrics.py`)
-- [ ] A non-stationarity / drift monitor for edge decay (`src/drift/`, not yet built)
+- [x] An EPA-based win-probability model with a calibration layer, validated for calibration
+      quality (not CLV — see §3.1) against a market baseline on ten seasons of historical
+      data (`src/model/train.py`, `src/model/calibration.py`)
+- [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
+      change-point detection, calibration drift (`src/drift/monitor.py`), built and
+      tested against synthetic data ahead of a live CLV time series to run it on
+- [x] A preseason dry run validating the full live pipeline against real odds ahead of
+      the regular season (§3.5) — no bets, no Pinnacle, not part of the results below
+- [x] A live +EV scanner and SMS alerting system (§4.9) comparing execution-book prices
+      against Pinnacle's fair value in real time, running as a 24/7 macOS service
+      (`src/signal/live_scan.py`, `src/notify/`) — a notification channel, not a
+      bet-placement bot; confirmed live against real data (§4.9)
 - [ ] An honest, falsifiable case study across the 2026 NFL season (in progress — infrastructure complete, season data collection just started 2026-08-14)
 
 ### 1.4 What success means here
@@ -57,10 +68,28 @@
 same ground — scores, opening/closing spread/total/moneyline lines back to 1999 — with
 no separate ingestion path needed.)
 
+**These two rows are not interchangeable, and the chronology matters.** nflverse's
+schedule odds are a market-consensus close that nflverse aggregates — nowhere confirmed
+to be Pinnacle specifically — and cover only a single closing number per game, with no
+intraday history. The Odds API's `regions=eu` feed is confirmed live to return Pinnacle
+explicitly (272/272 events matched in testing), and is the only source with the
+entry-vs-close snapshot pairs CLV actually requires. Because nflverse has no intraday
+snapshots, it **cannot produce a CLV number at all** — there is nothing to measure
+movement against. Its 2015-2024 coverage is used in §4.5 to train and calibration-test
+the win-probability model (Brier score, log loss, reliability vs. a market baseline),
+which is a calibration-quality result, not a CLV result and not a claim about beating
+Pinnacle. The CLV headline result (§5.3) is exclusively a live, 2026-season claim, built
+from Odds API/Pinnacle snapshots collected from 2026-08-14 onward. A paid Odds API plan
+(planned ~2026-08-22) would unlock a historical endpoint that could, in principle,
+backfill genuine Pinnacle intraday history pre-2026 at 10x the credit cost per call —
+not used in this paper as it stands.
+
 ### 3.2 Live snapshot collection
-**Provider:** The Odds API, `regions=eu` (Pinnacle is listed under EU bookmakers, not
-`us`/`us2` — confirmed live against the free-tier key: `regions=eu` alone returns
-Pinnacle without paying for the `us` region's extra credit cost).
+**Provider:** The Odds API, `regions=eu,us` — `eu` for Pinnacle (listed under EU
+bookmakers, not `us`/`us2`), `us` for the three execution books (§3.4, §4.9). Through
+2026-08-17 the collector ran `eu` only; `us` was added once comparing execution-book
+prices against Pinnacle live became a load-bearing part of the project (§4.9), doubling
+per-poll credit cost.
 
 **Polling cadence is budget-adaptive, not fixed.** `decide_poll()`
 (`src/collect/budget.py`) picks `max(game_interval, budget_interval, floor)`:
@@ -69,23 +98,48 @@ Pinnacle without paying for the `us` region's extra credit cost).
   billing period, so the free tier's 500 credits/month can't be exhausted in week one.
 - a 15-minute floor regardless.
 
-On the free tier alone, `budget_interval` (~4.5 hours, since `(500-20)/3` polls have to
-stretch across a 30-day period at 3 credits/poll for `regions=eu` × 3 markets)
-dominates the max() in every scenario tested, including the most favorable one (full
-budget, a kickoff 5 hours out). So in practice the free tier produces a **flat ~4.5-hour
-cadence around the clock**, not the dense-near-kickoff behavior the cadence rule targets
-— that only becomes the binding constraint once the budget ceiling is high enough for
-`budget_interval` to drop below 30-60 minutes. One poll captures the entire league's
-slate simultaneously (verified live: 272/272 scheduled games matched in one call), so
-"every 4.5 hours" still means every game gets a synchronized fresh snapshot, not just
+On the free tier, `budget_interval` dominates the max() in every scenario tested. At
+`regions=eu` alone this worked out to ~4.5 hours (`(500-20)/3` polls at 3 credits/poll
+spread across 30 days); adding `regions=us` on 2026-08-17 doubled the per-poll cost to 6
+credits and pushed the same math to **~8.6 hours** (confirmed against the live account
+state that day: 467 credits remaining, ~27 days left in the period). This resolves
+itself automatically once the paid plan (§3.1, ~2026-08-22) raises the account's real
+credit ceiling — `decide_poll` reads `remaining_credits` from the live API response
+header, not a hardcoded constant, so no code change is needed. One poll still captures
+the entire league's slate simultaneously (verified live: 272/272 scheduled games
+matched, all four books — Pinnacle, DraftKings, FanDuel, BetMGM — present in one call),
+so a long interval still means every game gets a synchronized fresh snapshot, not just
 whichever is closest to kickoff.
+
+**Deployment:** runs as a macOS launchd service (`ops/com.nflclv.collector.plist`,
+`RunAtLoad` + `KeepAlive`), not a foreground process. This distinction mattered in
+practice: the collector's first run (2026-08-14) was a one-off foreground invocation
+that died with its terminal session, producing a 2.5-day collection gap (§3.3) before
+the launchd service was installed on 2026-08-17.
 
 **Provenance:** every `OddsSnapshot` row carries `book`, `capture_time` (the real
 wall-clock moment the API response was received, never backfilled or estimated from
 game time), and `event_id` matching nflverse's `game_id` convention.
 
 ### 3.3 Known data limitations
-*State plainly: intraday history only exists from the day collection started. No backfill. Note any gaps, provider outages, or schema changes encountered.*
+Intraday history only exists from the day collection started (2026-08-14); nothing
+before that is recoverable by any means available to this project (§3.1's paid
+historical endpoint, not yet purchased, is the only thing that could partially
+backfill Pinnacle history, and even that starts from whenever it's purchased, not
+retroactively).
+
+**Collection gap, 2026-08-14 21:52 UTC → 2026-08-17 08:02 UTC (~2.5 days).** The
+collector's first run (`make collect-once`, verified live: 272/272 events matched,
+Pinnacle present) was a manual, one-off invocation in a foreground terminal session,
+not a persistent process — it exited when that session ended, and nothing was
+running again until it was installed as a macOS launchd service on 2026-08-17
+(`ops/com.nflclv.collector.plist`, `make collector-service-install`; `RunAtLoad` +
+`KeepAlive` so it now survives terminal closes, sleep, and reboots). Any line movement
+during that window is permanently unmeasured for every game whose price moved in that
+span — a real, if minor, hole in the pre-Week-1 CLV record, disclosed here rather than
+smoothed over. Collection has run continuously since 2026-08-17 08:02 UTC (verified:
+272/272 events matched again on restart, Pinnacle present, 467 Odds API credits
+remaining).
 
 ### 3.4 Bet execution venues
 Pinnacle is the project's fair-value anchor for CLV (see §4.2), but Pinnacle is not
@@ -125,6 +179,39 @@ alter the price actually being risked, which distorts the realized entry price r
 to a genuine risk-priced wager. Bets placed with bonus credit or under an odds boost are
 tagged separately in the bet log and excluded from the headline CLV figures reported in
 §5, consistent with the project's "honest math" framing (blueprint Part A).
+
+### 3.5 Preseason dry run (infrastructure validation, not a result)
+Before the regular season and the real collector's shared credit budget were on the
+line, the live pipeline (poll → match → store → measure) was exercised end-to-end
+against real 2026 preseason odds — `src/collect/preseason.py` polling The Odds API's
+`americanfootball_nfl_preseason` sport key, `src/clv/preseason_report.py` computing
+entry-vs-latest price and probability CLV movement. **No bets were placed and this data
+is not part of any result in §5** — it is purely a smoke test that the mechanics work
+before they matter.
+
+Two properties make this data structurally distinct from everything else in this paper:
+
+- **No Pinnacle.** Confirmed live, across every region tested (`eu`, `us`, `us2`):
+  Pinnacle does not trade NFL preseason at all. Only FanDuel, MyBookie, and 1xBet post
+  preseason lines. FanDuel served as the dry run's reference book — explicitly *not* a
+  Pinnacle substitute, and Pinnacle's own absence here is informative on its own terms:
+  a market a sharp book won't price is a market too thin and low-information to read
+  value into — a temptation directly considered and rejected during this build: a lone
+  book quoting a number nobody else quotes isn't evidence of mispricing, just a market
+  with no reference price to check it against.
+- **No nflverse identity.** nflverse's schedule tables carry no preseason rows
+  (`game_type` is only REG/WC/DIV/CON/SB), so preseason events have no `game_id` to
+  join against. They were identified instead by The Odds API's own stable per-event
+  `id`, namespaced with a `PRE` prefix (`2026_PRE_<odds-api-id>`) specifically so they
+  can never be mistaken for a real nflverse `game_id` downstream, and written to a
+  separate store (`data/snapshots_preseason/`, never `data/snapshots/`).
+
+First live run (2026-08-17): 16/16 `americanfootball_nfl_preseason` events matched
+cleanly (0 unmatched, 0 malformed) via the Odds-API-id path, confirming the matcher,
+transform, and store layers all work correctly against real data outside the schema
+nflverse was built to describe. An interactive notebook
+(`notebooks/preseason_dry_run.ipynb`) exists for re-running this inspection as more
+polls accrue through the remainder of the preseason window.
 
 ---
 
@@ -192,9 +279,44 @@ decision point it chooses to act; P&L uses the actual price available at that de
 point, not a theoretical fill.
 
 ### 4.5 Modeling approach
-*Not yet built. Baseline = devigged Pinnacle close (§4.2/§4.3, already implemented and
-usable as-is). Model architecture (logistic / GBM), feature set, and calibration layer
-are blocked on pulling and caching nflverse play-by-play data.*
+Baseline = devigged market close (§4.2/§4.3); on live 2026 data this is Pinnacle, on the
+2015-2024 historical data used here it is nflverse's consensus close (§3.1 — the two are
+not the same claim, and this section's results are calibration-quality validation, not a
+CLV result).
+
+**Features** (`src/model/features.py`): pre-game offensive and defensive EPA-per-play and
+success rate, one row per team per game, built from nflverse play-by-play
+(`src/features/load_static.py::load_pbp`, trimmed to a 12-column schema). Every feature
+is shifted one game before aggregating — a team's own game never contributes to its own
+pre-game feature — season-to-date expanding mean by default (resets each season, so
+roster turnover between years doesn't blend into a week-1 average). Regression-tested
+with a deliberate +100 EPA outlier that must not leak into its own game's row. Schedule
+context (rest days, divisional flag, roof/surface/weather) is joined in via
+`build_game_features`. The model deliberately excludes market odds as an input — it is
+scored *against* the market baseline, not fed the market's own price, so the comparison
+stays "model vs. market."
+
+**Model** (`src/model/train.py`): a standardized logistic regression — "start simple"
+per blueprint Part E, before reaching for a gradient-boosted model. Ties (9 of 2743
+games, 2015-2024) are excluded, since a binary win label can't encode them; rows missing
+pre-game history (a team's first cached game) are dropped rather than imputed.
+
+**Split:** a three-way, out-of-time split by season — train (2015-2021), calibrate
+(2022), test (2023-2024) — so no season is used for more than one of {fit model, fit
+calibration, report results}.
+
+**Calibration** (`src/model/calibration.py`): the base model is wrapped as a frozen
+estimator (`sklearn.frozen.FrozenEstimator`) and passed to `CalibratedClassifierCV`, so
+the calibration step cannot silently retrain the base model on the calibration split.
+Isotonic regression by default; Platt scaling (`method="sigmoid"`) available for smaller
+calibration sets.
+
+**Evaluation:** Brier score and log loss (§4.7) on the held-out test seasons, model vs.
+market baseline vs. calibrated model. Reference run (`python -m src.model.calibration`,
+1743/282/570 train/calib/test games): the market baseline (Brier 0.210) beats both the
+raw (0.232) and calibrated (0.229) logistic model — consistent with the blueprint's own
+expectation that "the market already is the model." This is reported as the honest
+starting point, not a result to be explained away.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
@@ -232,7 +354,67 @@ Implemented in `src/model/evaluate.py`:
 - Bootstrap CI on mean CLV: `bootstrap_ci()`, §4.3.
 
 ### 4.8 Non-stationarity and drift detection
-*Rolling CLV window, CUSUM change-point detection, calibration drift monitoring.*
+Implemented in `src/drift/monitor.py`. "The genuinely hard part," per blueprint Part E:
+books patch inefficiencies and edges decay, and the interesting question is knowing an
+edge died before the bankroll says so. Three signals:
+- `rolling_mean_clv(clv_series, window)`: trailing-window mean CLV, using whatever
+  history exists for the first `window - 1` bets rather than staying silent until the
+  window fills.
+- `cusum(x, target, threshold, drift)`: a two-sided Page (1954) CUSUM change-point
+  detector. `drift` is the allowance/slack that absorbs ordinary noise so it doesn't
+  slowly accumulate into a false alarm; too low and any random walk eventually trips
+  it, too high and a real shift never crosses `threshold`. Not reset after firing --
+  the caller decides whether a flag means the strategy pauses, or the detector restarts
+  on the remaining series with a fresh target.
+- `rolling_calibration_drift(p, y, window, reference_brier)`: rolling Brier score minus
+  a reference value from the model's original holdout (§4.5's train/calib/test split),
+  turning "calibration drifts" into a specific, thresholdable number.
+
+**On the historical-vs-live split (§3.1):** this module is built and unit-tested against
+synthetic series now, the same way `src/clv/metrics.py` and `src/backtest/engine.py`
+were built before any real snapshot existed. It has nothing to monitor yet -- a rolling
+CLV window needs a live CLV time series, which only exists from 2026-08-14 onward. §5.6
+reports what it actually flagged, once there's enough of a season for a window to mean
+anything.
+
+### 4.9 Live +EV monitoring and alerting
+A live counterpart to the historical backtester (§4.4): rather than replaying settled
+games after the fact, `src/signal/live_scan.py` continuously compares each execution
+book's *current* price against Pinnacle's *current* devigged fair value, so a good spot
+is surfaced while the game is still open, not discovered later in a backtest.
+
+**Mechanism.** For each event, Pinnacle's latest home/away moneyline prices (always from
+the same poll, so they're devigged as one consistent market rather than mixing two
+moments in time) are converted to a fair probability via `market_baseline()` (§4.2's
+Shin default). For each execution book (DraftKings, FanDuel, BetMGM -- §3.4's manual
+bet-execution venues, not an arbitrary book list), that fair probability and the book's
+own decimal price feed directly into `expected_value(p, d)` (§4.6, unchanged) to get EV
+per dollar staked. A spot is flagged when EV clears a **2% threshold**. Moneyline only
+for now -- spread/total comparisons need matching line numbers between books to be a
+clean apples-to-apples bet, deferred rather than built sloppily.
+
+**Alert dedup.** A spot that stays flagged doesn't re-alert every cycle: `data/alert_state.json`
+tracks the edge at last-alert time per (event, side, book), and only fires again once
+the edge has grown by at least one percentage point since then
+(`new_or_improved_spots()`).
+
+**Delivery.** Alerts are a read-only notification, not an action: `src/notify/sms.py`
+drives Messages.app via AppleScript to text a configured phone number -- no
+third-party account, no bet ever placed automatically. This is consistent with the
+manual-bets-only project scope (§3.4): the system finds and reports the spot, a human
+places the bet.
+
+**Deployment.** Runs as a second macOS launchd service (`com.nflclv.monitor`),
+independent of the collector -- `StartInterval`-based (every 5 minutes, a short-lived
+scan-and-exit script rather than a daemon), reading only local parquet files, so it
+costs nothing against the Odds API credit budget and its cadence is decoupled from the
+collector's own (§3.2).
+
+**First live result (2026-08-17):** against a real `regions=eu,us` poll, the scanner
+found 4 spots clearing the 2% threshold -- FanDuel and BetMGM each offering 3.6-6.1% EV
+on two different underdog moneylines relative to Pinnacle's fair value at that moment.
+Confirms the comparison logic end-to-end on real data; not a claim about the strategy's
+long-run edge, which only the live season (§5) can establish.
 
 ---
 
@@ -270,6 +452,10 @@ Implemented in `src/model/evaluate.py`:
 ## Appendix A. Repo structure and reproducibility
 
 *Link to repo tree, CI setup, how to reproduce results locally.*
+
+Interactive analysis (raw snapshot inspection, the preseason CLV report, line-movement
+charts, and the historical model/calibration pipeline) is runnable directly via
+`notebooks/preseason_dry_run.ipynb` — see the repo README for kernel setup.
 
 ## Appendix B. Full devig derivations
 
