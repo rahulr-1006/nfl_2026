@@ -1,9 +1,9 @@
 {
   "0": "Side",
   "1": "scheduler.py",
-  "2": "test_live_scan.py",
+  "2": "pit_store.py",
   "3": "props.py",
-  "4": "test_evaluate.py",
+  "4": "market_baseline",
   "5": "test_clv_metrics.py",
   "6": "OddsApiClient",
   "7": "PointInTimeStore",
@@ -36,5 +36,7 @@
   "34": "extraction-spec.md",
   "35": "test_prop_settlement.py",
   "36": "datetime",
-  "37": "DataFrame"
+  "37": "DataFrame",
+  "38": "test_evaluate.py",
+  "39": "test_sizing.py"
 }
