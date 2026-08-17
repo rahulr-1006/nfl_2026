@@ -2,9 +2,9 @@
   "0": "Side",
   "1": "scheduler.py",
   "2": "test_live_scan.py",
-  "3": "test_collect_transform.py",
+  "3": "props.py",
   "4": "test_evaluate.py",
-  "5": "market_baseline",
+  "5": "test_clv_metrics.py",
   "6": "OddsApiClient",
   "7": "PointInTimeStore",
   "8": "test_devig.py",
@@ -33,5 +33,8 @@
   "31": "graphify reference: transcribe video and audio",
   "32": "CLAUDE.md",
   "33": ".claude/CLAUDE.md",
-  "34": "extraction-spec.md"
+  "34": "extraction-spec.md",
+  "35": "test_prop_settlement.py",
+  "36": "datetime",
+  "37": "DataFrame"
 }

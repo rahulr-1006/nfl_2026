@@ -17,3 +17,4 @@ data/alert_state.json
 logs/
 graphify-out/cost.json
 graphify-out/cache/
+data/demo_snapshots/
