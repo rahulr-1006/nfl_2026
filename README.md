@@ -75,6 +75,12 @@ results in the paper fill in as the season generates enough data to report on:
       of the gap to the market baseline (0.232→0.219 vs. market's 0.210) — confirms
       opponent-adjustment was the single biggest gap in the original EPA-only model.
       Results: `notebooks/model_backtest_results.ipynb`.
+- [x] Garbage-time filtering (`src/model/features.py`, `exclude_garbage_time=True`) —
+      standard nflverse-community convention (Q4/OT + win probability outside
+      [0.05, 0.95]), 11.3% of real plays flagged, verified against a real EPA mean
+      shift (not degenerate). **Negative result:** makes both EPA-only and EPA+Elo
+      slightly *worse* (0.2316→0.2335, 0.2192→0.2197), not better — reported as
+      found. Stays opt-in, default off. Results: `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false
