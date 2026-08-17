@@ -1,4 +1,4 @@
-.PHONY: venv install test lint collect collect-once preseason-poll preseason-report \
+.PHONY: venv install test lint collect collect-once preseason-poll preseason-report props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status clean
 
@@ -33,6 +33,15 @@ preseason-poll:
 
 preseason-report:
 	$(PY) -m src.clv.preseason_report
+
+# Player props (src/collect/props.py): PREPPED, NOT ACTIVE as of 2026-08-17
+# -- live-checked and confirmed NFL props aren't posted this far before
+# kickoff (only DraftKings, one market, no Pinnacle). Don't run this on a
+# schedule; it's here so it's ready once props actually start filling in.
+# Defaults to games in the next 7 days; pass a different day count as an
+# arg, e.g. `make props-poll ARGS=3`.
+props-poll:
+	$(PY) -m src.collect.props $(ARGS)
 
 # Real-season collector as a persistent background service (macOS launchd),
 # so it survives terminal closes, sleep, and reboots -- `make collect` alone
