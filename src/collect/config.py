@@ -19,7 +19,12 @@ from pathlib import Path
 class Config:
     api_key: str
     sport_key: str = "americanfootball_nfl"
-    regions: str = "eu"  # Pinnacle lives here; "us" would double credit cost for nothing
+    # "eu" alone gets Pinnacle (the CLV anchor); "us" is DraftKings/FanDuel/BetMGM,
+    # the actual bet-execution books (paper Sec 3.4) -- src/signal/live_scan.py
+    # needs both regions to compare a live execution-book price against
+    # Pinnacle's fair value. This doubles per-poll credit cost (regions x
+    # markets); added 2026-08-17 once that comparison became load-bearing.
+    regions: str = "eu,us"
     markets: str = "h2h,spreads,totals"
     reduced_markets: str = "spreads,totals"  # budget-tight fallback: drop moneyline first
     odds_format: str = "american"
@@ -64,7 +69,7 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
 
     return Config(
         api_key=api_key,
-        regions=src.get("ODDS_API_REGIONS", "eu"),
+        regions=src.get("ODDS_API_REGIONS", "eu,us"),
         markets=src.get("ODDS_API_MARKETS", "h2h,spreads,totals"),
         season=int(src.get("COLLECT_SEASON", "2026")),
         monthly_budget=int(src.get("ODDS_API_MONTHLY_BUDGET", "500")),

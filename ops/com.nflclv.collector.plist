@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nflclv.collector</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/.venv/bin/python</string>
+        <string>-m</string>
+        <string>src.collect.run</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026</string>
+
+    <!-- Start as soon as the agent is loaded (covers login/reboot), and
+         restart automatically if the process ever exits -- src/collect/run.py
+         only exits on CollectorHalted (too many consecutive API failures) or
+         an unhandled bug, both of which should page a human via the log, not
+         silently stay down. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/collector.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/collector.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>
