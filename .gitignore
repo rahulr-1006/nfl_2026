@@ -15,3 +15,5 @@ data/alert_state.json
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/
 logs/
+graphify-out/cost.json
+graphify-out/cache/
