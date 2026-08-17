@@ -37,7 +37,7 @@ from collections.abc import Iterable
 from datetime import datetime, timedelta
 
 from src.collect.client import OddsApiClient, OddsApiError, RateLimitExceeded
-from src.collect.props import event_odds_to_prop_snapshots
+from src.collect.props import DEFAULT_MARKETS, event_odds_to_prop_snapshots
 from src.collect.transform import MatchResult, TransformError
 from src.store.pit_store import PointInTimeStore
 from src.store.schema import OddsSnapshot
@@ -66,16 +66,20 @@ def pull_historical_prop_snapshot(
     client: OddsApiClient,
     event_id: str,
     date: str,
-    market: str,
+    markets: str,
     match: MatchResult,
     regions: str = DEFAULT_REGIONS,
 ) -> list[OddsSnapshot]:
-    """One historical snapshot (nearest available <= `date`) for a single
-    market at a single event. `date` should be close to the bet you're
-    trying to reconstruct (e.g. near kickoff for a closing line) --
-    this pulls one point in time, not a range.
+    """One historical snapshot (nearest available <= `date`) for one or
+    more markets (comma-joined, e.g. props.DEFAULT_MARKETS for all seven
+    supported O/U markets in a single call) at a single event. `date`
+    should be close to the bet you're trying to reconstruct (e.g. near
+    kickoff for a closing line) -- this pulls one point in time, not a
+    range. Requesting N markets in one call costs the same as N separate
+    single-market calls (10 x markets x regions either way), so combining
+    them here only saves HTTP round-trips, not credits.
     """
-    response = client.get_historical_event_odds(event_id, date, regions, market)
+    response = client.get_historical_event_odds(event_id, date, regions, markets)
     event_data = response.events[0]
     return event_odds_to_prop_snapshots(event_data, response.fetched_at, match)
 
@@ -83,8 +87,8 @@ def pull_historical_prop_snapshot(
 def backfill_historical_props(
     client: OddsApiClient,
     games: Iterable[tuple[MatchResult, str, str, datetime]],
-    market: str,
     store: PointInTimeStore,
+    markets: str = DEFAULT_MARKETS,
     regions: str = DEFAULT_REGIONS,
     minutes_before_kickoff: int = 15,
 ) -> dict[str, int]:
@@ -112,7 +116,7 @@ def backfill_historical_props(
             continue
 
         try:
-            snapshots = pull_historical_prop_snapshot(client, event_id, snapshot_date, market, match, regions)
+            snapshots = pull_historical_prop_snapshot(client, event_id, snapshot_date, markets, match, regions)
         except (OddsApiError, RateLimitExceeded) as exc:
             log.error("historical props: failed to pull %s (%s): %s", event_id, match.event_id, exc)
             failed += 1
