@@ -36,6 +36,9 @@
       against Pinnacle's fair value in real time, running as a 24/7 macOS service
       (`src/signal/live_scan.py`, `src/notify/`) — a notification channel, not a
       bet-placement bot; confirmed live against real data (§4.9)
+- [x] Player-prop infrastructure (§3.6) — schema, per-event polling, and settlement
+      against real player stats, built and tested ahead of live prop data existing;
+      confirmed live 2026-08-17 that props aren't posted this far before kickoff
 - [ ] An honest, falsifiable case study across the 2026 NFL season (in progress — infrastructure complete, season data collection just started 2026-08-14)
 
 ### 1.4 What success means here
@@ -212,6 +215,49 @@ transform, and store layers all work correctly against real data outside the sch
 nflverse was built to describe. An interactive notebook
 (`notebooks/preseason_dry_run.ipynb`) exists for re-running this inspection as more
 polls accrue through the remainder of the preseason window.
+
+### 3.6 Player props (infrastructure prepped, not active)
+Mainline spreads/totals/moneylines are the most efficiently priced markets in sports
+betting -- Pinnacle and sharp money price them tightly. Player props get priced faster
+and with less scrutiny, and are the more commonly cited source of real mispricing, so
+extending toward them is a natural direction for this project. The infrastructure
+(schema, per-event polling, settlement) is built and tested ahead of any live prop data
+existing, deliberately, the same "prep now, activate later" pattern as §3.5.
+
+**Live-checked 2026-08-17 (3.5 weeks before the Week 1 opener), across every region
+(`us`, `us2`, `eu`, `uk`):** only DraftKings had posted anything for a Week 1 game, and
+only one market, `player_anytime_td` -- no passing/rushing/receiving yardage or
+reception props, no Pinnacle, no FanDuel, no BetMGM. This matches how NFL player props
+are actually released in the industry -- typically Tuesday-Thursday of game week, not
+weeks ahead like mainline markets -- so it is not a configuration gap the way the
+preseason and execution-book coverage gaps (§3.5, §4.9) were; there is simply nothing
+to poll yet. This leaves one question genuinely open: **whether Pinnacle trades NFL
+player props at all.** If it doesn't, the devig-Pinnacle-then-compare methodology this
+whole project is built around has no anchor for props, the same dead end preseason hit
+for team markets. Unknowable until props actually exist to check -- flagged for
+re-verification once they do (around 2026-09-02 for the Week 1 opener).
+
+**Structural differences from the mainline collector (§3.2), built now:**
+- Player props require the per-event endpoint (`OddsApiClient.get_event_odds`,
+  `/v4/sports/{sport}/events/{eventId}/odds`) -- one call per game, not one call for the
+  whole slate, at a materially different cost profile (unique markets returned x
+  regions per call).
+- Scoped to Over/Under markets only (`src/collect/props.py::PROP_MARKET_TO_STAT`:
+  passing/rushing/receiving yards and TDs, receptions) -- proposition-style markets
+  like `player_anytime_td` were observed live as single-sided (no complementary "No"
+  price), so they cannot be devigged with the existing two-outcome methods (§4.2) at
+  all, not merely unmapped yet.
+- The regular season already has real nflverse `game_id`s, unlike preseason, so props
+  reuse the mainline collector's own team matching (`match_event`) and write into the
+  same `data/snapshots/` store under `market=player_prop`, not a separate one.
+- Settlement (`src/store/prop_settlement.py`) grades an Over/Under prop against
+  `nflreadpy.load_player_stats()`, joined on `(game_id, player_display_name)`.
+  Unmatched players or missing stat values are left ungraded (`None`), never silently
+  dropped -- the same discipline `settle_snapshots` (§4.4-adjacent) already applies to
+  unplayed games.
+- Manual invocation only (`make props-poll`, defaulting to the coming week), not a
+  scheduled service -- per-event calls scale with game count and there is nothing to
+  poll most of the season.
 
 ---
 

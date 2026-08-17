@@ -80,6 +80,12 @@ results in the paper fill in as the season generates enough data to report on:
       devigged fair value, texts when the edge clears a threshold (default 2%
       EV). Runs 24/7 as a second macOS launchd service, independent of the
       collector. See "Live monitoring" below.
+- [x] Player-prop infrastructure (`src/collect/props.py`, `src/store/prop_settlement.py`)
+      — **prepped, not active.** Schema, per-event polling, and settlement
+      against nflverse player stats are built and tested; live-checked
+      2026-08-17 and confirmed props aren't posted this far before kickoff
+      (see "Player props" below for why, and what to check once they start
+      filling in).
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 
@@ -222,6 +228,67 @@ re-run it top to bottom after each new poll. It ends with a dated log section;
 add an entry each time you poll so there's a human-readable record alongside
 the parquet files' own `capture_time` timestamps.
 
+## Player props (prepped, not active)
+
+The thesis: mainline spreads/totals/moneylines are the most efficiently priced
+markets in sports betting — Pinnacle and sharp money hammer them into near-zero
+edge. Player props get priced faster, with less scrutiny, and are the more
+commonly cited source of real mispricing. Worth building toward — but the
+infrastructure (schema, per-event polling, settlement) is ready before any
+live data is, on purpose, so turning it on later is a config change, not a
+design scramble. Same pattern as the preseason dry run.
+
+**Why it's not running yet — checked live, 2026-08-17 (3.5 weeks before Week
+1):**
+- Across every region (`us`, `us2`, `eu`, `uk`), only **DraftKings** had
+  posted anything for Week 1, and only one market — `player_anytime_td`. No
+  passing/rushing/receiving yardage or reception props. No Pinnacle, no
+  FanDuel, no BetMGM.
+- This matches how the industry actually works: NFL player props are
+  typically posted Tuesday-Thursday of *game week*, not weeks ahead like
+  mainline markets. There's nothing to poll yet — this isn't a config or
+  region problem the way the preseason/execution-book gaps were.
+- **The open question this can't answer yet: does Pinnacle even trade NFL
+  player props at all?** If not, the whole devig-Pinnacle-then-compare
+  methodology (§4.9's live scanner, the CLV backtester) has no anchor for
+  props, the same dead end preseason hit. Unknown until props actually exist
+  to check.
+
+**What's built, structurally different from the mainline collector:**
+- **Different endpoint, different cost model.** Props require
+  `/v4/sports/{sport}/events/{eventId}/odds` (`OddsApiClient.get_event_odds`)
+  — one call *per game*, not one call for the whole slate. Cost is unique
+  markets returned × regions, billed per call.
+- **Over/Under props only.** `player_pass_yds`, `player_pass_tds`,
+  `player_rush_yds`, `player_rush_tds`, `player_reception_yds`,
+  `player_receptions`, `player_reception_tds` (`src/collect/props.py::PROP_MARKET_TO_STAT`).
+  Proposition-style markets (`player_anytime_td` and similar) were observed
+  live as **single-sided** — no complementary "No" price — so they can't be
+  devigged with the existing two-outcome methods at all; deliberately out of
+  scope, not just unmapped.
+- **Real nflverse game_ids**, unlike preseason — the regular season already
+  has real schedule rows, so props reuse the same team-matching
+  (`src/collect/transform.py::match_event`) the mainline collector uses, and
+  write into the *same* `data/snapshots/` store (just `market=player_prop`),
+  not a separate one.
+- **Settlement against real stats:** `src/store/prop_settlement.py` grades an
+  Over/Under prop against `nflreadpy.load_player_stats()` — passing/rushing/
+  receiving yards, TDs, receptions, joined on `(game_id, player_display_name)`.
+  Unmatched players or missing stats are left ungraded (`None`), never
+  silently dropped or defaulted.
+- **Manual invocation only, scoped to the coming week** —
+  `make props-poll` (defaults to games in the next 7 days; `make props-poll ARGS=3`
+  for a tighter window) — not a launchd service. Per-event calls scale with
+  game count, and there's nothing to poll most of the season anyway.
+
+**What to check once props start filling in (~1 week before a game, so watch
+starting around 2026-09-02 for the Week 1 opener):** re-run the live checks
+above — does Pinnacle show up for any prop market, and which of the seven
+supported markets actually have depth across DraftKings/FanDuel/BetMGM. That
+determines whether §4.9's live scanner and the CLV backtester can extend to
+props at all, or whether props end up scoped to calibration-only analysis the
+way the historical nflverse odds are (see "Data chronology" above).
+
 ## Quickstart
 
 ```bash
@@ -253,8 +320,8 @@ nfl-clv/
     snapshots/          # append-only intraday captures, real season (parquet, partitioned by date)
     snapshots_preseason/ # append-only intraday captures, preseason dry run (separate from the above)
   src/
-    collect/           # live odds collector + scheduler + preseason dry-run poller
-    store/              # point-in-time store read/write + leakage guards
+    collect/           # live odds collector + scheduler + preseason/props pollers
+    store/              # point-in-time store, leakage guards, settlement (team + player prop)
     devig/              # the four devig methods + tests
     features/            # feature builder from snapshots + play-by-play
     model/               # baseline (market) + your model + calibration
