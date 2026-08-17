@@ -27,6 +27,9 @@
 - [x] An EPA-based win-probability model with a calibration layer, validated for calibration
       quality (not CLV — see §3.1) against a market baseline on ten seasons of historical
       data (`src/model/train.py`, `src/model/calibration.py`)
+- [x] An Elo opponent-adjustment benchmark (§4.5) — sequential, leakage-free by
+      construction; beats the EPA-only model on its own and closes ~57% of the gap to
+      the market baseline when combined with EPA (`src/model/elo.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -382,6 +385,26 @@ market baseline vs. calibrated model. Reference run (`python -m src.model.calibr
 raw (0.232) and calibrated (0.229) logistic model — consistent with the blueprint's own
 expectation that "the market already is the model." This is reported as the honest
 starting point, not a result to be explained away.
+
+**Opponent-adjustment benchmark (Elo).** The EPA features above are not opponent-adjusted
+— a team's rolling EPA looks identical whether it was earned against a strong or weak
+defense. `src/model/elo.py` adds the standard fix from the sports-forecasting literature:
+FiveThirtyEight-style NFL Elo (starting rating 1500, K=20, margin-of-victory multiplier
+that dampens credit for a big favorite beating up on a team it was already better than,
+home-field advantage of 48 points, one-third reversion toward the mean at each new
+season). Sequential by construction — a team's rating entering a game reflects only games
+strictly before it, no shift() trick required the way EPA needs one. Relocated franchises
+(SD→LAC, OAK→LV, STL→LA, confirmed against the cached schedule rather than assumed) are
+canonicalized so a rating carries through a move.
+
+Same train/calib/test split, same test-season games: **Elo alone (Brier 0.221) already
+beats the full EPA feature set (0.232)** — opponent-adjustment on its own outperforms raw
+team-level EPA rolling averages. Combining both feature sets in one logistic regression
+(`epa_plus_elo`, Brier 0.219) closes roughly 57% of the gap between EPA-only and the
+market baseline. Still short of market — expected, and not explained away — but the first
+result in this project that substantively validates "opponent-adjustment is the modeling
+gap that matters most," rather than asserting it. Full reference run, coefficients, and
+the resulting end-of-2024 rating table: `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:

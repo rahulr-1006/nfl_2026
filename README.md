@@ -67,6 +67,14 @@ results in the paper fill in as the season generates enough data to report on:
       [`notebooks/model_backtest_results.ipynb`](notebooks/model_backtest_results.ipynb).
       **Trained on nflverse's odds, not Pinnacle — see "Data chronology" below
       before reading these numbers as a CLV result.**
+- [x] Elo opponent-adjustment benchmark (`src/model/elo.py`) — FiveThirtyEight-style NFL
+      Elo (K=20, margin-of-victory multiplier, 48pt home-field advantage, 1/3 season
+      reversion), sequential and leakage-free by construction, franchise relocations
+      (SD→LAC, OAK→LV, STL→LA) canonicalized so ratings carry through a move. **Elo alone
+      (Brier 0.221) beats the full EPA feature set (0.232)**; combining both closes ~57%
+      of the gap to the market baseline (0.232→0.219 vs. market's 0.210) — confirms
+      opponent-adjustment was the single biggest gap in the original EPA-only model.
+      Results: `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false
