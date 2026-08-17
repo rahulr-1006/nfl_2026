@@ -27,9 +27,11 @@ than the model just re-deriving the market's own price.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Protocol
 
 import numpy as np
 import pandas as pd
+from sklearn.ensemble import HistGradientBoostingClassifier
 from sklearn.linear_model import LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
@@ -113,6 +115,10 @@ def time_based_split(
     return train, calib, test
 
 
+class _ProbaClassifier(Protocol):
+    def predict_proba(self, X) -> np.ndarray: ...
+
+
 def fit_win_probability_model(train_df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS) -> Pipeline:
     """Standardized logistic regression on `feature_columns` (default:
     EPA only -- "start simple" per blueprint Part E, before reaching for
@@ -126,5 +132,35 @@ def fit_win_probability_model(train_df: pd.DataFrame, feature_columns: Sequence[
     return model
 
 
-def predict_home_win_proba(model: Pipeline, df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS) -> np.ndarray:
+def fit_gbm_model(
+    train_df: pd.DataFrame,
+    feature_columns: Sequence[str] = FEATURE_COLUMNS,
+    **kwargs,
+) -> HistGradientBoostingClassifier:
+    """Gradient-boosted trees on `feature_columns` -- blueprint Part E's
+    other suggested option ("logistic OR GBM"), actually tried now.
+    sklearn's HistGradientBoostingClassifier, not a new dependency (scikit-learn
+    is already required). No StandardScaler -- tree splits are scale-invariant,
+    unlike the logistic model.
+
+    Defaults are the best of a small hand-swept grid on this dataset's
+    size (~1700 training games, a dozen features) -- not sklearn's own
+    defaults, which grow deeper/more numerous trees than a set this small
+    can support without overfitting, and not an arbitrary first guess
+    either (an earlier max_depth=3/max_iter=200 config scored notably
+    worse; see notebooks/model_backtest_results.ipynb for the sweep).
+    Even at this best-found setting, GBM does not beat the logistic model
+    on this feature set (§4.5 of the paper) -- shallow trees and few
+    rounds narrow the gap, they don't close it. `**kwargs` overrides any
+    default for further sweeping.
+    """
+    defaults = {"max_iter": 50, "max_depth": 2, "learning_rate": 0.1, "l2_regularization": 1.0, "random_state": 0}
+    model = HistGradientBoostingClassifier(**{**defaults, **kwargs})
+    model.fit(train_df[feature_columns], train_df["home_win"])
+    return model
+
+
+def predict_home_win_proba(
+    model: _ProbaClassifier, df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS
+) -> np.ndarray:
     return model.predict_proba(df[feature_columns])[:, 1]

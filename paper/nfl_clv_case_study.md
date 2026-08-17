@@ -34,6 +34,9 @@
       convention, verified against a real EPA distribution shift; a negative result
       (makes the model slightly worse, not better), reported as found rather than
       discarded (`src/model/features.py`)
+- [x] A gradient-boosted-trees comparison (§4.5) — mixed result: beats logistic
+      regression on EPA-only, loses once Elo is added; logistic + EPA + Elo remains
+      the reference model (`src/model/train.py::fit_gbm_model`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -430,6 +433,24 @@ outperform a weak team's, so the excluded plays likely still carry real signal, 
 a level shift rather than pure noise. `exclude_garbage_time` stays opt-in, default `False`
 — this negative result is the reason, not an oversight. Full comparison:
 `notebooks/model_backtest_results.ipynb`.
+
+**Gradient-boosted trees — a mixed result.** Blueprint Part E named "logistic OR GBM" as
+the starting options; only logistic had actually been tried until now.
+`src/model/train.py::fit_gbm_model` adds `sklearn.ensemble.HistGradientBoostingClassifier`
+(no new dependency, no `StandardScaler` needed — tree splits are scale-invariant). A small
+hand-swept hyperparameter grid was run first, since GBM is far more sensitive to
+hyperparameters than logistic regression and reporting one arbitrary config would be a
+weak comparison; the best found (`max_depth=2, max_iter=50, learning_rate=0.1`) became the
+default, not a first guess.
+
+Result, same holdout: **GBM slightly beats logistic regression on EPA-only** (0.2300 vs.
+0.2316), **but loses once Elo is added** (0.2217 vs. 0.2192). Read together with the
+opponent-adjustment result above: GBM finds a small amount of genuine non-linear structure
+in the EPA features alone that a linear model misses, but once Elo — a strong signal
+that's plausibly already close to linear in log-odds — is added, the extra model capacity
+GBM brings stops helping and starts adding noise instead. Neither result is large enough
+to change the reference model: logistic regression on EPA+Elo (0.2192) remains the best
+result to date. Full sweep and comparison: `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
