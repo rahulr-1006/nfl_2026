@@ -37,6 +37,9 @@
 - [x] A gradient-boosted-trees comparison (§4.5) — mixed result: beats logistic
       regression on EPA-only, loses once Elo is added; logistic + EPA + Elo remains
       the reference model (`src/model/train.py::fit_gbm_model`)
+- [x] A QB-level Elo residual rating (§4.5) — isolates QB contribution from team
+      strength; a real, modest improvement over EPA+Elo (Brier 0.2192 → 0.2170),
+      sanity-checked against known-elite/known-weak QBs (`src/model/qb_elo.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -451,6 +454,30 @@ that's plausibly already close to linear in log-odds — is added, the extra mod
 GBM brings stops helping and starts adding noise instead. Neither result is large enough
 to change the reference model: logistic regression on EPA+Elo (0.2192) remains the best
 result to date. Full sweep and comparison: `notebooks/model_backtest_results.ipynb`.
+
+**QB-level Elo — a real, modest improvement.** Team Elo captures team strength but not
+who's under center; a backup starting for a strong team and losing isn't the same signal
+as the starter losing. `src/model/qb_elo.py` adds a QB-level residual rating, deliberately
+this project's own simplification rather than a replication of a published model (e.g.
+FiveThirtyEight's ANY/A-regression-based QB Elo): a QB's rating moves based on how much
+the *team's actual result* over- or under-performed what the *team's own pre-game Elo
+alone* (ignoring QB identity) predicted, using a smaller K (8, vs. team Elo's 20) since a
+QB explains part of a team's result, not all of it. Data: nflverse's schedule already
+carries `home_qb_id`/`away_qb_id` for every game, zero missing across all 2743 cached
+games (2015-2024) — no new pull needed. Sequential and leakage-free the same way team Elo
+is; no season reversion (v1 simplification — a starting QB's skill is more stable year to
+year than a full roster turnover).
+
+Same split, same test-season games: **`epa_elo_qb` (Brier 0.2170) beats `epa_plus_elo`
+(0.2192)** — adding the QB residual closes a further slice of the gap to the market
+baseline (0.2099). `qb_only` (0.2258) is worse than `elo_only` (0.2210) alone, as
+expected — team Elo already captures most of what matters, and the QB residual is a
+smaller signal riding on top of it, not a replacement. Sanity check before trusting the
+result: final QB ratings (min 20 starts, 2015-2024) put Mahomes and Brady at the top,
+Josh Allen/Goff/Lamar Jackson/Rodgers/Hurts/Prescott rounding out the top 10, and
+late-career Eli Manning/Joe Flacco, Blake Bortles, Carson Wentz, Daniel Jones at the
+bottom — directionally sound, not noise. Full comparison and rating table:
+`notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
