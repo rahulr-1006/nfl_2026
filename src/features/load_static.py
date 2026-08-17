@@ -29,6 +29,40 @@ def load_schedules(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
     return path
 
 
+# nflverse play-by-play carries ~370 columns (personnel, NGS, win prob
+# deltas, etc.). The feature builder only needs the EPA/success columns
+# behind a team-strength proxy, so cache a trimmed schema rather than the
+# full raw pull -- keeps the parquet small and the feature builder's join
+# surface explicit.
+PBP_COLUMNS = [
+    "game_id",
+    "season",
+    "week",
+    "season_type",
+    "posteam",
+    "defteam",
+    "play_type",
+    "pass",
+    "rush",
+    "epa",
+    "success",
+    "wp",
+]
+
+
+def load_pbp(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
+    """Fetch nflverse play-by-play, trim to PBP_COLUMNS, and cache as parquet.
+
+    Regular-season and postseason rows only (season_type == "REG"/"POST");
+    nflverse pbp has no preseason rows to begin with, matching schedules.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = nfl.load_pbp(seasons=seasons).select(PBP_COLUMNS)
+    path = out_dir / f"pbp_{min(seasons)}_{max(seasons)}.parquet"
+    df.write_parquet(path)
+    return path
+
+
 def home_spread_line(spread_line: float) -> float:
     """Convert nflverse's spread_line into the sportsbook side-line
     convention that OddsSnapshot.line / settlement.settle() expect.
@@ -46,5 +80,6 @@ def home_spread_line(spread_line: float) -> float:
 if __name__ == "__main__":
     # Ten most recent completed seasons: enough for feature/calibration work
     # without pulling the full 1999-present history on first run.
-    path = load_schedules(list(range(2015, 2025)))
-    print(f"wrote {path}")
+    seasons = list(range(2015, 2025))
+    print(f"wrote {load_schedules(seasons)}")
+    print(f"wrote {load_pbp(seasons)}")

@@ -2,11 +2,12 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.features.load_static import home_spread_line
+from src.features.load_static import PBP_COLUMNS, home_spread_line
 from src.store.schema import Market, Side
 from src.store.settlement import build_results_index, settle
 
 SCHEDULE_PATH = Path("data/static/schedules_2015_2024.parquet")
+PBP_PATH = Path("data/static/pbp_2015_2024.parquet")
 
 
 def test_home_spread_line_negates():
@@ -39,3 +40,14 @@ def test_home_spread_line_sign_convention_matches_an_efficient_market():
     win_rate = wins / (wins + losses)
     assert 0.45 < win_rate < 0.55, f"home ATS win rate {win_rate:.4f} is not efficient-market-plausible"
     assert 0 < pushes / total < 0.05  # spreads land on 3/7 often enough to push a few percent of the time
+
+
+def test_cached_pbp_matches_trimmed_schema_and_covers_the_cached_seasons():
+    """Regression guard for the trimmed-schema cache: src/model/features.py
+    depends on exactly PBP_COLUMNS existing, so a schema drift here would
+    silently break the feature builder rather than fail loudly.
+    """
+    pbp = pd.read_parquet(PBP_PATH)
+    assert list(pbp.columns) == PBP_COLUMNS
+    assert set(pbp["season"].unique()) == set(range(2015, 2025))
+    assert len(pbp) > 400_000  # sanity: ten seasons of real plays, not an empty/partial pull
