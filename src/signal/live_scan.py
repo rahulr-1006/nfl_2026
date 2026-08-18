@@ -4,8 +4,10 @@ value, right now, not just at settlement.
 This is the "optimal spot" detector -- it doesn't wait for a game to close
 and grade a backtest; it watches the point-in-time store as new snapshots
 land and flags whenever a book you can actually bet at (EXECUTION_BOOKS,
-matching the manual-bets-only scope in paper Sec 3.4) offers a price that
-beats Pinnacle's current devigged fair probability by a real margin.
+matching the manual-bets-only scope in paper Sec 3.4 -- updated 2026-08-18
+to five real accounts: DraftKings, FanDuel, BetMGM, BetRivers, Caesars/
+William Hill US) offers a price that beats Pinnacle's current devigged
+fair probability by a real margin.
 
 Moneyline only for now: spread/total comparisons need matching line
 numbers between books to be a clean apples-to-apples bet, which adds real
@@ -32,7 +34,7 @@ from src.model.baseline import market_baseline
 from src.signal.sizing import apply_bankroll_caps, expected_value, fractional_kelly
 from src.store.pit_store import PointInTimeStore
 
-EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm")
+EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers", "williamhill_us")  # williamhill_us = Caesars Sportsbook's Odds API key
 DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked
 
 

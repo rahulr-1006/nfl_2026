@@ -215,6 +215,19 @@ extreme:
   product reliability, not for how slowly they limit sharp bettors — that concern only
   binds at real stakes, which this study explicitly is not attempting (§4.6).
 
+**Updated 2026-08-18: expanded to five accounts (+ BetRivers, + Caesars/William Hill
+US), reopening the tradeoff above on new evidence rather than by default.** The
+original "two books already capture most of the shopping value" argument was a
+reasonable prior with no data behind it. §3.10's arbitrage finding is now real
+evidence against it specifically for player props: a genuine, week-by-week-consistent
+cross-book pricing disagreement between FanDuel and BetMGM (present in 14-15 of 15
+weeks checked) that neither DraftKings alone nor the DK/FD/BetMGM trio could have
+surfaced without a third-plus book in the comparison. Both regulated in Virginia, same
+legal footing as the original three. The bankroll-fragmentation concern from the
+original reasoning (a $100 total bankroll, $2 max bet, split across more accounts)
+still applies exactly as stated and was not resolved by this update, just accepted as
+the cost of the wider comparison.
+
 **Promotional bet handling.** Welcome bonuses and odds boosts pay out as bonus credit or
 alter the price actually being risked, which distorts the realized entry price relative
 to a genuine risk-priced wager. Bets placed with bonus credit or under an odds boost are
@@ -518,6 +531,35 @@ the realized one. **This is one season, one book pair, two market types -- needs
 out-of-sample confirmation on live 2026 data before treating it as a durable pattern
 rather than a 2024-specific artifact.** Full results:
 `notebooks/model_backtest_results.ipynb`.
+
+**Within-season robustness check: the skew holds up week by week, not just in
+aggregate.** Live 2026 props aren't posted yet (checked 2026-08-18, 0 books returned
+data for the Week 1 opener, 2026-09-10 -- still three weeks out), so a true
+out-of-sample test isn't available yet. The strongest check available now: does the
+FanDuel/BetMGM skew persist across individual weeks within batch 1, or was it driven
+by a couple of unusual games? Arbitrage spots appeared in 14 of the 15 weeks in
+batch 1. The underlying price skew is even more consistent: across all 15 weeks,
+**FanDuel's Over price on passing TDs was shorter than BetMGM's in 15/15 weeks
+(100%), and FanDuel's Under was steeper in 15/15 weeks (100%); for receptions, 12/15
+(80%) and 15/15 (100%) respectively.** A pattern present in essentially every week of
+the season is much harder to explain as a coincidence than 31 isolated spots would
+be -- still not proof it persists into 2026, but real evidence within 2024 that this
+is structural, not scattered.
+
+**Updated 2026-08-18: re-run on five execution books.** Following the account
+expansion above (DraftKings/FanDuel/BetMGM -> +BetRivers, +Caesars), both
+strategies were re-run on the same batch-1 data, no new pull needed. **Arbitrage
+roughly doubled: 65 spots (was 31), 0.70% of 9,346 matched pairs (was 0.35% of
+8,992).** Persistence held (14/15 weeks either way) and the market-type
+concentration held (57 of 65, 88%, still receptions/passing TDs) -- wider book
+coverage strengthened the finding rather than diluting it, with FanDuel/BetMGM
+still the largest single pair (26 of 65) and BetRivers now appearing heavily too
+(13 with BetMGM, 6 with FanDuel). **The EV backtest, re-run on the same five books,
+moved further into null territory, not away from it:** win rate dropped to 47.1%
+(n=552, was 49.85% at n=333), average return went negative (-1.64%, was +3.07%),
+95% CI (-10.4%, +7.2%) still includes zero. More data made the arbitrage finding
+more credible and the null EV result more confident -- a consistent, honest
+picture, not two results pulling in different directions.
 
 ---
 

@@ -201,9 +201,21 @@ results in the paper fill in as the season generates enough data to report on:
       snapshot (reasonable but not proof of real-time simultaneous
       executability), margins this small would likely be eaten by execution
       latency, and books are known to limit/ban accounts that repeatedly hit
-      guaranteed-profit spots — none of which pure EV math captures. One
-      season, one book pair — needs live 2026 confirmation before treating as
-      durable. Results: `notebooks/model_backtest_results.ipynb`.
+      guaranteed-profit spots — none of which pure EV math captures. **Within-
+      season robustness check:** live 2026 props aren't posted yet (checked
+      2026-08-18, 0 books returned data), so the strongest test available now is
+      whether the skew holds week-by-week within 2024 — it does: FanDuel's Over
+      price on passing TDs was shorter than BetMGM's in 15/15 weeks, receptions in
+      12/15 weeks, arb spots appeared in 14/15 weeks. **Updated 2026-08-18 — book
+      scope widened from 3 to 5** (DraftKings/FanDuel/BetMGM + BetRivers + Caesars,
+      all real accounts, same VA licensing footing, paper §3.4): re-run on the same
+      data, arbs roughly doubled (65, 0.70% of 9,346 matched pairs), persistence and
+      market-type concentration both held (57/65 still receptions/passing TDs) —
+      wider coverage strengthened the finding. The EV backtest, re-run the same way,
+      moved further into null territory (win rate 47.1%, avg return -1.64%, n=552) —
+      more data confirming no detectable edge there, not less. One season still —
+      needs live 2026 confirmation before treating as durable. Results:
+      `notebooks/model_backtest_results.ipynb`.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 
