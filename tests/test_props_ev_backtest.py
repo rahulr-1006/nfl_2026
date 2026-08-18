@@ -1,7 +1,11 @@
 import pandas as pd
 import pytest
 
-from src.backtest.props_ev_backtest import find_prop_ev_spots, pinnacle_fair_probs
+from src.backtest.props_ev_backtest import (
+    find_arbitrage_spots,
+    find_prop_ev_spots,
+    pinnacle_fair_probs,
+)
 from src.devig.convert import american_to_decimal
 
 
@@ -83,3 +87,60 @@ def test_find_prop_ev_spots_requires_exact_line_match():
     )
     spots = find_prop_ev_spots(props, threshold=0.02, books=("draftkings",))
     assert spots.empty
+
+
+def test_find_arbitrage_spots_flags_a_real_cross_book_disagreement():
+    # DraftKings Over +120 (implied 45.5%) + FanDuel Under +110 (implied 47.6%)
+    # sums to 93.1% -- a real, hand-verified 6.9% risk-free margin.
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 120),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "fanduel"))
+    assert len(spots) == 1
+    row = spots.iloc[0]
+    assert row["book_over"] == "draftkings"
+    assert row["book_under"] == "fanduel"
+    assert row["arb_margin"] == pytest.approx(0.06926, abs=1e-4)
+
+
+def test_find_arbitrage_spots_ignores_a_normal_two_sided_market():
+    # Both sides at standard -110 -- implied sum > 100%, no arbitrage, as expected
+    # for any competently-priced two-sided market (that's the vig).
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", -110),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", -110),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "fanduel"))
+    assert spots.empty
+
+
+def test_find_arbitrage_spots_only_considers_the_named_execution_books():
+    # A juicy Pinnacle-side price shouldn't count -- Pinnacle isn't a
+    # placeable execution book, an arb needs both legs to be real bets.
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", 500),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "fanduel"))
+    assert spots.empty
+
+
+def test_find_arbitrage_spots_picks_the_best_price_when_multiple_books_quote():
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 100),  # worse
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "betmgm", 120),  # better -- should win
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "betmgm", "fanduel"))
+    assert len(spots) == 1
+    assert spots.iloc[0]["book_over"] == "betmgm"
+    assert spots.iloc[0]["price_american_over"] == 120
