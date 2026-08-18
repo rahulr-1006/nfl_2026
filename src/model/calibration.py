@@ -13,7 +13,11 @@ just correcting for the base model's own training-set overfit.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
+import numpy as np
 import pandas as pd
+from scipy.stats import norm
 from sklearn.calibration import CalibratedClassifierCV
 from sklearn.frozen import FrozenEstimator
 from sklearn.pipeline import Pipeline
@@ -42,6 +46,51 @@ def fit_calibrated_model(base_model: Pipeline, calib_df: pd.DataFrame, method: s
 
 def predict_calibrated_proba(calibrated_model: CalibratedClassifierCV, df: pd.DataFrame):
     return calibrated_model.predict_proba(df[FEATURE_COLUMNS])[:, 1]
+
+
+def fit_residual_std(model, calib_df: pd.DataFrame, feature_columns: Sequence[str], target_col: str) -> float:
+    """Std of (actual - predicted) on `calib_df` -- a regression analogue
+    of `fit_calibrated_model`'s split discipline: residuals measured on the
+    same rows the model was fit on are optimistically small (the model fit
+    those exact points), which would understate real uncertainty and
+    oversharpen `predict_over_proba` below. Always pass the calibration
+    split here, never `train_df`.
+    """
+    predicted = model.predict(calib_df[feature_columns])
+    return float(np.std(calib_df[target_col].to_numpy() - predicted, ddof=1))
+
+
+def predict_over_proba(
+    model, df: pd.DataFrame, feature_columns: Sequence[str], line_col: str, residual_std: float
+) -> np.ndarray:
+    """P(actual > line) under Normal(predicted_mean, residual_std) -- a v1
+    simplification, stated plainly: NFL margins/totals aren't guaranteed
+    Gaussian (blowouts fat-tail the distribution). `line_col` is generic
+    ("spread_line" or "total_line") so this one function serves both the
+    margin and total models -- they differ only in which column and which
+    fitted model/residual_std are passed in, not in the conversion logic
+    itself. Compare against `predict_over_proba_empirical` before trusting
+    a result -- if they diverge, the Gaussian assumption is the reason, not
+    the underlying model.
+    """
+    predicted_mean = model.predict(df[feature_columns])
+    return norm.sf(df[line_col].to_numpy(), loc=predicted_mean, scale=residual_std)
+
+
+def predict_over_proba_empirical(
+    model, calib_residuals: np.ndarray, df: pd.DataFrame, feature_columns: Sequence[str], line_col: str
+) -> np.ndarray:
+    """Same question as `predict_over_proba` -- P(actual > line) -- but
+    without assuming the residual distribution is Normal: resamples the
+    empirical calibration-split residuals around each test-row prediction
+    instead of a fitted Gaussian. `calib_residuals` = `calib_df[target_col]
+    - model.predict(calib_df[feature_columns])`, computed by the caller
+    (same residuals `fit_residual_std` summarizes into a single number;
+    this uses the full distribution instead of just its std).
+    """
+    predicted_mean = model.predict(df[feature_columns])
+    lines = df[line_col].to_numpy()
+    return np.mean(predicted_mean[:, None] + calib_residuals[None, :] > lines[:, None], axis=1)
 
 
 def compare_to_baseline(predictions: dict[str, pd.Series | list[float]], y: pd.Series) -> pd.DataFrame:
