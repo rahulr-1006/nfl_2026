@@ -32,7 +32,7 @@ import pandas as pd
 from src.model.baseline import market_baseline
 from src.signal.sizing import expected_value
 
-EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm")
+EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers", "williamhill_us")  # williamhill_us = Caesars Sportsbook's Odds API key
 DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked, same default as live_scan.py
 
 
