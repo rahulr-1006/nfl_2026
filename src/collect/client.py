@@ -72,6 +72,17 @@ class OddsApiClient:
         response = self._request(url, params)
         return self._to_response(events=response.json(), headers=response.headers)
 
+    def get_events(self) -> OddsApiResponse:
+        """Live events listing (id, team names, commence_time) for the
+        sport's current slate -- **free, 0 credits**, confirmed against The
+        Odds API's own docs. The cheap way to discover event ids and
+        kickoff times before spending real credits on `get_event_odds`.
+        """
+        url = f"{_BASE_URL}/sports/{self._sport_key}/events"
+        params = {"apiKey": self._api_key}
+        response = self._request(url, params)
+        return self._to_response(events=response.json(), headers=response.headers)
+
     def get_event_odds(self, event_id: str, regions: str, markets: str, odds_format: str = "american") -> OddsApiResponse:
         """Per-event endpoint: the only way to reach player-prop markets
         (src/collect/props.py) -- one call per game, unlike get_odds()'s

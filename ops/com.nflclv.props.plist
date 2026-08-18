@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.nflclv.props</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/.venv/bin/python</string>
+        <string>-m</string>
+        <string>src.collect.props_run</string>
+    </array>
+
+    <key>WorkingDirectory</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026</string>
+
+    <!-- Same persistent-daemon pattern as com.nflclv.collector.plist: src/collect/props_run.py
+         only exits on an unhandled bug, which should page a human via the log, not stay
+         silently down. Uses ODDS_API_KEY_PAID (via .env), a separate credit pool from the
+         mainline collector's free-tier ODDS_API_KEY -- see props_budget.py's module
+         docstring for why they must not share a budget. -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/props.log</string>
+    <key>StandardErrorPath</key>
+    <string>/Users/rahulramakrishnan/Documents/code_and_related/personal_projects/algobetting/nfl/nfl_2026/logs/props.err.log</string>
+
+    <key>ProcessType</key>
+    <string>Background</string>
+</dict>
+</plist>

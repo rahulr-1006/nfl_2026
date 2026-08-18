@@ -44,6 +44,10 @@
 - [x] A QB-level Elo residual rating (§4.5) — isolates QB contribution from team
       strength; a real, modest improvement over EPA+Elo (Brier 0.2192 → 0.2170),
       sanity-checked against known-elite/known-weak QBs (`src/model/qb_elo.py`)
+- [x] Automated live props polling (§3.6) — budget-aware, per-event scheduling
+      on a separate paid key from the mainline collector, deliberately, so it
+      can't starve the collector's own free-tier CLV polling; schedules a real
+      entry-vs-close CLV pair per prop for the first time (`props_scheduler.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -328,6 +332,42 @@ access. The plan once paid access lands: pull one prop market for one recent sea
 (e.g. `player_pass_yds`, 2024) as a cheap proof of concept before committing further,
 and specifically check whether Pinnacle appears at all, which resolves §3.6's open
 question without waiting for the 2026 season's own props to materialize.
+
+**Automated live polling, built 2026-08-18 ahead of props actually posting.**
+`src/collect/props.py`'s manual `poll_all_props` was the only way to catch live
+props; nothing ran it on a schedule. `src/collect/props_scheduler.py` (with pure
+decision logic in `props_budget.py`) fixes that with a materially different
+scheduling problem than the mainline collector's: the mainline collector polls the
+whole slate on a shared cadence (one bulk call), but each game's props post
+independently, typically Tue-Thu of that game's own week -- so this decides
+per-event whether to poll *right now*. Schedules two real polls per event: an
+"entry" poll once the event is within a 5-day posting window, and a "close" poll
+once inside 6 hours of kickoff -- a genuine entry-vs-close CLV pair for props, for
+the first time. (The historical pull above was forced to a single near-kickoff
+snapshot per game by the historical endpoint's 10x cost multiplier; live polling
+doesn't carry that multiplier, so two real time points per event is affordable.)
+
+**Deliberately uses `ODDS_API_KEY_PAID`, not the mainline collector's
+`ODDS_API_KEY`.** The mainline collector's dense pre-kickoff polling is the
+project's actual CLV thesis and runs on the free tier's 500 credits/month. Props
+polling at real per-event cost (~10-14 credits/event, historically observed via the
+10x historical rate), twice per event across ~16 games/week, would exhaust that
+same free-tier budget within days and starve the mainline collector precisely when
+it matters most -- game week. The paid key's much larger monthly allowance (§3.6)
+absorbs this without touching the free tier at all. Event discovery
+(`OddsApiClient.get_events`) is free (0 credits, confirmed against The Odds API's
+own docs) so the eligible-event list stays current at no cost regardless of
+polling decisions; only gated `get_event_odds` calls spend real credits.
+
+Tested (19 tests across `test_props_budget.py`/`test_props_scheduler.py`,
+including an injectable-clock refactor so time-relative polling decisions are
+deterministically testable) and smoke-tested against the real API 2026-08-18:
+272 real events listed for free, correctly 0 polled -- none are within the
+posting window yet, three weeks before the Week 1 opener. Not yet exercised
+against a real posted prop, and not yet installed as a running service
+(`make props-service-install` mirrors the mainline collector's deployment,
+available but not enabled) -- there's genuinely nothing to poll until props
+start posting.
 
 ### 3.7 Receiver-level Elo (player-prop pricing infrastructure)
 A different kind of Elo than §4.5's team/QB ratings, built for the same reason props
