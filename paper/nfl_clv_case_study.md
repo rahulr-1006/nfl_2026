@@ -56,6 +56,10 @@
       injury status, resolved as-of-week from free nflverse roster/injury data;
       validated against a real 2024 trade, with an honest caveat found for
       fringe/practice-squad players (`src/features/player_status.py`)
+- [x] Player-prop cross-book EV backtest (§3.10) — first real use of the historical
+      props pull; a clean negative result, no statistically detectable edge at any
+      EV threshold tested, and the apparent +3.07% at the default threshold doesn't
+      survive a robustness check (`src/backtest/props_ev_backtest.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -422,6 +426,56 @@ past the actual trade). This is a data-quality property of nflverse's roster fee
 players who move through waivers/practice squads, not a bug in the resolution logic --
 worth knowing before trusting `current_team` for a fringe-roster player specifically,
 less of a concern for a clearly active starter like the Cooper case above.
+
+### 3.10 Player-prop cross-book EV backtest (historical, not the live CLV headline)
+The first real use of the historical props pull (§3.6): does comparing an execution
+book's price against Pinnacle's devigged fair value, at a matching prop line, find
+bets that actually win at the rate the implied edge predicts?
+
+**Scope, stated plainly: this is not a CLV backtest, and not §5's live 2026 headline
+result.** The historical pull captures one snapshot per game near kickoff -- there's
+no earlier "entry" price to compare against a "close" the way the CLV thesis works
+for mainline markets. What this tests instead: a same-moment cross-book mispricing
+signal, using batch 1 of the pull (178 games, 2024 weeks 8-22, 118K snapshots, 8
+books including Pinnacle).
+
+**Method (`src/backtest/props_ev_backtest.py`):** devig Pinnacle's Over/Under pair at
+each (event, player, stat, line) where both sides are quoted at the *same* number
+(4,994 of 4,998 groups -- the 4 mismatched-line groups are dropped, can't devig a
+market that isn't quoting one number). Compare each execution book's (DraftKings,
+FanDuel, BetMGM) price at the *exact same line* against that fair probability
+(`expected_value`, reused unchanged from `src/signal/live_scan.py`'s live scanner --
+same methodology, applied retrospectively). 8,992 exact-line-matched pairs exist in
+the batch-1 data.
+
+**At the default 2% EV threshold: 344 spots flagged, 333 gradable against real 2024
+outcomes (11 ungraded -- genuine player-name/stat-availability gaps, same known issue
+as §3.6).** Win rate: 166/333 = **49.85%** -- a coin flip. Realized return: **+3.07%
+per dollar staked**, strikingly close to the +3.74% average edge the Pinnacle-fair
+methodology predicted going in. A 95% bootstrap CI (10,000 resamples, same
+`bootstrap_ci` used for CLV) on realized return: **(-8.3%, +14.3%) -- includes zero,
+not statistically distinguishable from breakeven** at this sample size.
+
+**Threshold sensitivity -- the honest tell that this isn't (yet) a confirmed edge.**
+A real edge should hold up or strengthen as the EV threshold tightens (a more
+selective bet should be more profitable, not less). It doesn't, here:
+
+| Threshold | n | Win rate | Avg. return | 95% CI |
+|---|---|---|---|---|
+| 0.00 | 824 | 50.7% | +1.6% | (-5.3%, +8.5%) |
+| 0.02 | 333 | 49.9% | +3.1% | (-8.3%, +14.3%) |
+| 0.04 | 111 | 44.1% | -6.3% | (-26.6%, +13.7%) |
+| 0.06 | 27 | 44.4% | +6.7% | (-37.9%, +53.2%) |
+| 0.08 | 8 | 50.0% | +25.3% | (-67.3%, +113.1%) |
+
+Non-monotonic, and every CI is wide enough to include zero. **Honest conclusion: no
+robust, statistically detectable edge found in this cross-book comparison at any
+threshold tested** -- not "no edge exists" (333-824 bets is a genuinely small sample
+for a few-percent-per-bet signal, the same power-analysis caveat §5.5 is reserved for
+the live season), and not "confirmed edge" either. The apparent +3.07% at the default
+threshold does not survive a basic robustness check, so it should not be read as a
+validated result. Full backtest and threshold sweep:
+`notebooks/model_backtest_results.ipynb`.
 
 ---
 
