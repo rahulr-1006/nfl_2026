@@ -1,7 +1,7 @@
 # Graph Report - nfl_2026  (2026-08-18)
 
 ## Corpus Check
-- 95 files · ~55,991 words
+- 95 files · ~56,375 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -10,7 +10,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `cb3c2a77`
+- Built from commit: `1488723d`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -65,7 +65,7 @@
 7. `Outcome` - 25 edges
 8. `tick()` - 25 edges
 9. `OddsApiResponse` - 23 edges
-10. `TransformError` - 21 edges
+10. `OddsApiError` - 21 edges
 
 ## Surprising Connections (you probably didn't know these)
 - `test_write_rejects_empty_batch()` --uses--> `PointInTimeStore`  [INFERRED]
