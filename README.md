@@ -170,6 +170,22 @@ results in the paper fill in as the season generates enough data to report on:
       leave a real multi-week gap — the resolver correctly returns "last known
       state," but that state can be stale for players who aren't cleanly rostered.
       Not a concern for an active starter, worth knowing for a fringe player.
+- [x] Player-prop cross-book EV backtest (`src/backtest/props_ev_backtest.py`) —
+      first real use of the historical props pull (178 games, 118K snapshots):
+      does an execution book's price beating Pinnacle's devigged fair value at a
+      matching line predict a real edge? **Not a CLV backtest** — only one
+      snapshot per game exists (near-kickoff), no entry-vs-close comparison
+      possible; this is a same-moment cross-book mispricing test. **Clean
+      negative result:** 344 spots flagged at the default 2% threshold, 333
+      graded — win rate 49.85% (a coin flip), realized return +3.07%/bet with a
+      95% bootstrap CI of (-8.3%, +14.3%) that includes zero. **Threshold
+      sensitivity confirms it's not real:** a genuine edge should hold up or
+      strengthen as the threshold tightens; instead it's non-monotonic (+1.6% →
+      +3.1% → -6.3% → +6.7% → +25.3% across five thresholds, every CI including
+      zero). Not "no edge exists" — 333-824 bets is underpowered for a
+      few-percent signal — but the apparent result at the default threshold
+      doesn't survive a basic robustness check. Results:
+      `notebooks/model_backtest_results.ipynb`.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 
