@@ -52,6 +52,10 @@
       fair player-level rating isn't buildable on free participation data);
       needed a measured base-rate offset receiver Elo didn't, sanity-checked
       against real 2024 reporting (`src/model/pass_rush_elo.py`)
+- [x] Player status tracking (§3.9) — trade-aware current-team lookup + weekly
+      injury status, resolved as-of-week from free nflverse roster/injury data;
+      validated against a real 2024 trade, with an honest caveat found for
+      fringe/practice-squad players (`src/features/player_status.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -388,6 +392,36 @@ the cache: T.J. Watt, Aaron Donald, Khalil Mack, Danielle Hunter, Myles Garrett 
 exactly who this list should surface, a useful check that the credit-parsing logic
 (full sack / half-sack / QB hit columns) is correct. Full results:
 `notebooks/model_backtest_results.ipynb`.
+
+### 3.9 Player status tracking (current team + injury status)
+Every Elo rating above (§3.7, §3.8, §4.5's QB Elo) is already trade-safe by
+construction -- each is keyed by `gsis_id`, so a player's rating carries with them
+regardless of which team they're on in a given game row. What was missing was the
+lookup layer: given a player, which team are they on *right now*, and are they hurt?
+`src/features/player_status.py` answers this from two free nflverse tables
+(`load_weekly_rosters`, `load_injuries` in `src/features/load_static.py`): a weekly
+roster snapshot (one row per player per team per week, so a trade shows up as a new
+row the week it happens) and a weekly injury report (`report_status`:
+Out/Doubtful/Questionable/no report). `player_status_snapshot(season, as_of_week)`
+resolves both to "most recent state at or before this week" -- a bye week or a week
+with no new injury report still resolves to the last known state, not a gap.
+
+**Validated against a real 2024 trade:** Amari Cooper (CLE → BUF, actual trade week
+7) resolves cleanly -- `current_team` reads CLE through week 6, BUF from week 7
+onward, with injury status (`Questionable`, week 12) updating independently and
+correctly on top of it.
+
+**An honest caveat, found while validating, not swept under the rug:** the
+resolution logic is correct, but the underlying nflverse data is murkier for
+fringe/practice-squad players. Checked against Greg Joseph (a kicker who bounced
+CUT → practice squad → traded → unrostered → signed elsewhere across 2024): his
+`TRD` (traded) status row keeps his *outgoing* team label, not the incoming one, and
+there's a real four-week gap in his roster history where the resolver correctly
+returns "most recent known state" but that state is stale (still shows the old team,
+past the actual trade). This is a data-quality property of nflverse's roster feed for
+players who move through waivers/practice squads, not a bug in the resolution logic --
+worth knowing before trusting `current_team` for a fringe-roster player specifically,
+less of a concern for a clearly active starter like the Cooper case above.
 
 ---
 
