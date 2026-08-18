@@ -129,6 +129,23 @@ results in the paper fill in as the season generates enough data to report on:
       at the bottom (Zeke Elliott, Tony Pollard, Jonathan Taylor). Read
       alongside a volume stat, not as a standalone "best receiver" ranking.
       Results: `notebooks/model_backtest_results.ipynb`.
+- [x] Pass-rush Elo (`src/model/pass_rush_elo.py`) — the DL-vs-OL companion to
+      receiver Elo, **team-level not player-level**: free nflverse pbp records
+      who got credit for a sack/QB hit but not who was rushing (and blocked)
+      on plays where nobody did, so a player-level rating would only ever see
+      wins, never losses — not a fair Elo contest. Rates `posteam`'s pass
+      protection vs. `defteam`'s pass rush instead, same play-level mechanic
+      (K=4). Needed a base-rate offset receiver Elo didn't (`DEFAULT_BASE_
+      PRESSURE_OFFSET = -320.6`, same role as `elo.py`'s home-field
+      advantage) since pressure events happen ~13.6% of the time, not ~50% —
+      without it, ratings drift off-center with no informative baseline;
+      caught by checking the mean rating before trusting the result.
+      **Sanity-checked:** Cleveland/Kansas City/Denver/Seattle/Dallas top the
+      pass-rush leaderboard; Kansas City's offensive line sits at the bottom
+      of pass protection, matching real 2024 reporting. A separate, explicitly
+      non-Elo credited-sacks/QB-hits leaderboard (`credited_pressure_counts`)
+      is included for named-player context — T.J. Watt, Aaron Donald, Khalil
+      Mack top it. Results: `notebooks/model_backtest_results.ipynb`.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 

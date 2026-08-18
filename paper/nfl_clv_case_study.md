@@ -44,6 +44,10 @@
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
       (`src/model/receiver_elo.py`)
+- [x] A pass-rush Elo (§3.8) — team-level DL-vs-OL companion to receiver Elo (a
+      fair player-level rating isn't buildable on free participation data);
+      needed a measured base-rate offset receiver Elo didn't, sanity-checked
+      against real 2024 reporting (`src/model/pass_rush_elo.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -334,9 +338,52 @@ companion pass-defense Elo leaderboard: `notebooks/model_backtest_results.ipynb`
 
 **Not yet wired into anything.** Standalone rating infrastructure -- not fed into the
 game-outcome model (§4.5, since this project isn't betting game outcomes with it), and
-not fed into prop pricing yet either (props are prepped but not live, §3.6). The
-natural next piece, sharing this same play-level Elo mechanic, is a pass-rusher Elo vs.
-pass-protection Elo (sacks/pressures produced) -- deferred, not built this pass.
+not fed into prop pricing yet either (props are prepped but not live, §3.6).
+
+### 3.8 Pass-rush Elo (the DL-vs-OL companion, at team level)
+The natural next piece after §3.7, for sack props / QB-under-pressure props, sharing
+the same play-level Elo mechanic.
+
+**Team-level, not player-level -- and this is a deliberate, data-forced choice, not a
+scope cut.** Free nflverse pbp records *who got credit* for a sack or QB hit, but not
+who was rushing (and being blocked) on the plays where nobody did -- there's no full
+pass-rush participation list. A player-level Elo built only from credited plays would
+only ever see wins, never losses: not a fair two-sided Elo contest, just production
+volume wearing an Elo costume, and it would fail this project's own sanity-check
+discipline (§4.5, §3.7). So `src/model/pass_rush_elo.py` rates the two units fully
+observed on every dropback: `posteam`'s pass protection and `defteam`'s pass rush.
+
+**Design:** every dropback (`pass == 1`, sacks included) is a two-sided Elo match; the
+outcome is whether the rush won the play (`sack == 1` or `qb_hit == 1`). K=4, same
+order as receiver Elo's target-level K.
+
+**A base-rate correction §3.7 didn't need.** A target's `success` rate is close to
+50/50 (~49.5%), close enough that two ratings starting at 1500 need no correction.
+Pressure events are not -- ~13.6% base rate, measured on the 2015-2024 cache. Without a
+correction, every play surprises the rush side downward on average, so both ratings
+drift monotonically away from 1500 forever with no informative center -- caught before
+trusting the first run, whose mean rush Elo had drifted to ~1402 instead of ~1500.
+Fixed with `DEFAULT_BASE_PRESSURE_OFFSET` (-320.6, derived as `-400 * log10(1/p - 1)`
+from the measured base rate `p`), handed to the same Elo win-probability transform the
+same way `elo.py`'s `home_field_advantage` corrects the ~50-55% home-win base rate.
+After the fix, mean rush Elo and mean protection Elo both land within 5 points of 1500.
+
+**Result, sanity-checked (2015-2024, end-of-dataset ratings):** Cleveland, Kansas City,
+Denver, Seattle, and Dallas top the pass-rush leaderboard; New Orleans, Atlanta,
+Arizona, New England, and Jacksonville sit at the bottom -- plausible given real
+2015-2024 form (Myles Garrett's Browns, Micah Parsons' Cowboys). Tampa Bay, Arizona,
+and Buffalo top pass protection; Pittsburgh, Tennessee, Minnesota, Houston, and Kansas
+City sit at the bottom -- the Chiefs' offensive-line struggles were widely reported in
+2024, a real-world check this rating happens to confirm independently.
+
+**A separate, explicitly-not-Elo companion:** `credited_pressure_counts()` is a raw
+per-player count of sacks (full credit) and half-sacks (0.5 credit each) plus QB hits
+-- a named-player leaderboard for context, deliberately not blended into the Elo
+rating above, for the participation-data reason stated up top. Top by career sacks in
+the cache: T.J. Watt, Aaron Donald, Khalil Mack, Danielle Hunter, Myles Garrett --
+exactly who this list should surface, a useful check that the credit-parsing logic
+(full sack / half-sack / QB hit columns) is correct. Full results:
+`notebooks/model_backtest_results.ipynb`.
 
 ---
 
