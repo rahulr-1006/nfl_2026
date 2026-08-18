@@ -1,9 +1,9 @@
 {
   "0": "Side",
-  "1": "test_collect_scheduler.py",
-  "2": "live_scan.py",
-  "3": "scheduler.py",
-  "4": "test_evaluate.py",
+  "1": "scheduler.py",
+  "2": "test_evaluate.py",
+  "3": "transform.py",
+  "4": "test_margin_total.py",
   "5": "PointInTimeStore",
   "6": "4. Methodology",
   "7": "test_pass_rush_elo.py",
@@ -50,15 +50,11 @@
   "48": "1. Introduction",
   "49": "6. Discussion",
   "50": "2. Background and Related Work",
-  "51": "pit_store.py",
+  "51": "test_props_scheduler.py",
   "52": "RuntimeError",
-  "53": "test_clv_metrics.py",
+  "53": "Series",
   "54": "Path",
-  "55": "send_message",
-  "56": "datetime",
   "57": "datetime",
   "58": "Path",
-  "59": "Series",
-  "60": "run",
-  "61": "test_live_scan.py"
+  "59": "Series"
 }
