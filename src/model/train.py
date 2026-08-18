@@ -55,8 +55,15 @@ FEATURE_COLUMNS = [
 EPA_FEATURE_COLUMNS = FEATURE_COLUMNS  # backward-compat alias, now that a second feature set (Elo) exists
 ELO_FEATURE_COLUMNS = ["home_pre_elo", "away_pre_elo"]
 QB_FEATURE_COLUMNS = ["home_pre_qb_elo", "away_pre_qb_elo"]
+PASS_RUSH_FEATURE_COLUMNS = [
+    "home_pre_pass_rush_elo", "away_pre_pass_rush_elo", "home_pre_pass_protection_elo", "away_pre_pass_protection_elo",
+]
+RECEIVER_FEATURE_COLUMNS = [
+    "home_receiving_corps_elo", "away_receiving_corps_elo", "home_opp_pass_defense_elo", "away_opp_pass_defense_elo",
+]
 COMBINED_FEATURE_COLUMNS = FEATURE_COLUMNS + ELO_FEATURE_COLUMNS
 COMBINED_QB_FEATURE_COLUMNS = COMBINED_FEATURE_COLUMNS + QB_FEATURE_COLUMNS
+EXPANDED_FEATURE_COLUMNS = COMBINED_QB_FEATURE_COLUMNS + PASS_RUSH_FEATURE_COLUMNS + RECEIVER_FEATURE_COLUMNS
 
 
 def build_training_frame(
@@ -65,6 +72,8 @@ def build_training_frame(
     window: int | None = None,
     elo_ratings: pd.DataFrame | None = None,
     qb_elo_ratings: pd.DataFrame | None = None,
+    pass_rush_features: pd.DataFrame | None = None,
+    receiver_features: pd.DataFrame | None = None,
     exclude_garbage_time: bool = False,
 ) -> pd.DataFrame:
     """One row per game: `build_game_features()` output plus the home-win
@@ -85,6 +94,15 @@ def build_training_frame(
     `home_pre_qb_elo`/`away_pre_qb_elo` (see `QB_FEATURE_COLUMNS`), same
     drop-if-uncovered behavior as `elo_ratings`.
 
+    `pass_rush_features`: optional output of
+    `src/model/game_level_features.py::aggregate_pass_rush_elo_to_game`.
+    When given, merges in `PASS_RUSH_FEATURE_COLUMNS`, same drop-if-uncovered
+    behavior as `elo_ratings`.
+
+    `receiver_features`: optional output of
+    `aggregate_receiver_elo_to_game`. When given, merges in
+    `RECEIVER_FEATURE_COLUMNS`, same drop-if-uncovered behavior.
+
     `exclude_garbage_time`: see `features.py::team_game_epa` -- defaults to
     False so the original EPA feature set's numbers stay reproducible.
 
@@ -102,6 +120,12 @@ def build_training_frame(
     if qb_elo_ratings is not None:
         df = df.merge(qb_elo_ratings[["game_id", *QB_FEATURE_COLUMNS]], on="game_id", how="left")
         required = required + QB_FEATURE_COLUMNS
+    if pass_rush_features is not None:
+        df = df.merge(pass_rush_features[["game_id", *PASS_RUSH_FEATURE_COLUMNS]], on="game_id", how="left")
+        required = required + PASS_RUSH_FEATURE_COLUMNS
+    if receiver_features is not None:
+        df = df.merge(receiver_features[["game_id", *RECEIVER_FEATURE_COLUMNS]], on="game_id", how="left")
+        required = required + RECEIVER_FEATURE_COLUMNS
 
     df = df.dropna(subset=required)
     df = df[df["home_score"] != df["away_score"]].copy()
@@ -119,6 +143,8 @@ def build_margin_total_frame(
     window: int | None = None,
     elo_ratings: pd.DataFrame | None = None,
     qb_elo_ratings: pd.DataFrame | None = None,
+    pass_rush_features: pd.DataFrame | None = None,
+    receiver_features: pd.DataFrame | None = None,
     exclude_garbage_time: bool = False,
 ) -> pd.DataFrame:
     """`build_training_frame()`'s output plus spread/total regression
@@ -155,6 +181,7 @@ def build_margin_total_frame(
     """
     df = build_training_frame(
         pbp, schedule, window=window, elo_ratings=elo_ratings, qb_elo_ratings=qb_elo_ratings,
+        pass_rush_features=pass_rush_features, receiver_features=receiver_features,
         exclude_garbage_time=exclude_garbage_time,
     )
     # spread_line/total_line already flow through build_game_features's context

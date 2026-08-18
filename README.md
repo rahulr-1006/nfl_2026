@@ -125,6 +125,24 @@ results in the paper fill in as the season generates enough data to report on:
       stayed close anyway (0.2581 vs. 0.2585), so the practical impact was
       small, but the check earned that conclusion rather than assuming it.
       Results: `notebooks/model_backtest_results.ipynb`.
+- [x] Game-level Elo aggregation (`src/model/game_level_features.py`) — receiver Elo
+      and pass-rush Elo are both play-level (one row per target/dropback), unusable
+      by any game-outcome model until rolled up to one row per game. Pass-rush is a
+      groupby-first (already team-level); receiver Elo needs a real roster join
+      (`player_status.py::current_team`, active WR/TE only) plus a top-3-by-rating
+      average, not a flat roster mean. **Validated against a real injury case:**
+      Justin Jefferson's 2023 IR stint (weeks 6-12) — correctly excluded during that
+      exact window, correctly reappears at his pre-injury rating in week 14,
+      next-men-up fill the gap between. **Wired into all three targets
+      (moneyline/margin/total) and tested — clean negative result, consistent across
+      all three:** expanded features make every model slightly *worse* (moneyline
+      0.2173→0.2180, margin 0.2587→0.2590, total 0.2585→0.2616), same pattern as GBM
+      — more inputs don't help at this sample size, compounded by ~50 fewer training
+      games (coverage gaps). **The infrastructure itself is still a real win** — both
+      ratings are now genuinely usable by any future model; this specific way of
+      using them (naive linear addition) doesn't help, which is a finding about the
+      modeling choice, not the underlying ratings. Results:
+      `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false

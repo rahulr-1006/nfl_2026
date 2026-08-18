@@ -1,8 +1,8 @@
 {
   "0": "Side",
-  "1": "scheduler.py",
-  "2": "pit_store.py",
-  "3": "test_collect_transform.py",
+  "1": "test_collect_scheduler.py",
+  "2": "live_scan.py",
+  "3": "scheduler.py",
   "4": "test_evaluate.py",
   "5": "PointInTimeStore",
   "6": "4. Methodology",
@@ -50,13 +50,15 @@
   "48": "1. Introduction",
   "49": "6. Discussion",
   "50": "2. Background and Related Work",
-  "51": "props.py",
-  "52": "OddsApiResponse",
-  "53": "test_props_ev_backtest.py",
+  "51": "pit_store.py",
+  "52": "RuntimeError",
+  "53": "test_clv_metrics.py",
   "54": "Path",
-  "55": "client.py",
-  "56": "preseason.py",
+  "55": "send_message",
+  "56": "datetime",
   "57": "datetime",
   "58": "Path",
-  "59": "Series"
+  "59": "Series",
+  "60": "run",
+  "61": "test_live_scan.py"
 }
