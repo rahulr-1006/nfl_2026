@@ -52,6 +52,18 @@ PBP_COLUMNS = [
     "receiver_player_id",
     "receiver_player_name",
     "receiving_yards",
+    "sack",  # pass-rush win flags for src/model/pass_rush_elo.py
+    "qb_hit",
+    "sack_player_id",
+    "sack_player_name",
+    "half_sack_1_player_id",
+    "half_sack_1_player_name",
+    "half_sack_2_player_id",
+    "half_sack_2_player_name",
+    "qb_hit_1_player_id",
+    "qb_hit_1_player_name",
+    "qb_hit_2_player_id",
+    "qb_hit_2_player_name",
 ]
 
 
