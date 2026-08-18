@@ -17,6 +17,15 @@ results in the paper fill in as the season generates enough data to report on:
 - [x] Point-in-time odds snapshot schema (`src/store/schema.py`)
 - [x] Append-only PIT store with a leakage guard + regression test (`src/store/pit_store.py`)
 - [x] Four devig methods with tests (`src/devig/methods.py`)
+- [x] Empirical devig method comparison (2,733 games, 2015-2024 closing lines) — a
+      clean negative result: no method beats another at a statistically detectable
+      level (paired bootstrap on Brier score, 95% CIs all include zero). Shin stays
+      the default on its independent theoretical justification (informed-money
+      modeling, relevant for CLV anchoring), not because it tested best — it didn't,
+      power/additive were marginally (not significantly) ahead. Caught a minor data
+      note along the way: mean vig ~2.97%, one game (of 2,733) with slightly negative
+      overround, additive's clip never triggered. Results:
+      `notebooks/model_backtest_results.ipynb`.
 - [x] Free static data pull: nflverse schedules + closing lines, 2015-2024 (`src/features/load_static.py`)
 - [x] Live odds collector (`src/collect/`) — polls The Odds API (`regions=eu,us`:
       `eu` for Pinnacle, `us` for the DraftKings/FanDuel/BetMGM execution books —
