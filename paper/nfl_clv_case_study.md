@@ -23,6 +23,10 @@
 ### 1.3 Contributions
 - [x] A leakage-free, point-in-time backtesting framework (`src/backtest/engine.py`)
 - [x] A comparative implementation of four probability devigging methods, anchored to Pinnacle (`src/devig/`)
+- [x] An empirical comparison of the four devig methods against 2,733 real game
+      outcomes (§4.2) — a clean negative result, no method beats another at a
+      statistically detectable level (paired bootstrap); Shin stays the default on
+      its independent theoretical justification, not because it tested best
 - [x] A CLV measurement framework with bootstrap confidence intervals (`src/clv/metrics.py`)
 - [x] An EPA-based win-probability model with a calibration layer, validated for calibration
       quality (not CLV — see §3.1) against a market baseline on ten seasons of historical
@@ -409,7 +413,30 @@ enough live data to pick a representative example.
 **Reference method: Shin**, used as the default anchor throughout (`src/model/baseline.py`,
 `src/backtest/engine.py`) — it models informed money rather than just normalizing away
 the vig, which the blueprint argues gives the best fair probabilities near an efficient
-close.
+close. That justification was theoretical, not tested against this project's own data,
+until now.
+
+**Empirical comparison, checked 2026-08-18: no method beats the others at a
+statistically detectable level.** Using nflverse's closing moneylines (2,733 games,
+2015-2024, ties excluded), each method's devigged home-win probability was scored
+against the realized outcome (Brier score, log loss) both over the full sample and the
+2023-2024 test window used everywhere else in this project. Raw numbers rank
+power/additive marginally ahead of multiplicative/Shin (full sample: 0.21229 vs.
+0.21236, a 0.00007 Brier gap; test window: 0.20947 vs. 0.20986, a 0.00039 gap) — but a
+paired bootstrap (10,000 resamples, per-game squared-error difference, same
+`bootstrap_ci` used for CLV in §4.3) on Shin vs. each alternative gives 95% confidence
+intervals that all include zero (e.g. Shin vs. power: mean diff 0.000066, CI
+[-0.000212, 0.000335]). **The honest conclusion: devig method choice does not
+measurably affect calibration quality on this dataset — a clean negative result, in the
+same spirit as §4.5's garbage-time-filtering finding.** Shin stays the default: nothing
+here contradicts its independent theoretical justification (modeling informed money,
+relevant specifically for CLV anchoring — a different criterion than raw outcome
+calibration), and there is no calibration evidence to prefer switching. A genuine, minor
+data-quality note surfaced along the way: mean vig across the sample is a thin ~2.97%
+(consistent with sharp closing lines), and exactly one game (of 2,733) has slightly
+negative overround — a data artifact, not a systemic issue; additive's negative-probability
+clip never triggered across the full sample. Full comparison:
+`notebooks/model_backtest_results.ipynb`.
 
 ### 4.3 Closing Line Value
 Implemented in `src/clv/metrics.py`:
