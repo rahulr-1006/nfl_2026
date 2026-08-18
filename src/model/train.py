@@ -32,7 +32,7 @@ from typing import Protocol
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import HistGradientBoostingClassifier
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
@@ -113,6 +113,79 @@ def build_training_frame(
     return df
 
 
+def build_margin_total_frame(
+    pbp: pd.DataFrame,
+    schedule: pd.DataFrame,
+    window: int | None = None,
+    elo_ratings: pd.DataFrame | None = None,
+    qb_elo_ratings: pd.DataFrame | None = None,
+    exclude_garbage_time: bool = False,
+) -> pd.DataFrame:
+    """`build_training_frame()`'s output plus spread/total regression
+    targets and their market-baseline comparison probabilities -- a
+    separate function, not an edit to `build_training_frame`, since that
+    function's `required` dropna list and its callers' fixtures don't
+    carry spread/total odds columns; extending it in place would silently
+    drop rows for every existing moneyline caller.
+
+    New columns:
+    - `margin` = home_score - away_score. A tie's margin (0) is a valid
+      regression target, unlike the home-win label -- ties are NOT
+      dropped here the way `build_training_frame` drops them.
+    - `total_points` = home_score + away_score.
+    - `home_covers` / `over`: nullable 0/1 labels for the probability-
+      comparison harness, NaN on a push (`margin == spread_line` /
+      `total_points == total_line`). Pushes are common on key numbers (3,
+      7) -- expect a real NaN rate (3-4 of ~285 games/season observed),
+      not a rounding edge case. Callers must filter on `.notna()` before
+      scoring, the same way `build_training_frame`'s tie-drop keeps a
+      binary label well-defined.
+    - `market_prob_home_cover` / `market_prob_over`: devigged fair
+      probabilities from the spread/total odds pair, via the same
+      `market_baseline()` used for `market_prob_home` -- it's already
+      generic over any two-outcome American-odds pair, no new devig code.
+
+    Sign convention, hand-verified against `src/store/settlement.py::settle()`
+    on real 2024 games before trusting it here: `home_covers = margin >
+    spread_line` using nflverse's raw (unflipped) `spread_line` column
+    directly -- NOT `home_spread_line()`, which exists to convert to the
+    sportsbook-posted line convention `settle()` expects, a different
+    representation of the same number. `over = total_points > total_line`
+    needs no conversion at all (total has no home/away sign ambiguity).
+    """
+    df = build_training_frame(
+        pbp, schedule, window=window, elo_ratings=elo_ratings, qb_elo_ratings=qb_elo_ratings,
+        exclude_garbage_time=exclude_garbage_time,
+    )
+    # spread_line/total_line already flow through build_game_features's context
+    # columns -- only the odds (needed to devig a fair cover/over probability)
+    # are new here.
+    odds = schedule[["game_id", "home_spread_odds", "away_spread_odds", "over_odds", "under_odds"]]
+    df = df.merge(odds, on="game_id", how="left")
+    required = ["spread_line", "home_spread_odds", "away_spread_odds", "total_line", "over_odds", "under_odds"]
+    df = df.dropna(subset=required)
+
+    df["margin"] = df["home_score"] - df["away_score"]
+    df["total_points"] = df["home_score"] + df["away_score"]
+
+    df["home_covers"] = np.where(
+        df["margin"] == df["spread_line"], np.nan, (df["margin"] > df["spread_line"]).astype(float)
+    )
+    df["over"] = np.where(
+        df["total_points"] == df["total_line"], np.nan, (df["total_points"] > df["total_line"]).astype(float)
+    )
+
+    df["market_prob_home_cover"] = [
+        market_baseline([int(h), int(a)], side_index=0)
+        for h, a in zip(df["home_spread_odds"], df["away_spread_odds"], strict=True)
+    ]
+    df["market_prob_over"] = [
+        market_baseline([int(o), int(u)], side_index=0)
+        for o, u in zip(df["over_odds"], df["under_odds"], strict=True)
+    ]
+    return df
+
+
 def time_based_split(
     df: pd.DataFrame, train_seasons: Sequence[int], calib_seasons: Sequence[int], test_seasons: Sequence[int]
 ) -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
@@ -176,3 +249,31 @@ def predict_home_win_proba(
     model: _ProbaClassifier, df: pd.DataFrame, feature_columns: Sequence[str] = FEATURE_COLUMNS
 ) -> np.ndarray:
     return model.predict_proba(df[feature_columns])[:, 1]
+
+
+def fit_margin_model(train_df: pd.DataFrame, feature_columns: Sequence[str] = COMBINED_QB_FEATURE_COLUMNS) -> Pipeline:
+    """Standardized linear regression predicting `margin` (home_score -
+    away_score) -- "start simple" the same way `fit_win_probability_model`
+    did before GBM was tried; a GBM regressor is a natural follow-up, not
+    part of this first cut. Reuses the same feature set the win-probability
+    model uses -- no new feature engineering, the point of this model is a
+    richer *target* (continuous margin vs. binary win/loss), not richer inputs.
+
+    The raw margin prediction isn't a bet by itself -- pair with
+    `src/model/calibration.py::fit_residual_std`/`predict_over_proba` to
+    turn it into a cover probability comparable against
+    `market_prob_home_cover` (`build_margin_total_frame`).
+    """
+    model = Pipeline([("scale", StandardScaler()), ("linreg", LinearRegression())])
+    model.fit(train_df[feature_columns], train_df["margin"])
+    return model
+
+
+def fit_total_model(train_df: pd.DataFrame, feature_columns: Sequence[str] = COMBINED_QB_FEATURE_COLUMNS) -> Pipeline:
+    """Same as `fit_margin_model`, predicting `total_points` (home_score +
+    away_score) instead of margin -- pair with `predict_over_proba` against
+    `market_prob_over`.
+    """
+    model = Pipeline([("scale", StandardScaler()), ("linreg", LinearRegression())])
+    model.fit(train_df[feature_columns], train_df["total_points"])
+    return model

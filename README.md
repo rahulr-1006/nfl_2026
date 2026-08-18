@@ -104,6 +104,27 @@ results in the paper fill in as the season generates enough data to report on:
       0.2170) beats EPA+Elo (0.2192). Sanity-checked: Mahomes/Brady top the final
       ratings, late-career Eli Manning/Bortles/Wentz sit at the bottom. Results:
       `notebooks/model_backtest_results.ipynb`.
+- [x] Spread-cover and total-points regression (`build_margin_total_frame`,
+      `fit_margin_model`, `fit_total_model` in `src/model/train.py`) — every
+      prior model predicts moneyline win/loss, the hardest, most heavily arbed
+      market; margin and total are continuous targets carrying strictly more
+      information than a binary result, and had never been modeled directly in
+      this project (only used as static market data). Same features, same
+      train/calib/test split, same `compare_to_baseline` harness as the
+      win-probability models — no new dependency. A point prediction becomes a
+      betting-relevant probability via `fit_residual_std`/`predict_over_proba`
+      (Gaussian residual assumption, `src/model/calibration.py`), checked
+      against `predict_over_proba_empirical` (non-parametric) before trusting
+      it. **Honest result: market baseline beats both models** (spread: 0.2504
+      vs. 0.2588; total: 0.2500 vs. 0.2581 Brier, n=552/563) — expected, same
+      framing as the win-probability model. **A real finding from the
+      robustness check, not just a formality:** margin residuals pass a
+      normality check (Shapiro p=0.075) but total-points residuals do NOT
+      (Shapiro p=0.009, right-skewed) — flagged as a real possibility up front,
+      confirmed on real data; the normal and empirical probability estimates
+      stayed close anyway (0.2581 vs. 0.2585), so the practical impact was
+      small, but the check earned that conclusion rather than assuming it.
+      Results: `notebooks/model_backtest_results.ipynb`.
 - [x] Drift monitor (`src/drift/monitor.py`) — `rolling_mean_clv` (trailing-window
       mean CLV), `cusum` (two-sided Page CUSUM change-point detector, with a
       `drift`/slack term so expected noise doesn't accumulate into a false

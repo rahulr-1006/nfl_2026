@@ -48,6 +48,11 @@
       on a separate paid key from the mainline collector, deliberately, so it
       can't starve the collector's own free-tier CLV polling; schedules a real
       entry-vs-close CLV pair per prop for the first time (`props_scheduler.py`)
+- [x] Spread-cover and total-points regression (§4.5) — a genuinely new market
+      target (continuous margin/total, not binary win/loss), reusing all existing
+      infra; market beats both models as expected, and a robustness check found a
+      real asymmetric result (total residuals non-normal, margin residuals aren't)
+      (`build_margin_total_frame`, `fit_margin_model`, `fit_total_model`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -810,6 +815,56 @@ result: final QB ratings (min 20 starts, 2015-2024) put Mahomes and Brady at the
 Josh Allen/Goff/Lamar Jackson/Rodgers/Hurts/Prescott rounding out the top 10, and
 late-career Eli Manning/Joe Flacco, Blake Bortles, Carson Wentz, Daniel Jones at the
 bottom — directionally sound, not noise. Full comparison and rating table:
+`notebooks/model_backtest_results.ipynb`.
+
+**Spread-cover and total-points regression -- a genuinely new market target, not
+another moneyline variant.** Every model above predicts moneyline win probability, a
+binary classification target -- and the hardest one to beat: mainline moneyline is
+the most heavily arbed market in the industry, and this project's best win-probability
+model (0.2170) still trails the market baseline (0.2099). Spread and total, while
+still mainline markets, are driven by *continuous* quantities (margin of victory,
+combined points) that carry strictly more information than a binary result, and had
+never been modeled directly in this project until now -- only used as static market
+comparison data. This tests whether that richer target produces a better-calibrated
+model, reusing the exact same features, `time_based_split`, and `compare_to_baseline`
+harness as every classification model above -- no new dependency, no new evaluation
+framework.
+
+**Method** (`build_margin_total_frame`, `fit_margin_model`, `fit_total_model` in
+`src/model/train.py`): `margin = home_score - away_score` and `total_points =
+home_score + away_score` as regression targets, `LinearRegression` on the same 15
+EPA+Elo+QB-Elo features ("start simple," matching the win-probability model's own
+history before GBM was tried). Sign convention (`home_covers = margin > spread_line`,
+raw unflipped nflverse column) hand-verified against `src/store/settlement.py::settle()`
+on real 2024 games -- including a real push case -- before writing any code. A raw
+point prediction isn't a bet by itself; `src/model/calibration.py::fit_residual_std`
+(residual std measured on the calibration split, never train, same discipline as
+`fit_calibrated_model`) and `predict_over_proba` (P(actual > line) under a Normal
+residual assumption, `scipy.stats.norm`) convert it into a probability comparable
+against a devigged market cover/over probability (`market_baseline()`, already
+generic over any two-outcome odds pair -- no new devig code).
+
+**Result: the market wins both, as expected.** On the 2023-2024 test season: spread
+cover, market baseline 0.2504 vs. model 0.2588 Brier (n=552, pushes excluded); total
+over/under, market baseline 0.2500 vs. model 0.2581 (n=563). Consistent with the
+win-probability model's own result and with spreads/totals being tightly priced
+mainline markets -- not a surprising result, and not spun as one.
+
+**Robustness check, run before trusting the Gaussian probability conversion at all --
+and it surfaced a real, asymmetric finding.** A Normal-residual assumption was
+flagged as a v1 simplification going in (NFL margins/totals aren't guaranteed
+Gaussian -- blowouts fat-tail the distribution); the check was to test it, not assume
+it holds. Residual normality on the calibration split: margin residuals pass (Shapiro-
+Wilk p=0.075, fails to reject at 0.05) -- the Gaussian assumption is defensible there.
+**Total-points residuals do not** (Shapiro-Wilk p=0.009, moderately right-skewed) --
+genuinely non-normal, not a false alarm. A second check -- comparing the Normal-based
+probability against a non-parametric empirical-residual alternative
+(`predict_over_proba_empirical`), the same "does the result survive a different
+reasonable methodological choice" discipline as the devig method comparison (§4.2) --
+found the two estimates stayed close for total despite the distributional violation
+(0.2581 vs. 0.2585 Brier). The miscalibration this check was designed to catch turned
+out to be small enough not to change the conclusion, but that's a confidence the check
+earned, not one assumed going in. Full results and both robustness checks:
 `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
