@@ -123,6 +123,28 @@ results in the paper fill in as the season generates enough data to report on:
       2026-08-17 and confirmed props aren't posted this far before kickoff
       (see "Player props" below for why, and what to check once they start
       filling in).
+- [x] Automated live props polling (`src/collect/props_scheduler.py`,
+      `props_budget.py`, `props_run.py`) — budget-aware, per-event scheduling
+      (a different problem than the mainline collector's shared-slate cadence:
+      each game's props post on its own timeline). Schedules two real polls per
+      event — "entry" once inside a 5-day posting window, "close" inside 6
+      hours of kickoff — a genuine CLV pair for props for the first time
+      (the historical pull was forced to one snapshot/game by the 10x
+      historical-endpoint cost; live polling doesn't have that multiplier).
+      **Uses `ODDS_API_KEY_PAID`, not `ODDS_API_KEY`** — a deliberate
+      resource-contention call: props polling at real per-event cost across
+      ~16 games/week would burn through the mainline collector's free-tier
+      500 credits/month and starve its dense pre-kickoff CLV polling right
+      when it matters most. Event discovery (`OddsApiClient.get_events`) is
+      free (0 credits) so the eligible list is always current at no cost;
+      only gated `get_event_odds` calls spend real credits. 19 tests
+      (`test_props_budget.py`, `test_props_scheduler.py`); smoke-tested
+      against the real API 2026-08-18 (272 events listed free, 0 polled —
+      correctly, none are within the posting window yet, three weeks before
+      Week 1). `make props-collect-once` / `make props-service-install`
+      (mirrors `collector-service-*`, not yet installed as a running
+      service). Not yet exercised against a real posted prop — nothing to
+      poll until props actually start filling in.
 - [x] Receiver-level Elo (`src/model/receiver_elo.py`) — play-level rating for
       pass-catchers, for player-prop pricing rather than game outcomes. True
       man-to-man coverage matchup data (which corner covered which receiver)

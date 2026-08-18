@@ -1,6 +1,8 @@
 .PHONY: venv install test lint demo collect collect-once preseason-poll preseason-report props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
-	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status clean
+	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
+	props-collect props-collect-once \
+	props-service-install props-service-uninstall props-service-status clean
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -50,6 +52,20 @@ preseason-report:
 props-poll:
 	$(PY) -m src.collect.props $(ARGS)
 
+# Automated, budget-aware live props polling (src/collect/props_scheduler.py) --
+# unlike props-poll above (manual, polls everything in the window at once),
+# this schedules two real polls per event (entry near when props post, close
+# near kickoff) and persists per-event state so it never re-polls a finished
+# event. Uses ODDS_API_KEY_PAID, NOT ODDS_API_KEY -- a separate credit pool
+# from the mainline collector's free tier, deliberately, so props polling
+# can never starve the collector's own dense pre-kickoff CLV polling. See
+# src/collect/props_budget.py's module docstring for the full reasoning.
+props-collect:
+	$(PY) -m src.collect.props_run
+
+props-collect-once:
+	$(PY) -m src.collect.props_run --once
+
 # Real-season collector as a persistent background service (macOS launchd),
 # so it survives terminal closes, sleep, and reboots -- `make collect` alone
 # blocks in the foreground and dies with the terminal. Source of truth for
@@ -96,6 +112,23 @@ monitor-service-status:
 	launchctl list | grep com.nflclv.monitor || echo "not running"
 	@echo "--- last 20 log lines ---"
 	tail -n 20 logs/monitor.log 2>/dev/null || echo "(no log yet)"
+
+PROPS_AGENT := $(HOME)/Library/LaunchAgents/com.nflclv.props.plist
+
+props-service-install:
+	mkdir -p logs
+	cp ops/com.nflclv.props.plist $(PROPS_AGENT)
+	launchctl bootstrap gui/$$(id -u) $(PROPS_AGENT)
+	@echo "installed and started -- check with 'make props-service-status'"
+
+props-service-uninstall:
+	launchctl bootout gui/$$(id -u)/com.nflclv.props || true
+	rm -f $(PROPS_AGENT)
+
+props-service-status:
+	launchctl list | grep com.nflclv.props || echo "not running"
+	@echo "--- last 20 log lines ---"
+	tail -n 20 logs/props.log 2>/dev/null || echo "(no log yet)"
 
 clean:
 	rm -rf $(VENV) .pytest_cache **/__pycache__

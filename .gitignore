@@ -10,6 +10,7 @@ data/snapshots/**/*.parquet
 data/snapshots_preseason/**/*.parquet
 !data/snapshots_preseason/.gitkeep
 data/collect_state.json
+data/props_collect_state.json
 data/alert_state.json
 .DS_Store
 .ipynb_checkpoints/
