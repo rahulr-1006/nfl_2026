@@ -155,6 +155,21 @@ results in the paper fill in as the season generates enough data to report on:
       non-Elo credited-sacks/QB-hits leaderboard (`credited_pressure_counts`)
       is included for named-player context — T.J. Watt, Aaron Donald, Khalil
       Mack top it. Results: `notebooks/model_backtest_results.ipynb`.
+- [x] Player status tracking (`src/features/player_status.py`) — every Elo rating
+      above is already trade-safe (keyed by `gsis_id`, not team), but nothing
+      answered "which team is this player on *right now*, and are they hurt?"
+      until now. `player_status_snapshot(season, as_of_week)` resolves current
+      team + injury status (`Out`/`Doubtful`/`Questionable`/no report) from free
+      nflverse weekly roster + injury tables (`load_weekly_rosters`,
+      `load_injuries` in `src/features/load_static.py`), "most recent state at
+      or before this week" so byes/gaps resolve, not break. **Validated against
+      a real 2024 trade** (Amari Cooper, CLE→BUF at the actual trade week) —
+      resolves cleanly. **Honest caveat found, not swept under the rug:** for a
+      fringe/practice-squad player (checked against Greg Joseph's 2024 waiver-wire
+      churn), nflverse's `TRD` status row keeps the *outgoing* team label and can
+      leave a real multi-week gap — the resolver correctly returns "last known
+      state," but that state can be stale for players who aren't cleanly rostered.
+      Not a concern for an active starter, worth knowing for a fringe player.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 

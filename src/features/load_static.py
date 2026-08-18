@@ -95,6 +95,43 @@ def load_players(out_dir: Path = STATIC_DIR) -> Path:
     return path
 
 
+def load_weekly_rosters(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
+    """Fetch nflverse's weekly roster snapshots and cache as parquet.
+
+    One row per player per team per week they were affiliated with (active
+    roster, practice squad, injured reserve, etc. -- `status` distinguishes
+    them). This is what makes a player's team assignment *fluid*: a trade
+    shows up as a new row with a new `team` starting the week it happened,
+    not a static season-long team label. `src/features/player_status.py`
+    resolves this into a "current team as of week N" lookup.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = nfl.load_rosters_weekly(seasons=seasons).select(
+        ["season", "week", "team", "gsis_id", "full_name", "position", "status", "status_description_abbr"]
+    )
+    path = out_dir / f"rosters_weekly_{min(seasons)}_{max(seasons)}.parquet"
+    df.write_parquet(path)
+    return path
+
+
+def load_injuries(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
+    """Fetch nflverse's weekly injury reports and cache as parquet.
+
+    One row per player per team per week with an injury report entry --
+    `report_status` is the game-status field (Out/Doubtful/Questionable/
+    null=no report that week). `src/features/player_status.py` resolves
+    this into a "current status as of week N" lookup, same pattern as
+    `load_weekly_rosters`.
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = nfl.load_injuries(seasons=seasons).select(
+        ["season", "week", "team", "gsis_id", "report_status", "report_primary_injury", "practice_status", "date_modified"]
+    )
+    path = out_dir / f"injuries_{min(seasons)}_{max(seasons)}.parquet"
+    df.write_parquet(path)
+    return path
+
+
 def home_spread_line(spread_line: float) -> float:
     """Convert nflverse's spread_line into the sportsbook side-line
     convention that OddsSnapshot.line / settlement.settle() expect.
@@ -116,3 +153,5 @@ if __name__ == "__main__":
     print(f"wrote {load_schedules(seasons)}")
     print(f"wrote {load_pbp(seasons)}")
     print(f"wrote {load_players()}")
+    print(f"wrote {load_weekly_rosters(seasons)}")
+    print(f"wrote {load_injuries(seasons)}")
