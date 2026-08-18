@@ -53,6 +53,11 @@
       infra; market beats both models as expected, and a robustness check found a
       real asymmetric result (total residuals non-normal, margin residuals aren't)
       (`build_margin_total_frame`, `fit_margin_model`, `fit_total_model`)
+- [x] Game-level Elo aggregation (§4.5) — makes receiver/pass-rush Elo usable by any
+      model for the first time; validated against a real 2023 injury case (Justin
+      Jefferson's IR stint); wired into all three targets, clean negative result
+      consistent across all three, same pattern as GBM
+      (`src/model/game_level_features.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -866,6 +871,44 @@ found the two estimates stayed close for total despite the distributional violat
 out to be small enough not to change the conclusion, but that's a confidence the check
 earned, not one assumed going in. Full results and both robustness checks:
 `notebooks/model_backtest_results.ipynb`.
+
+**Game-level Elo aggregation -- making receiver/pass-rush Elo usable by any model,
+then testing whether that helps.** Receiver Elo (§3.7) and pass-rush Elo (§3.8) are
+both play-level -- one row per target or dropback -- so neither was reachable by any
+game-outcome model until `src/model/game_level_features.py` rolled them up.
+Pass-rush is nearly free: its output is already team-level, so a team's rating
+entering a game is already sitting on that game's first play by construction --
+`aggregate_pass_rush_elo_to_game` is a groupby-first, not a new computation. Receiver
+Elo needs a real design decision, since a "receiving corps" is a set of players, not
+one entity: the roster join reuses `player_status.py::current_team` (active WR/TE
+only, the same trade-safe lookup §3.9 built), a player's rating carries forward
+across games he isn't targeted in (`merge_asof`, leakage-free), and the aggregate is
+the mean of the **top 3 by current rating**, not a flat roster average -- a
+deliberate v1 simplification (target-share weighting is the natural v2, gated on
+data unavailable pre-game).
+
+**Validated against a real injury case, not just unit tests, before trusting it:**
+Justin Jefferson's 2023 hamstring IR stint (weeks 6-12, confirmed against his real
+roster status). The aggregation correctly excludes him from Minnesota's receiving
+corps for that exact window and correctly re-includes him at his pre-injury rating
+the instant he returns (week 14) -- next-men-up (Hockenson, Mundt, Addison) fill the
+gap between, exactly as intended.
+
+**Wired into all three targets built this session (moneyline, margin, total) --
+clean negative result, consistent across all three.** Adding receiving-corps Elo,
+opponent pass-defense Elo, and pass-rush/protection Elo makes every model slightly
+*worse*: moneyline 0.2173 -> 0.2180, margin 0.2587 -> 0.2590, total 0.2585 -> 0.2616
+(same reference split, though ~50 fewer training games due to receiver/pass-rush
+coverage gaps). Same pattern as GBM (§4.5 above): more model inputs don't help at
+this sample size (~1,690-1,740 training games) -- plausibly because these features
+correlate heavily with team Elo (already the dominant signal) and add
+multicollinearity noise rather than new information. **The infrastructure itself is
+still a real, reusable result** -- both ratings are now genuinely usable by any
+future game-outcome model, not stuck at play-level; this specific way of using them
+(naive linear addition to the existing feature set) doesn't help, which is a finding
+about the modeling choice, not a verdict on the underlying ratings (independently
+sanity-checked already in §3.7/§3.8, and validated again here against the Jefferson
+case). Full results: `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
