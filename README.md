@@ -186,6 +186,24 @@ results in the paper fill in as the season generates enough data to report on:
       few-percent signal — but the apparent result at the default threshold
       doesn't survive a basic robustness check. Results:
       `notebooks/model_backtest_results.ipynb`.
+- [x] Pure cross-book arbitrage (`find_arbitrage_spots` in
+      `src/backtest/props_ev_backtest.py`) — no Pinnacle/fair-value model needed:
+      does the best Over price at one execution book plus the best Under at
+      another sum under 100% implied probability? Restricted to DraftKings/
+      FanDuel/BetMGM only — Pinnacle and offshore books aren't real bettable
+      legs. **Found 31 genuine risk-free spots (0.35% of 8,992 matched-line
+      pairs), mean margin 0.79%, max 1.61% — and it's not noise:** 29 of 31 are
+      the same FanDuel(Over)/BetMGM(Under) pair on the same two market types
+      (receptions, passing TDs), traced to a real systematic vig-skew
+      difference between the two books on those specific markets (e.g. passing
+      TDs: FanDuel's Over averages -0.05, BetMGM's averages -31.35). **Honest
+      caveats attached, not oversold as a ready strategy:** single near-kickoff
+      snapshot (reasonable but not proof of real-time simultaneous
+      executability), margins this small would likely be eaten by execution
+      latency, and books are known to limit/ban accounts that repeatedly hit
+      guaranteed-profit spots — none of which pure EV math captures. One
+      season, one book pair — needs live 2026 confirmation before treating as
+      durable. Results: `notebooks/model_backtest_results.ipynb`.
 
 ## Data chronology: nflverse (historical) vs. Pinnacle (live)
 

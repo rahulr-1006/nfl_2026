@@ -60,6 +60,11 @@
       props pull; a clean negative result, no statistically detectable edge at any
       EV threshold tested, and the apparent +3.07% at the default threshold doesn't
       survive a robustness check (`src/backtest/props_ev_backtest.py`)
+- [x] Pure cross-book arbitrage (§3.10) — no Pinnacle/fair-value model needed; found
+      31 real risk-free spots (0.35% of matched lines), traced to a genuine
+      systematic FanDuel/BetMGM pricing-convention gap on receptions/passing-TD
+      props, not noise — with honest execution-risk caveats attached
+      (`find_arbitrage_spots` in `src/backtest/props_ev_backtest.py`)
 - [x] A non-stationarity / drift monitor for edge decay — rolling CLV, CUSUM
       change-point detection, calibration drift (`src/drift/monitor.py`), built and
       tested against synthetic data ahead of a live CLV time series to run it on
@@ -427,8 +432,10 @@ players who move through waivers/practice squads, not a bug in the resolution lo
 worth knowing before trusting `current_team` for a fringe-roster player specifically,
 less of a concern for a clearly active starter like the Cooper case above.
 
-### 3.10 Player-prop cross-book EV backtest (historical, not the live CLV headline)
-The first real use of the historical props pull (§3.6): does comparing an execution
+### 3.10 Player-prop cross-book strategies (historical, not the live CLV headline)
+The first real use of the historical props pull (§3.6), two strategies that don't
+need market timing to test: a Pinnacle-anchored EV backtest, and pure cross-book
+arbitrage. Does comparing an execution
 book's price against Pinnacle's devigged fair value, at a matching prop line, find
 bets that actually win at the rate the implied edge predicts?
 
@@ -475,6 +482,41 @@ for a few-percent-per-bet signal, the same power-analysis caveat §5.5 is reserv
 the live season), and not "confirmed edge" either. The apparent +3.07% at the default
 threshold does not survive a basic robustness check, so it should not be read as a
 validated result. Full backtest and threshold sweep:
+`notebooks/model_backtest_results.ipynb`.
+
+**Pure cross-book arbitrage -- a different, and real, kind of finding.** The EV
+backtest above assumes Pinnacle's price is truth. Arbitrage needs no such
+assumption: does the best available Over price at one execution book, plus the best
+available Under price at another, sum to under 100% implied probability? If so, both
+legs are placeable and the outcome doesn't matter -- a risk-free lock, not a
+predictive edge (`find_arbitrage_spots`, restricted to DraftKings/FanDuel/BetMGM only
+-- Pinnacle and offshore books like Bovada aren't places this project's bettor can
+actually place a bet, so they don't count as a real arb leg).
+
+**Result: 31 genuine arbitrage opportunities found, out of 8,992 exact-line-matched
+pairs (0.35%).** Mean margin 0.79%, max 1.61% -- small, but mathematically guaranteed
+if both legs were simultaneously placeable. **Not random noise: 29 of 31 are the same
+book pair (FanDuel Over, BetMGM Under) on the same two prop types (receptions,
+passing TDs).** Checking why: FanDuel prices these two markets with a real,
+systematic vig skew relative to BetMGM -- FanDuel's average Over price is
+dramatically shorter (e.g. passing TDs: -0.05 average vs. BetMGM's -31.35) while its
+Under price is dramatically steeper (-86.76 vs. -52.90). This is a structural pricing
+difference between two specific books on two specific market types, not a fleeting
+mispricing -- a mechanistically different (and more interesting) finding than "prices
+sometimes disagree."
+
+**Three honest caveats before this reads as a real strategy, not overselling it:**
+(1) each snapshot is captured near kickoff at a single point in time (5-minute
+snapshot granularity on the historical endpoint) -- reasonable confidence the two
+prices existed close together, but not proof both legs were simultaneously bettable
+in real time the way live monitoring would confirm; (2) margins under 2% would likely
+be eaten by execution latency/slippage in practice, placing two bets at two different
+books isn't instantaneous; (3) sportsbooks are well known to limit or ban accounts
+that repeatedly hit guaranteed-profit spots -- a real-world risk pure EV math doesn't
+capture, and worth stating plainly rather than pretending the theoretical margin is
+the realized one. **This is one season, one book pair, two market types -- needs
+out-of-sample confirmation on live 2026 data before treating it as a durable pattern
+rather than a 2024-specific artifact.** Full results:
 `notebooks/model_backtest_results.ipynb`.
 
 ---
