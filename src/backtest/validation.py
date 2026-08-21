@@ -27,6 +27,25 @@ significance check that doesn't lean on `chi2_contingency`'s asymptotic
 approximation, and -- more importantly -- tests the METHODOLOGY itself
 (does this pipeline manufacture significance from data that has no real
 structure?), not just any one finding.
+
+**Fifth piece, added 2026-08-21: `paired_permutation_test_mean_diff`.** This
+project's model-comparison work (`notebooks/model_backtest_results.ipynb`) has
+evaluated `test_seasons=[2023, 2024]` at least 8 separate times across its
+history (base Elo, GBM, QB Elo, garbage-time filtering, expanded
+receiver/pass-rush features, weather, and the margin/total regression's own
+expanded-feature checks) -- each an honest, independently-motivated
+comparison, never adaptively re-tuned against test feedback (checked against
+commit history), but still 8 looks at the same fixed holdout. That's a
+winner's-curse/selection-bias risk distinct from adaptive tuning: even with
+zero tuning, whichever of 8 honest candidates happens to beat its baseline on
+that specific 570-game slice is expected to look better than its true
+population performance, purely from which slice it was evaluated against.
+This is the exact same family of problem `benjamini_hochberg` above already
+fixes for correlated-props' chi-square p-values -- applied here to Brier-score
+improvements instead. `paired_permutation_test_mean_diff` supplies the
+per-comparison significance estimate (sign-flip permutation test on paired
+per-game Brier deltas, no distributional assumption) that feeds into that same
+correction.
 """
 
 from __future__ import annotations
@@ -155,6 +174,55 @@ def permutation_test_lift(
         "observed_lift": observed,
         "null_mean": float(np.mean(null_lifts)),
         "null_std": float(np.std(null_lifts, ddof=1)),
+        "p_value_empirical": p_empirical,
+        "n_permutations": n_permutations,
+    }
+
+
+def paired_permutation_test_mean_diff(
+    delta: Sequence[float], n_permutations: int = 10000, random_state: int | None = None
+) -> dict:
+    """One-sided significance test for whether the mean of paired
+    per-game differences `delta` is genuinely greater than zero, under the
+    null that baseline and candidate are exchangeable per game (each
+    game's sign is equally likely to have gone either way).
+
+    Built for comparing two models' per-game Brier-score errors on the
+    SAME test games: `delta_i = baseline_brier_i - candidate_brier_i`, so
+    a positive mean means the candidate had lower error (better) on
+    average. Not specific to Brier scores, though -- any paired per-unit
+    difference works the same way.
+
+    Sign-flip permutation test, not a bootstrap: resamples the SIGN of
+    each `delta_i` (`+delta_i` or `-delta_i` with equal probability,
+    `n_permutations` times), which is the standard nonparametric test for
+    "is this paired mean difference real" -- it doesn't assume normality
+    or resample which games are IN the test set (that's a different
+    question, about how much the specific 570-game sample matters; this
+    is about whether the observed improvement could plausibly be sign
+    noise even keeping the exact same games). Same "add-one" p-value
+    correction as `permutation_test_lift`, for the same reason (never
+    exactly 0, valid even at the most extreme observed values).
+    """
+    delta = np.asarray(delta, dtype=float)
+    if delta.size == 0:
+        raise ValueError("delta must be non-empty")
+    if n_permutations < 1:
+        raise ValueError(f"n_permutations must be >= 1, got {n_permutations}")
+
+    observed = float(np.mean(delta))
+
+    rng = np.random.default_rng(random_state)
+    n = delta.size
+    signs = rng.choice(np.array([-1.0, 1.0]), size=(n_permutations, n))
+    null_means = (signs * np.abs(delta)).mean(axis=1)
+
+    p_empirical = float((1 + np.sum(null_means >= observed)) / (n_permutations + 1))
+
+    return {
+        "observed_mean_diff": observed,
+        "null_mean": float(np.mean(null_means)),
+        "null_std": float(np.std(null_means, ddof=1)),
         "p_value_empirical": p_empirical,
         "n_permutations": n_permutations,
     }

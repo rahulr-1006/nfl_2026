@@ -6,6 +6,7 @@ from src.backtest.correlated_props import measure_leg_correlation
 from src.backtest.validation import (
     benjamini_hochberg,
     expanding_season_folds,
+    paired_permutation_test_mean_diff,
     permutation_test_lift,
     split_by_season,
 )
@@ -245,3 +246,59 @@ def test_benjamini_hochberg_rejects_out_of_range_p_values():
         benjamini_hochberg([0.01, 1.5])
     with pytest.raises(ValueError):
         benjamini_hochberg([-0.1, 0.5])
+
+
+# --- paired_permutation_test_mean_diff ---
+
+
+def test_paired_permutation_test_flags_a_real_consistent_improvement():
+    # candidate's error is smaller than baseline's on every single game by
+    # a similar margin -- an unambiguous, real, consistent improvement.
+    rng = np.random.default_rng(0)
+    delta = rng.normal(loc=0.05, scale=0.01, size=500)  # always positive -> candidate always better
+    result = paired_permutation_test_mean_diff(delta, n_permutations=2000, random_state=1)
+    assert result["observed_mean_diff"] == pytest.approx(0.05, abs=0.01)
+    assert result["p_value_empirical"] < 0.001
+
+
+def test_paired_permutation_test_does_not_flag_pure_noise():
+    # delta has no consistent sign -- half the games favor baseline, half
+    # favor candidate, purely at random. No real improvement to detect.
+    rng = np.random.default_rng(2)
+    delta = rng.normal(loc=0.0, scale=0.05, size=500)
+    result = paired_permutation_test_mean_diff(delta, n_permutations=2000, random_state=3)
+    assert result["p_value_empirical"] > 0.05
+
+
+def test_paired_permutation_test_null_mean_is_close_to_zero():
+    # Sign-flipping destroys any real consistent direction -- the null
+    # distribution of the mean should center near 0 regardless of the
+    # real data's own average difference.
+    rng = np.random.default_rng(4)
+    delta = rng.normal(loc=0.05, scale=0.01, size=500)
+    result = paired_permutation_test_mean_diff(delta, n_permutations=3000, random_state=5)
+    assert result["null_mean"] == pytest.approx(0.0, abs=0.01)
+
+
+def test_paired_permutation_test_matches_hand_computation_for_observed_mean():
+    delta = [0.1, -0.05, 0.2, 0.0, 0.15]
+    result = paired_permutation_test_mean_diff(delta, n_permutations=100, random_state=6)
+    assert result["observed_mean_diff"] == pytest.approx(sum(delta) / len(delta))
+
+
+def test_paired_permutation_test_is_reproducible_with_a_fixed_seed():
+    rng = np.random.default_rng(7)
+    delta = rng.normal(size=200)
+    r1 = paired_permutation_test_mean_diff(delta, n_permutations=500, random_state=42)
+    r2 = paired_permutation_test_mean_diff(delta, n_permutations=500, random_state=42)
+    assert r1 == r2
+
+
+def test_paired_permutation_test_rejects_empty_delta():
+    with pytest.raises(ValueError):
+        paired_permutation_test_mean_diff([])
+
+
+def test_paired_permutation_test_rejects_non_positive_n_permutations():
+    with pytest.raises(ValueError):
+        paired_permutation_test_mean_diff([0.1, 0.2], n_permutations=0)

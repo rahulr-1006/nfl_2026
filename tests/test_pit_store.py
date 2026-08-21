@@ -60,6 +60,24 @@ def test_read_as_of_includes_snapshot_at_exact_decision_time(tmp_path):
     assert len(visible) == 1
 
 
+def test_read_as_of_honors_the_boundary_across_a_non_utc_but_tz_aware_decision_time(tmp_path):
+    # A 2026-08-21 adversarial audit verified this live (not just by
+    # inspection) but found no existing test pinning it down -- correct
+    # today by virtue of standard Python/pandas tz-aware comparison, but
+    # unguarded against a future regression. decision_time expressed in
+    # UTC-4 rather than UTC must still honor the exact same inclusive
+    # boundary as every other test in this file.
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(5)])  # captured at BASE + 5h UTC
+
+    utc_minus_4 = timezone(timedelta(hours=-4))
+    same_instant = (BASE + timedelta(hours=5)).astimezone(utc_minus_4)
+    one_minute_earlier = same_instant - timedelta(minutes=1)
+
+    assert len(store.read_as_of(same_instant)) == 1
+    assert store.read_as_of(one_minute_earlier).empty
+
+
 def test_read_as_of_before_any_capture_returns_empty(tmp_path):
     store = PointInTimeStore(root=tmp_path)
     store.write([_snap(5)])
