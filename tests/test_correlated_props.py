@@ -2,13 +2,18 @@ import pandas as pd
 import pytest
 
 from src.backtest.correlated_props import (
+    VALIDATED_RELIABLE_BUCKETS,
+    UnvalidatedBucketError,
+    bucket_edge,
     bucket_favorite_strength,
     build_team_game_outcomes,
     correlated_edge,
     estimate_game_specific_joint_prob,
+    is_bucket_validated,
     measure_leg_correlation,
     measure_leg_correlation_by_bucket,
     naive_parlay_price,
+    price_bucket_bet,
 )
 
 # --- measure_leg_correlation ---
@@ -59,12 +64,12 @@ def test_probabilities_match_hand_computed_values():
 
 def _schedule_fixture():
     games = [
-        # game_id, home, away, home_score, away_score, spread_line, total_line, home_qb, away_qb
-        ("2024_01_A_B", "A", "B", 28, 14, -7.0, 45.0, "QB_A", "QB_B"),
+        # game_id, season, home, away, home_score, away_score, spread_line, total_line, home_qb, away_qb
+        ("2024_01_A_B", 2024, "A", "B", 28, 14, -7.0, 45.0, "QB_A", "QB_B"),
     ]
     df = pd.DataFrame(
         games,
-        columns=["game_id", "home_team", "away_team", "home_score", "away_score", "spread_line", "total_line", "home_qb_id", "away_qb_id"],
+        columns=["game_id", "season", "home_team", "away_team", "home_score", "away_score", "spread_line", "total_line", "home_qb_id", "away_qb_id"],
     )
     return df
 
@@ -85,6 +90,14 @@ def test_team_game_outcomes_pools_home_and_away_perspectives():
     out = build_team_game_outcomes(_schedule_fixture(), _player_stats_fixture())
     assert len(out) == 2
     assert set(out["team"]) == {"A", "B"}
+
+
+def test_team_game_outcomes_carries_season_from_the_schedule():
+    # Needed for an honest train/test split (src/backtest/validation.py) --
+    # without this column, splitting by season means parsing game_id
+    # strings, which nothing here should have to do.
+    out = build_team_game_outcomes(_schedule_fixture(), _player_stats_fixture())
+    assert (out["season"] == 2024).all()
 
 
 def test_team_won_is_correct_from_each_perspective():
@@ -231,3 +244,90 @@ def test_estimate_game_specific_joint_prob_is_clipped_to_a_valid_range():
     # must clip to the tighter marginal (min(p_a, p_b) = 0.5), never exceed it.
     result = estimate_game_specific_joint_prob(team_market_prob=0.5, historical_p_b=0.5, bucket_lift=10.0)
     assert result == pytest.approx(0.5)
+
+
+# --- bucket_edge ---
+
+
+def test_bucket_edge_matches_correlated_edge_when_unclipped():
+    # p_a small enough (0.2) and lift small enough (1.5) that the joint estimate
+    # (1.5*0.2*0.3=0.09) stays well below both marginals -- the clip never binds,
+    # so bucket_edge's closed form must match correlated_edge's edge exactly.
+    p_a, p_b, lift, vig = 0.2, 0.3, 1.5, 0.05
+    joint = lift * p_a * p_b
+    full = correlated_edge(p_a, p_b, joint, vig=vig)
+    assert bucket_edge(lift, vig=vig) == pytest.approx(full["edge"])
+
+
+def test_bucket_edge_is_independent_of_market_probability():
+    # The whole point of the closed form: edge depends only on lift/vig, not
+    # on p_a -- confirmed by varying p_a across the unclipped-safe range and
+    # checking bucket_edge always agrees with correlated_edge's actual edge.
+    lift, p_b, vig = 1.3, 0.25, 0.0575
+    for p_a in (0.05, 0.2, 0.4):
+        joint = lift * p_a * p_b
+        full = correlated_edge(p_a, p_b, joint, vig=vig)
+        assert bucket_edge(lift, vig=vig) == pytest.approx(full["edge"])
+
+
+def test_bucket_edge_uses_measured_prop_vig_by_default():
+    from src.backtest.correlated_props import MEASURED_PROP_VIG
+
+    assert bucket_edge(1.2) == pytest.approx(1.2 / (1 + MEASURED_PROP_VIG) ** 2 - 1)
+
+
+# --- is_bucket_validated / price_bucket_bet (2026-08-21 portfolio-validation fix) ---
+
+
+def test_is_bucket_validated_matches_the_validated_set():
+    assert VALIDATED_RELIABLE_BUCKETS == {"underdog", "narrow"}
+    assert is_bucket_validated("underdog") is True
+    assert is_bucket_validated("narrow") is True
+    assert is_bucket_validated("favorite") is False
+    assert is_bucket_validated("heavy_favorite") is False
+
+
+def test_price_bucket_bet_prices_a_validated_bucket_normally():
+    # team_market_prob=0.3 -> "underdog" bucket, validated.
+    bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
+    result = price_bucket_bet(team_market_prob=0.3, historical_p_b=0.186, bucket_lift=bucket_lift)
+
+    assert result["bucket"] == "underdog"
+    assert result["bucket_validated"] is True
+    assert result["bucket_lift"] == pytest.approx(1.76)
+
+    # matches calling the unwrapped functions directly
+    joint = estimate_game_specific_joint_prob(0.3, 0.186, 1.76)
+    expected = correlated_edge(0.3, 0.186, joint)
+    assert result["edge"] == pytest.approx(expected["edge"])
+    assert result["suggested_stake"] == pytest.approx(expected["suggested_stake"])
+
+
+def test_price_bucket_bet_refuses_an_unvalidated_bucket_by_default():
+    # team_market_prob=0.8 -> "heavy_favorite" bucket, NOT validated.
+    bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
+    with pytest.raises(UnvalidatedBucketError):
+        price_bucket_bet(team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift)
+
+
+def test_price_bucket_bet_refuses_a_favorite_bucket_by_default():
+    # team_market_prob=0.6 -> "favorite" bucket, NOT validated -- despite
+    # having cleared vig in the original pooled (in-sample, leaky) analysis.
+    bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
+    with pytest.raises(UnvalidatedBucketError):
+        price_bucket_bet(team_market_prob=0.6, historical_p_b=0.186, bucket_lift=bucket_lift)
+
+
+def test_price_bucket_bet_allows_unvalidated_when_explicitly_requested():
+    bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
+    result = price_bucket_bet(
+        team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift, allow_unvalidated=True
+    )
+    assert result["bucket"] == "heavy_favorite"
+    assert result["bucket_validated"] is False
+
+
+def test_price_bucket_bet_error_message_names_the_bad_bucket():
+    bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
+    with pytest.raises(UnvalidatedBucketError, match="heavy_favorite"):
+        price_bucket_bet(team_market_prob=0.9, historical_p_b=0.186, bucket_lift=bucket_lift)
