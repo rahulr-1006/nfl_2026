@@ -95,6 +95,39 @@ def load_players(out_dir: Path = STATIC_DIR) -> Path:
     return path
 
 
+PLAYER_STATS_COLUMNS = [
+    "player_id",
+    "player_display_name",
+    "position",
+    "season",
+    "week",
+    "game_id",
+    "team",
+    "opponent_team",
+    "passing_yards",
+    "passing_tds",
+    "rushing_yards",
+    "rushing_tds",
+    "receiving_yards",
+    "receptions",
+    "receiving_tds",
+]
+
+
+def load_player_stats(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
+    """Fetch nflverse's weekly player stats, trim to PLAYER_STATS_COLUMNS,
+    and cache as parquet -- the free per-player-per-game box score
+    (passing/rushing/receiving yards and TDs, receptions), used for prop
+    settlement (`src/store/prop_settlement.py`) and correlated-outcome
+    analysis (`src/backtest/correlated_props.py`).
+    """
+    out_dir.mkdir(parents=True, exist_ok=True)
+    df = nfl.load_player_stats(seasons=seasons).select(PLAYER_STATS_COLUMNS)
+    path = out_dir / f"player_stats_{min(seasons)}_{max(seasons)}.parquet"
+    df.write_parquet(path)
+    return path
+
+
 def load_weekly_rosters(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:
     """Fetch nflverse's weekly roster snapshots and cache as parquet.
 
@@ -155,3 +188,4 @@ if __name__ == "__main__":
     print(f"wrote {load_players()}")
     print(f"wrote {load_weekly_rosters(seasons)}")
     print(f"wrote {load_injuries(seasons)}")
+    print(f"wrote {load_player_stats(seasons)}")
