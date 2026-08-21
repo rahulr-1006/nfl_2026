@@ -30,14 +30,15 @@ structure?), not just any one finding.
 
 **Fifth piece, added 2026-08-21: `paired_permutation_test_mean_diff`.** This
 project's model-comparison work (`notebooks/model_backtest_results.ipynb`) has
-evaluated `test_seasons=[2023, 2024]` at least 8 separate times across its
+evaluated `test_seasons=[2023, 2024]` at least 9 separate times across its
 history (base Elo, GBM, QB Elo, garbage-time filtering, expanded
-receiver/pass-rush features, weather, and the margin/total regression's own
-expanded-feature checks) -- each an honest, independently-motivated
-comparison, never adaptively re-tuned against test feedback (checked against
-commit history), but still 8 looks at the same fixed holdout. That's a
+receiver/pass-rush features, weather, rest/travel differential, and the
+margin/total regression's own expanded-feature checks) -- each an honest,
+independently-motivated comparison, never adaptively re-tuned against test
+feedback (checked against commit history), but still 9 looks at the same
+fixed holdout. That's a
 winner's-curse/selection-bias risk distinct from adaptive tuning: even with
-zero tuning, whichever of 8 honest candidates happens to beat its baseline on
+zero tuning, whichever of 9 honest candidates happens to beat its baseline on
 that specific 570-game slice is expected to look better than its true
 population performance, purely from which slice it was evaluated against.
 This is the exact same family of problem `benjamini_hochberg` above already

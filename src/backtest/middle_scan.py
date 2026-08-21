@@ -52,11 +52,14 @@ log = logging.getLogger(__name__)
 _DATA_ROOT = Path("data/static")
 
 
-def _fit_residual_stds() -> tuple[float, float]:
+def fit_residual_stds() -> tuple[float, float]:
     """(sigma_margin, sigma_total), reusing the exact fitting pipeline
     already validated in `notebooks/model_backtest_results.ipynb` (same
     train/calib/test split, same feature set) -- not a fresh model, a
-    reuse of the one this project already trusts.
+    reuse of the one this project already trusts. Public (not
+    module-private) because `src/backtest/steam_scan.py` reuses it too --
+    the sigma this scan needs is the same one middling needs, no reason to
+    fit it twice or duplicate this function.
     """
     schedule = pd.read_parquet(_DATA_ROOT / "schedules_2015_2024.parquet")
     pbp = pd.read_parquet(_DATA_ROOT / "pbp_2015_2024.parquet")
@@ -79,7 +82,7 @@ def run(store_root: str = "data/snapshots", min_ev: float = 0.0) -> pd.DataFrame
     """One scan. Returns the report DataFrame (also logged); never sends
     any notification -- print/log output only, reviewed by hand.
     """
-    sigma_margin, sigma_total = _fit_residual_stds()
+    sigma_margin, sigma_total = fit_residual_stds()
     log.info("fitted residual stds: sigma_margin=%.2f sigma_total=%.2f", sigma_margin, sigma_total)
 
     store = PointInTimeStore(root=store_root)

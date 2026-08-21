@@ -49,16 +49,24 @@ DEFAULT_MAX_CAPTURE_GAP = pd.Timedelta(minutes=30)
 
 def pinnacle_fair_probs(props: pd.DataFrame) -> pd.DataFrame:
     """One row per (event_id, player_name, prop_stat, line) with both a
-    Pinnacle Over and Under price at the SAME line, from Pinnacle's LATEST
-    capture_time for that group (not `aggfunc="first"`'s arbitrary
-    DataFrame-order pick, which could silently select a stale snapshot once
-    a group has more than one Pinnacle poll -- see `DEFAULT_MAX_CAPTURE_GAP`'s
-    comment): devigged fair Over/Under probabilities, plus that
-    `pinnacle_time` so `find_prop_ev_spots` can check it isn't stale relative
-    to whatever execution-book price it gets compared against. Groups where
-    Pinnacle's Over and Under lines don't match (rare -- 4 of 4998 in the
-    2024-season pull) are dropped: can't devig a market where the two sides
-    aren't quoting the same number.
+    Pinnacle Over and Under price at the SAME line, from the LATEST
+    capture_time where a COMPLETE (both Over AND Under) pair exists for
+    that group -- devigged fair Over/Under probabilities, plus that
+    `pinnacle_time` so `find_prop_ev_spots` can check it isn't stale
+    relative to whatever execution-book price it gets compared against.
+
+    **Deliberately not "the group's single latest capture_time overall"**
+    (a real bug caught by code review 2026-08-21, fixed here): if the
+    absolute-latest poll for a group only updated one side (e.g. Pinnacle
+    re-priced the Over but the Under didn't move that cycle), taking the
+    latest timestamp alone would pick up a one-sided snapshot and drop the
+    whole group -- discarding a perfectly valid, fully simultaneous EARLIER
+    pair that still exists. Finding the latest timestamp where both sides
+    are actually present avoids that.
+
+    Groups where Pinnacle's Over and Under lines don't match (rare -- 4 of
+    4998 in the 2024-season pull) are dropped: can't devig a market where
+    the two sides aren't quoting the same number.
     """
     group_cols = ["event_id", "player_name", "prop_stat", "line"]
     empty = pd.DataFrame(columns=[*group_cols, "over_fair", "under_fair", "pinnacle_time"])
@@ -67,15 +75,20 @@ def pinnacle_fair_probs(props: pd.DataFrame) -> pd.DataFrame:
     if pin.empty:
         return empty
 
-    latest_time = pin.groupby(group_cols)["capture_time"].transform("max")
-    pin = pin[pin["capture_time"] == latest_time]
+    has_over = pin.loc[pin["side"] == "over", [*group_cols, "capture_time"]].drop_duplicates()
+    has_under = pin.loc[pin["side"] == "under", [*group_cols, "capture_time"]].drop_duplicates()
+    complete_times = has_over.merge(has_under, on=[*group_cols, "capture_time"])
+    if complete_times.empty:
+        return empty
+    latest_complete = complete_times.groupby(group_cols, as_index=False)["capture_time"].max()
+
+    pin = pin.merge(latest_complete, on=[*group_cols, "capture_time"], how="inner")
 
     wide = pin.pivot_table(index=group_cols, columns="side", values="price_american", aggfunc="first").reset_index()
     if not {"over", "under"}.issubset(wide.columns):
         return empty
 
-    pinnacle_time = pin.groupby(group_cols)["capture_time"].max().reset_index().rename(columns={"capture_time": "pinnacle_time"})
-    wide = wide.merge(pinnacle_time, on=group_cols, how="left")
+    wide = wide.merge(latest_complete.rename(columns={"capture_time": "pinnacle_time"}), on=group_cols, how="left")
     wide = wide.dropna(subset=["over", "under"])
     if wide.empty:
         return empty

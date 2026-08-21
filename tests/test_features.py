@@ -5,6 +5,22 @@ import pytest
 
 from src.model.features import build_game_features, rolling_team_strength, team_game_epa
 
+# Shared by every schedule fixture in this file so a future context_cols
+# addition (weekday/stadium_id/location just were) only needs updating in
+# one place, not once per fixture (caught by code review 2026-08-21).
+_SCHEDULE_CONTEXT_COLS = [
+    "home_rest",
+    "away_rest",
+    "div_game",
+    "roof",
+    "surface",
+    "temp",
+    "wind",
+    "weekday",
+    "stadium_id",
+    "location",
+]
+
 # Team A is home in three straight games one season, with each game's
 # per-play EPA on offense fixed so a rolling mean is easy to hand-check:
 # game 1 -> 0.5, game 2 -> -0.5, game 3 -> 100 (a deliberate outlier used
@@ -72,7 +88,7 @@ def _schedule_fixture() -> pd.DataFrame:
     ]
     df = pd.DataFrame(games, columns=["game_id", "week", "gameday", "home_team", "away_team"])
     df["season"] = 2024
-    for col in ["home_rest", "away_rest", "div_game", "roof", "surface", "temp", "wind", "spread_line", "total_line"]:
+    for col in [*_SCHEDULE_CONTEXT_COLS, "spread_line", "total_line"]:
         df[col] = None
     return df
 
@@ -208,7 +224,7 @@ def test_build_game_features_propagates_exclude_garbage_time():
         ]
     )
     schedule["season"] = 2024
-    for col in ["home_rest", "away_rest", "div_game", "roof", "surface", "temp", "wind", "spread_line", "total_line"]:
+    for col in [*_SCHEDULE_CONTEXT_COLS, "spread_line", "total_line"]:
         schedule[col] = None
 
     without_filter = build_game_features(pbp, schedule)

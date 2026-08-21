@@ -66,6 +66,8 @@ def _schedule_fixture() -> pd.DataFrame:
     df["season"] = 2023
     for col in ["home_rest", "away_rest", "div_game", "roof", "surface", "temp", "wind", "spread_line", "total_line"]:
         df[col] = 0
+    for col in ["weekday", "stadium_id", "location"]:
+        df[col] = None
     return df
 
 
