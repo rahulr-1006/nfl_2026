@@ -1,6 +1,7 @@
 .PHONY: venv install test lint demo collect collect-once preseason-poll preseason-report props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
+	middle-scan-once \
 	props-collect props-collect-once \
 	props-service-install props-service-uninstall props-service-status clean
 
@@ -95,6 +96,16 @@ collector-service-status:
 # actually send anything; without it, it scans and logs in dry-run mode.
 monitor-scan-once:
 	$(PY) -m src.notify.monitor_run
+
+# Middling (src/backtest/): checks the real-season store for spread/total
+# lines that have moved enough over time to open a genuine middle window.
+# Manual only, deliberately no launchd service yet -- real movement takes
+# days to accumulate this early in the pre-season window, and this
+# strategy has zero live track record to trust with an unattended alert
+# channel yet. Reads local files + the cached 2015-2024 parquet only, no
+# Odds API cost.
+middle-scan-once:
+	$(PY) -m src.backtest.middle_scan
 
 MONITOR_AGENT := $(HOME)/Library/LaunchAgents/com.nflclv.monitor.plist
 

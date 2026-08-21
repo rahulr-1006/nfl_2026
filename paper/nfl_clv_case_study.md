@@ -81,6 +81,25 @@
       shows up in the Kelly stake, not the edge percentage
       (`measure_leg_correlation_by_bucket`/`estimate_game_specific_joint_prob` in
       `src/backtest/correlated_props.py`)
+- [x] 7-pair bucket sweep (§4.5) — extended bucketing from 2 pairs to all 7; found it
+      partially rescues the one pooled-failed pair (+0.30% edge in its underdog
+      bucket) and, more importantly, exposes a real negative bucket hiding inside two
+      pooled-positive pairs (heavy-favorite buckets going to -1.2% and ~0%) — 4 of 7
+      pairs clear vig in all four buckets regardless of favorite strength, the
+      genuinely robust subset (`bucket_edge` in `src/backtest/correlated_props.py`)
+- [x] Middling (§4.10) — a genuinely different mechanism (real line movement over
+      time, not a single-instant price comparison); built live-first since nflverse
+      has no historical intraday line data; proved algebraically a real middle can
+      never lose both legs, checked numerically; first live smoke test against the
+      real 2026 collector found two real, small, bettable windows from cross-book
+      disagreement (`src/backtest/middling.py`, `make middle-scan-once`)
+- [x] Portfolio validation (§4.5) — leakage-safe splitting, walk-forward folds,
+      permutation nulls, and Benjamini-Hochberg correction across all 57 real p-values
+      this project has produced; found and fixed a real in-sample leak in the bucket
+      pricing (favorite/heavy_favorite buckets don't survive honest out-of-sample
+      testing; underdog/narrow do), confirmed the core correlation mechanism 3
+      independent ways, multiple-comparison correction changes nothing else
+      (`src/backtest/validation.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -1090,6 +1109,129 @@ discrete edge levels plus a tail correction. The Kelly stake, not the edge
 percentage, is where per-game granularity actually shows up. Full bucket table and
 real-game examples: `notebooks/model_backtest_results.ipynb`.
 
+**Extending the bucket sweep to all 7 leg pairs (2026-08-21), not just the 2 tested
+above.** Bucketing was only exercised on the two pairs with the strongest pooled
+lift. The natural check: does bucketing change the verdict for the other 5 pairs --
+especially `team_won x leading_receiver_75plus`, the one pair whose *pooled* edge was
+negative (-4.0%, failed the vig hurdle in §4.5 above)? Added `bucket_edge(lift, vig)`
+to `correlated_props.py`, the closed-form result derived above
+(`edge = lift/(1+vig)^2 - 1`) as a real, tested function rather than notebook
+arithmetic -- lets a bucket screened for "clears vig" without looping over every
+individual game, and matches `correlated_edge`'s actual edge exactly whenever the
+joint estimate isn't hitting the clip.
+
+**Result: bucketing partially rescues the failed pair, and reveals a real negative
+segment hiding inside two previously "successful" pooled pairs.**
+
+- `team_won x leading_receiver_75plus`: the underdog bucket (market win prob < 0.45,
+  n=2,245) clears vig at **+0.30% edge**, p=1e-5 -- real and significant, but tiny,
+  almost certainly not worth the execution friction of placing it. The `narrow` and
+  `favorite` buckets for this same pair are NOT significant (p=0.63, p=0.48) -- lift
+  is statistically indistinguishable from 1.0 there, so the negative closed-form
+  numbers those buckets produce (-9.2%, -9.5%) should not be read as real negative
+  edges, just "no measurable correlation, don't bet it" (same discipline as every
+  other insignificant result in this project -- a lift that looks real but isn't
+  shouldn't be reported as a finding).
+- `team_won x qb_2plus_tds` (pooled edge a healthy +12.1%) has a `heavy_favorite`
+  bucket (market win prob > 0.70, n=900) that goes **negative, -1.2% edge**, p<1e-13
+  (significant, i.e. this is a real, precisely-measured small negative edge, not
+  noise) -- a pooled-positive pair that would still lose money if bet blindly on
+  heavy favorites specifically.
+- `leading_receiver_75plus x qb_2plus_tds` (pooled edge +8.3%) has its
+  `heavy_favorite` bucket land almost exactly at breakeven (-0.01% edge, p<1e-10).
+- The two strongest pairs from the original pooled analysis --
+  `team_won x leading_rusher_100plus` and `game_over x qb_2plus_tds` -- along with
+  both `team_covers` pairs, clear vig in **all four buckets**, favorite strength and
+  all, and every one of those 16 buckets is individually significant (p from 1e-5 to
+  1e-134). These four pairs are the genuinely robust ones: real edge regardless of
+  which team is favored.
+
+**How this changes the picture:** bucketing isn't just a per-game pricing refinement,
+it's a real screen. A pooled edge number can hide a bucket that's actually
+loss-making (the two "successful" pairs above), and a pooled failure can hide a
+narrow, real, significant pocket of edge (the receiver pair's underdog bucket) --
+too small to act on here, but the mechanism is confirmed, which matters more than the
+number itself. Same honest ceiling as everywhere else in this section: these are
+theoretical edges against a naive-independence SGP price, not confirmed against any
+real book quote. Full 7-pair x 4-bucket table: `notebooks/model_backtest_results.ipynb`.
+
+**Portfolio validation: is any of this leakage or luck? (2026-08-21)** Prompted directly
+by the question "how do we account for overfitting or leakage -- what tests tell us if
+this is bullshit or real edge." Four checks, `src/backtest/validation.py`
+(`split_by_season`, `expanding_season_folds`, `permutation_test_lift`,
+`benjamini_hochberg`; all independently unit-tested, not just applied ad hoc in a
+notebook).
+
+**1. A real, previously-uncaught leak, found and fixed.** The bucket-lift pricing above
+computed lift on the FULL 2015-2024 pool -- including 2024 -- then applied it to price
+"test" 2024 games that had themselves contributed to that same lift estimate. Not
+hypothetical: recomputing lift on 2015-2023 only and pricing 2024 games strictly
+out-of-sample changes the real, actionable conclusion. `underdog`/`narrow` buckets hold
+up robustly -- `team_won x leading_rusher_100plus`'s underdog edge, measured strictly
+within 2024 alone, comes in even higher than the leaky in-sample number (+97.7% vs.
++57.5%). But `favorite`/`heavy_favorite` buckets do not: the same pair's `favorite`
+bucket collapses from +19.2% (in-sample) to +3.8% (realized-2024), and
+`game_over x qb_2plus_tds`'s `favorite` bucket flips sign entirely (+20.9% to -0.9%).
+Revised conclusion: only the `underdog`/`narrow` buckets of these two pairs are backed
+by an honest held-out check; `favorite`/`heavy_favorite`, despite "clearing vig" in the
+original pooled analysis, are not reliably real.
+
+**2. Walk-forward across four expanding-window folds confirms this is a pattern, not a
+2024 fluke.** Training on all prior seasons and testing the next one in turn (test
+seasons 2021-2024), direction agreement between train-fold and held-out-fold edge is
+84% across 32 fold x bucket combinations, with a 0.70 correlation between train lift and
+held-out lift -- real generalization, not perfect. `underdog`/`narrow` are positive in
+essentially every fold for both pairs; `favorite`/`heavy_favorite` flip sign repeatedly
+(`team_won x leading_rusher_100plus`'s heavy_favorite edge is negative in 3 of 4 folds).
+Exactly the signature of a real-but-narrower edge, not pure noise (which wouldn't cohere
+by bucket at all) and not a fully robust one either (which wouldn't flip sign
+repeatedly in the same bucket).
+
+**3. A permutation test confirms the underlying correlation mechanism independent of
+chi-square's assumptions.** `chi2_contingency` relies on an asymptotic approximation;
+`permutation_test_lift` instead shuffles one indicator 10,000 times (destroying any real
+association while preserving both marginal rates exactly) and reports the empirical
+fraction of shuffles that matched or exceeded the observed lift. All 7 pooled leg pairs
+-- including the weakest, `team_won x leading_receiver_75plus` (lift 1.07) -- come back
+at `p_empirical = 0.0001`: not one of 10,000 shuffles produced a lift that extreme, for
+any pair. A negative control matters just as much here: run on the two buckets
+chi-square already found NOT significant, permutation p-values come back unremarkable
+(0.24-0.31) -- the methodology correctly distinguishes real signal from noise in both
+directions, not just when it's convenient.
+
+**4. Multiple-comparison correction does not overturn anything already reported.** This
+project has produced 57 real p-values with this session's work: 7 pooled correlated-props
+tests, 20 per-season robustness checks, 28 bucket-level tests, and 2 Shapiro-Wilk
+residual-normality checks (§4.5 above) -- each judged against its own p<0.05 in
+isolation, with no correction applied anywhere until now. Benjamini-Hochberg FDR at
+q=0.05, applied at the most conservative level (combined across all 57 at once, not
+just within each family), leaves 54/57 significant. The 3 casualties: the same two
+bucket-level results already known and reported as not significant (never claimed as
+findings), plus the margin-residual Shapiro-Wilk test (p=0.075) -- a diagnostic where
+NOT rejecting normality is the hoped-for outcome, not a discovery claim, so its
+exclusion doesn't threaten anything either. The many-tests risk was real in principle;
+in practice this project's effect sizes (most p-values 1e-8 to 1e-140) are large enough
+that correction changes nothing substantive.
+
+**Overall verdict.** The pooled same-game correlation finding is real -- confirmed
+independent of chi-square by permutation testing, and survives multiple-comparison
+correction. The game-specific bucket pricing needed a real correction: half its claimed
+granularity (the favorite/heavy_favorite buckets) was not earned by an honest
+out-of-sample check, while the other half (underdog/narrow) holds up under both a
+proper train/test split and walk-forward validation. Not "the correlated-props work was
+bullshit" -- the core mechanism is real and now independently verified three different
+ways -- but "part of its claimed precision wasn't earned yet, and now it's been checked
+rather than assumed." Full validation notebook: `notebooks/model_backtest_results.ipynb`.
+
+**The fix is enforced in code, not left as a documentation caveat.** `price_bucket_bet`
+(`src/backtest/correlated_props.py`) is now the one real pricing entrypoint a future
+live scanner should call — it classifies a game's bucket and **refuses**
+(`UnvalidatedBucketError`) to price `favorite`/`heavy_favorite` unless the caller
+explicitly opts in via `allow_unvalidated=True`. `estimate_game_specific_joint_prob`
+and `correlated_edge` themselves are unchanged and still have no notion of which
+bucket is trustworthy — their docstrings now point to `price_bucket_bet` so a future
+reader lands on the safe path rather than the raw one.
+
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
 - `expected_value(p, d) = p(d-1) - (1-p)`.
@@ -1187,6 +1329,77 @@ found 4 spots clearing the 2% threshold -- FanDuel and BetMGM each offering 3.6-
 on two different underdog moneylines relative to Pinnacle's fair value at that moment.
 Confirms the comparison logic end-to-end on real data; not a claim about the strategy's
 long-run edge, which only the live season (§5) can establish.
+
+### 4.10 Middling: exploiting real line movement over time (2026-08-20)
+
+**A different mechanism than every other strategy in this paper.** §4.5's correlated
+props and §4.9's live scanner both compare prices at a single instant -- cross-book
+divergence or model-vs-market disagreement. Middling instead exploits the SAME
+market moving over real time: bet Team A -3 today; if the line later drifts to Team A
+-7 (injury news, sharp money), bet Team B +7. If the final margin lands in (3, 7),
+**both bets win outright** -- not a hedge, a genuine double win. Outside that window,
+exactly one leg wins; there is no outcome where both lose (proven algebraically below,
+and checked numerically in `tests/test_middling.py::test_middle_ev_never_loses_both_legs`).
+
+**Why this had to be built live-first, unlike every other strategy here.** nflverse's
+2015-2024 schedule data is closing-line-only -- there is no historical record of a
+line moving over time, so middling cannot be backtested against the past the way
+correlated props or the margin/total regression were. `PointInTimeStore` is the only
+source of real intraday line movement available for this purpose, and it only starts
+on 2026-08-14. This strategy's real track record has to be built forward from this
+project's own live collection, not validated against history first.
+
+**Mechanism, formalized.** `src/backtest/middling.py::win_interval(market, side, line)`
+returns the (lo, hi) region of the true outcome (home_margin for SPREAD, total_score
+for TOTAL) where a leg wins -- derived directly from `src/store/settlement.py::settle`'s
+own arithmetic and cross-checked against it over a full integer margin/total grid, not
+re-derived independently. `middle_window` intersects two opposite-side legs' win
+regions; a real, positive-width intersection is a genuine middle. `best_middle_for_game`
+finds the single WIDEST achievable window from all real quotes for one game across
+every book and capture_time -- provably sufficient to use each side's single best-ever
+quote rather than an exhaustive pairwise scan, because `win_interval` is monotonic in
+`line` for each side (a lesser quote can only produce a subset of the best-vs-best
+window).
+
+**Pricing reuses this project's own established finding, deliberately not its own
+regression models.** `middle_ev` prices a window under a Normal(mu, sigma) model of
+the true outcome. `sigma` reuses `src/model/calibration.py::fit_residual_std` on the
+existing margin/total regression (§4.5) -- a real, direct reuse. `mu`, however, is
+**Pinnacle's own current line** (`pinnacle_reference_line`), not the regression
+model's point prediction -- because every backtest in this paper found the market
+beats the model (§5.2); plugging in a worse estimate here would be a step backward
+with no justification. Sizing defaults to $2 per leg (the project's existing
+per-bet cap, §4.6) rather than a joint 2-leg Kelly optimization over both stakes --
+a real, harder problem the project's existing single-outcome Kelly math doesn't cover,
+and not worth solving ahead of any live confirmation this strategy works at all.
+
+**A genuine three-outcome payoff, priced honestly.** Unlike a pure hedge, a middle
+usually wins exactly one leg and sometimes wins both -- `middle_ev` computes
+`p_both_win`, `p_a_only`, `p_b_only`, and `p_neither` from the Normal model, and
+`p_neither` is a real correctness check baked into the tests: for any genuine
+opposite-side window, it must be ~0 regardless of where `mu`/`sigma` place the
+probability mass, since the algebra guarantees at least one leg always wins.
+
+**Deployment: deliberately manual, not a live service.** `make middle-scan-once`
+(`src/backtest/middle_scan.py`) fits the margin/total models once per run purely to
+extract their residual std, then scans the current store and prints/logs any real
+window found -- no SMS wiring, unlike §4.9's monitor. Two reasons: real movement takes
+days to accumulate this early in the season (a 5-minute service cadence would mostly
+find nothing), and this strategy has zero live track record yet -- wiring an untested
+pricing model straight to an unattended alert channel would be premature trust, the
+same discipline already applied to the props scheduler (§3.6).
+
+**First real smoke test (2026-08-20), against the live 2026 collector's actual data.**
+`make middle-scan-once` against the real store found two live, bettable windows --
+not from a line drifting over days yet (too early, §3.3), but from genuine cross-book
+disagreement on which side of a near-even game to favor: DraftKings quoting SEA home
++1.5 while FanDuel independently quoted NE away +1.5 on the same game, and a similar
+pair on GB/MIN. Both real, both at real execution-book prices, small (window widths
+of 2.5-3.0 points, EV $0.04-$0.09 on $4 risked) -- exactly the modest scale expected
+this early, and confirmation the full pipeline (detection -> Pinnacle-referenced
+pricing -> EV) works end-to-end on live data, not just synthetic test fixtures. Not
+yet a claim about this strategy's long-run edge -- that requires real games completing
+against real middle bets, which only the live season can provide.
 
 ---
 

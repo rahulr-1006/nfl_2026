@@ -149,9 +149,34 @@ def estimate_game_specific_joint_prob(team_market_prob: float, historical_p_b: f
     Clipped to a valid joint-probability range: P(A and B) can never
     exceed either marginal, and a naive `lift * p_a * p_b` product isn't
     guaranteed to respect that on its own.
+
+    **This function has no notion of which bucket is trustworthy** -- it
+    will happily price a favorite/heavy_favorite bucket that failed an
+    honest out-of-sample check just as readily as a validated one. A real
+    live scan should call `price_bucket_bet` instead, which wraps this
+    function with that check.
     """
     raw = bucket_lift * team_market_prob * historical_p_b
     return min(raw, team_market_prob, historical_p_b)
+
+
+def bucket_edge(lift: float, vig: float = MEASURED_PROP_VIG) -> float:
+    """Closed-form edge for one `FAVORITE_BUCKETS` bucket, under this
+    module's multiplicative pricing model -- a real algebraic property, not
+    an approximation. `naive_parlay_price` scales as `1/p_a`; the unclipped
+    `estimate_game_specific_joint_prob` scales as `p_a` directly; they
+    cancel exactly, so the edge depends only on which bucket's lift applies,
+    not on any specific game's market probability. Derivation:
+    `edge = p*d - 1 = (lift*p_a*p_b) * (1/(p_a*(1+vig)*p_b*(1+vig))) - 1
+    = lift/(1+vig)^2 - 1`.
+
+    Matches `correlated_edge(...)["edge"]` exactly whenever the joint estimate
+    isn't hitting the clip (true for all but the most extreme favorite
+    games -- see `estimate_game_specific_joint_prob`'s docstring). Lets a
+    bucket sweep across many leg pairs be screened for "clears vig" without
+    looping over every individual game.
+    """
+    return lift / (1 + vig) ** 2 - 1
 
 
 def naive_parlay_price(p_a: float, p_b: float, vig: float = MEASURED_PROP_VIG) -> float:
@@ -199,6 +224,83 @@ def correlated_edge(
     }
 
 
+# Buckets confirmed to survive an honest out-of-sample check
+# (`src/backtest/validation.py`'s 2026-08-21 portfolio validation -- see paper
+# §4.5's "Portfolio validation" subsection for the full evidence), not just the
+# original in-sample pooled analysis that first reported bucket edges above.
+# `favorite`/`heavy_favorite` cleared vig pooled for BOTH pairs checked this way
+# (`team_won x leading_rusher_100plus`, `game_over x qb_2plus_tds`), but neither
+# survived a proper train/test split or walk-forward validation -- one bucket's
+# edge collapsed to near-zero, the other flipped sign entirely. The other 5 leg
+# pairs' favorite/heavy_favorite buckets have never been checked this way at
+# all -- there's no evidence they're fine, only less evidence they're broken.
+# Treating them as unvalidated too, not just the two directly tested, is the
+# conservative direction to be wrong in.
+VALIDATED_RELIABLE_BUCKETS = {"underdog", "narrow"}
+
+
+def is_bucket_validated(bucket: str) -> bool:
+    """Whether `bucket` (one of `FAVORITE_BUCKETS`' labels) has survived an
+    honest out-of-sample check. See `VALIDATED_RELIABLE_BUCKETS`'s comment
+    for the evidence and its scope.
+    """
+    return bucket in VALIDATED_RELIABLE_BUCKETS
+
+
+class UnvalidatedBucketError(ValueError):
+    """Raised by `price_bucket_bet` when asked to price a favorite/
+    heavy_favorite bucket without explicitly opting in via
+    `allow_unvalidated=True`. See `VALIDATED_RELIABLE_BUCKETS`."""
+
+
+def price_bucket_bet(
+    team_market_prob: float,
+    historical_p_b: float,
+    bucket_lift: dict[str, float],
+    vig: float = MEASURED_PROP_VIG,
+    bankroll: float = 100.0,
+    allow_unvalidated: bool = False,
+) -> dict:
+    """The one real pricing entrypoint any future live correlated-props
+    scanner should call -- not `estimate_game_specific_joint_prob` /
+    `correlated_edge` directly, which have no notion of which buckets are
+    trustworthy and will happily price an unvalidated one.
+
+    Classifies `team_market_prob` into its `FAVORITE_BUCKETS` bucket, REFUSES
+    (raises `UnvalidatedBucketError`) to price it if that bucket isn't in
+    `VALIDATED_RELIABLE_BUCKETS` -- unless the caller explicitly passes
+    `allow_unvalidated=True` (e.g. for further research on the unvalidated
+    buckets, never for a real live scan) -- and otherwise reuses
+    `estimate_game_specific_joint_prob` + `correlated_edge` completely
+    unchanged.
+
+    `bucket_lift` must be keyed by bucket label (e.g. the output of
+    `dict(zip(bt["bucket"], bt["lift"]))` on a `measure_leg_correlation_by_bucket`
+    result) -- and should itself come from an honest split
+    (`src/backtest/validation.py::split_by_season`/`expanding_season_folds`
+    on TRAIN data only), not the full pool including whatever game is being
+    priced. This function only guards which BUCKET is trustworthy; it
+    can't detect whether the `bucket_lift` passed in was itself leaked --
+    that discipline is still the caller's responsibility.
+    """
+    bucket = bucket_favorite_strength(team_market_prob)
+    if not allow_unvalidated and not is_bucket_validated(bucket):
+        raise UnvalidatedBucketError(
+            f"bucket {bucket!r} (team_market_prob={team_market_prob}) has not survived an "
+            f"honest out-of-sample check -- only {sorted(VALIDATED_RELIABLE_BUCKETS)} have "
+            f"(src/backtest/validation.py, 2026-08-21). Pass allow_unvalidated=True to price "
+            f"it anyway."
+        )
+
+    lift = bucket_lift[bucket]
+    joint = estimate_game_specific_joint_prob(team_market_prob, historical_p_b, lift)
+    result = correlated_edge(team_market_prob, historical_p_b, joint, vig=vig, bankroll=bankroll)
+    result["bucket"] = bucket
+    result["bucket_validated"] = is_bucket_validated(bucket)
+    result["bucket_lift"] = lift
+    return result
+
+
 def build_team_game_outcomes(schedule: pd.DataFrame, player_stats: pd.DataFrame) -> pd.DataFrame:
     """One row per team per game, home and away pooled (2x the game count,
     each team's own perspective) -- the analysis frame `measure_leg_correlation`
@@ -215,6 +317,10 @@ def build_team_game_outcomes(schedule: pd.DataFrame, player_stats: pd.DataFrame)
       `receiving_yards` in `player_stats`, ties broken arbitrarily -- rare)
       gained >=75 receiving yards.
     - `leading_rusher_100plus`: same for `rushing_yards` >= 100.
+    - `season`: from the schedule's own `season` column -- needed for an
+      honest train/test split (`src/backtest/validation.py::split_by_season`)
+      instead of parsing it out of `game_id` ad hoc, which the notebook did
+      before this column existed.
     """
     games = schedule.dropna(subset=["home_score", "away_score", "spread_line", "total_line"]).copy()
     games["home_team"] = games["home_team"].map(canonical_team)
@@ -245,6 +351,7 @@ def build_team_game_outcomes(schedule: pd.DataFrame, player_stats: pd.DataFrame)
             rows.append(
                 {
                     "game_id": row.game_id,
+                    "season": row.season,
                     "team": team,
                     "opponent": opp_team,
                     "team_won": team_margin > 0,
