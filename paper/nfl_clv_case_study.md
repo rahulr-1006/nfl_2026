@@ -58,6 +58,20 @@
       Jefferson's IR stint); wired into all three targets, clean negative result
       consistent across all three, same pattern as GBM
       (`src/model/game_level_features.py`)
+- [x] Weather features (§4.5) — fifth consecutive negative result in the same
+      direction (GBM, expanded receiver/pass-rush, weather all fail the same way
+      on all 3 targets); caught a real pre-existing surface-column whitespace bug
+      along the way (`src/model/features.py::add_weather_features`)
+- [x] Correlated same-game outcome mispricing (§4.5) — a genuinely new
+      methodology, not more capacity on old targets; every leg pair tested is
+      significantly positively correlated (lift 1.07-1.48), robust across all 10
+      individual seasons; the strongest, most robust finding in the session
+      (`src/backtest/correlated_props.py`)
+- [x] Correlated-edge pricing (§4.5) — turns the correlation finding into a
+      quantified EV/Kelly-stake output using the project's own measured 5.75%
+      prop vig, not a guess; 6 of 7 pairs clear the vig hurdle, and the two
+      strongest survive a vig sensitivity sweep up to 10%
+      (`correlated_edge`/`naive_parlay_price` in `src/backtest/correlated_props.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -909,6 +923,107 @@ future game-outcome model, not stuck at play-level; this specific way of using t
 about the modeling choice, not a verdict on the underlying ratings (independently
 sanity-checked already in §3.7/§3.8, and validated again here against the Jefferson
 case). Full results: `notebooks/model_backtest_results.ipynb`.
+
+**Weather features -- a fifth negative result, same direction as the other four.**
+`roof`/`surface`/`temp`/`wind` have flowed through `build_game_features()`'s output
+since the first version of this pipeline, present in every training frame used in
+this paper, but never used as a model input until `src/model/features.py::add_weather_features`.
+Cleans them into four usable columns (`is_outdoor`, `temp_outdoor`/`wind_outdoor` --
+a real reading if outdoor, a neutral 70/0 fallback if indoor, correct by construction
+for domes, a genuine simplification for the ~9% of outdoor games with missing
+readings -- and `is_grass`). Building this caught a real, pre-existing data-quality
+bug: `"grass"` and `"grass "` (trailing whitespace) were counted as separate surface
+categories in the raw column.
+
+Result, all three targets: moneyline 0.2170 -> 0.2179, margin 0.2588 -> 0.2592, total
+0.2581 -> 0.2598 -- worse across the board, including for wind on total points, the
+single most plausible weather signal going in. **This is the fifth consecutive test
+showing the same pattern** (GBM; receiver/pass-rush game-level features on all three
+targets; weather on all three targets): more model inputs do not help at this sample
+size (~1,690-1,740 training games), independent of how plausible the added signal
+sounds beforehand. The consistency across five independent attempts is itself the
+finding -- the binding constraint is dataset size, not a missing feature or a missing
+model class.
+
+**Correlated same-game outcomes -- a real, robust, positive finding, and a
+methodologically different kind of result from anything else in this section.** A
+documented industry mispricing mechanism: a sportsbook building a same-game-parlay
+(SGP) price by multiplying single-leg probabilities together, as if the legs were
+independent, when legs from the same game are often genuinely correlated. This tests
+whether that correlation is real in NFL data -- not whether any specific book
+misprices any specific parlay. No real posted SGP odds exist anywhere in this
+project's data (The Odds API doesn't expose SGP pricing the way it exposes
+single-market odds); a confirmed correlation is evidence the underlying mechanism a
+bettor would need is real, not proof of a live, executable exploit.
+
+`src/backtest/correlated_props.py::build_team_game_outcomes` builds one row per team
+per game (home and away pooled, 5,468 team-games across 2,734 games) with: did the
+team win, cover, did the game go over, did that team's *starting* QB (the schedule's
+own `home_qb_id`/`away_qb_id`, the same authoritative field `qb_elo.py` already uses)
+throw 2+ TDs, did the team's leading receiver clear 75 yards, did the team's leading
+rusher clear 100. `measure_leg_correlation` computes the lift (P(A∩B)/(P(A)×P(B)) --
+1.0 means independent) and a chi-square significance test per pair, backed by a free
+new cached dataset (`src/features/load_static.py::load_player_stats`, nflverse's
+weekly player box scores, 2015-2024).
+
+**Every pair tested is significantly positively correlated: lift 1.07-1.48, p-values
+from 1e-12 to 1e-142.** Strongest: `team_won x leading_rusher_100plus` (lift 1.475 --
+a known football phenomenon, leading teams run more to control the clock) and
+`game_over x qb_2plus_tds` (lift 1.395 -- points disproportionately come from passing
+touchdowns). **Robustness check, same discipline as the props-arbitrage week-by-week
+check: does this hold every season individually, or is it a ten-year pooling
+artifact?** It holds cleanly -- both pairs are significantly positively correlated in
+all 10 individual seasons (2015-2024), lift consistently 1.27-1.59, never crossing
+into insignificance in any single year. Unlike some earlier checks this session that
+killed a promising-looking result (the props EV backtest's threshold sweep), this one
+survives -- the strongest, most robust new finding in this section. **Stated plainly,
+one more time, so it isn't overclaimed:** this confirms the correlation is real and
+stable, not that any specific book's SGP pricing is exploitable today -- that requires
+real posted SGP odds this project doesn't have, and is the natural next check if such
+data ever becomes available. Full results:
+`notebooks/model_backtest_results.ipynb`.
+
+**Pricing the correlation -- a quantified edge, not just a statistical fact.** The
+correlation result above confirms the precondition for SGP mispricing is real; this
+turns it into the same kind of output every other +EV signal in this project
+produces (an edge percentage, a Kelly stake), reusing `src/signal/sizing.py`
+unchanged rather than inventing a bespoke calculation. The model
+(`src/backtest/correlated_props.py::naive_parlay_price`/`correlated_edge`): if a book
+builds a same-game-parlay price by multiplying each leg's own *vigged* single-leg
+price together (a documented, real SGP-pricing approach for at least some books),
+using `src/devig/methods.py::devig_multiplicative`'s own vig convention in reverse,
+and the TRUE joint probability is the one already measured (not assumed), the
+resulting bettor EV and suggested stake follow directly. The vig assumption is
+measured, not guessed: Pinnacle's own real vig on 5,005 Over/Under prop pairs from
+this project's historical pull averages 5.75% -- that's the default.
+
+**Result: 6 of 7 pairs show positive edge; the weakest correlation (`team_won x
+leading_receiver_75plus`, lift 1.07) does not clear the vig hurdle** -- a small
+negative edge (-3.9%). This differentiated outcome is itself reassuring: "6 of 7
+work, 1 doesn't" is more credible than "everything works," which would look like an
+artifact of the pricing model rather than a real signal. The two strongest pairs
+(`team_won x leading_rusher_100plus`: +31.9% edge, $1.39 suggested stake;
+`game_over x qb_2plus_tds`: +24.8% edge, $2.00 stake -- capped) reuse the exact same
+fractional-Kelly-then-bankroll-cap sizing every other spot in this project uses.
+
+**Robustness check: does the edge survive if the vig assumption is wrong?** 5.75% is
+Pinnacle's own measured prop vig, but execution books typically carry more, and a
+real multi-leg SGP engine's effective vig isn't independently measured here. Swept
+across this project's own measured mainline vig (2.97%), the standard -110/-110
+convention (4.76%), the measured prop vig (5.75%), and two higher retail-book
+scenarios (8%, 10%): **both strongest pairs stay solidly positive-EV even at 10%
+vig**, well above the measured mean -- the edge shrinks monotonically as assumed vig
+rises (mechanically expected) but never crosses zero within a realistic range.
+
+**Honest summary, stated one more time so it isn't overclaimed:** a real, quantified,
+robustness-checked theoretical edge *if* a book prices a same-game parlay by
+multiplying vigged single-leg prices together -- not a confirmed live exploit against
+any specific book's actual SGP engine, since no real posted SGP odds exist anywhere
+in this project's data to check against directly. The natural next step, if this is
+ever revisited, is comparing this model's predicted naive price against a real posted
+SGP price the moment one becomes available -- that comparison, not more analysis on
+top of this one, is what would turn "quantified theoretical edge" into "confirmed
+mispricing." Full results: `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:

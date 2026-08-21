@@ -172,3 +172,47 @@ def build_game_features(
     out = context.merge(home, on=["game_id", "home_team"], how="left")
     out = out.merge(away, on=["game_id", "away_team"], how="left")
     return out
+
+
+def add_weather_features(df: pd.DataFrame) -> pd.DataFrame:
+    """Cleans and derives model-usable weather features from `roof`/
+    `surface`/`temp`/`wind` -- present in `build_game_features()`'s output
+    (and therefore `build_training_frame`'s/`build_margin_total_frame`'s)
+    since day one, but never actually used as a model input until now.
+
+    `temp`/`wind` are NaN for ~34% of games (937/2743) -- mostly a
+    structural fact, not broken data: they're only meaningful for outdoor
+    games, and nflverse doesn't record a meaningless "indoor temperature"
+    for a dome. Naively dropping those rows (`FEATURE_COLUMNS`'s existing
+    dropna pattern) would discard a third of the dataset for no reason, so
+    this imputes a neutral value instead (`temp_outdoor=70`,
+    `wind_outdoor=0` -- correct, not a guess, for the indoor case: there
+    genuinely is no wind indoors) and adds `is_outdoor` so a model can
+    still tell the two cases apart rather than being fed a fabricated
+    "70 degrees" as if it were a real outdoor reading.
+
+    **A real gap this glosses over, stated plainly rather than hidden:**
+    174 of 1,980 outdoor games (8.8%) have a genuinely missing `temp`
+    despite being outdoors -- true missing data, not the structural dome
+    case. Those rows get the same 70/0 fallback as an indoor game, which
+    is a real simplification (not a "correct by construction" case the
+    way the dome fallback is) -- a dedicated "weather known" indicator is
+    the natural v2 if this feature set is ever revisited for accuracy,
+    not built here to keep this v1 simple.
+
+    `surface` has a real, pre-existing data-quality wrinkle, caught while
+    building this: `"grass"` and `"grass "` (trailing whitespace) are
+    counted as separate categories (1446 vs 93 rows) in the raw column --
+    stripped here before use. Simplified to a single `is_grass` indicator
+    (grass vs. every turf variant) rather than one-hot-encoding all 8 raw
+    surface strings -- "start simple," matching this project's own stated
+    modeling philosophy, and grass-vs-turf is the distinction actually
+    cited in NFL analytics (injury rates, play speed), not the specific
+    turf brand.
+    """
+    out = df.copy()
+    out["is_outdoor"] = out["roof"].isin(["outdoors", "open"]).astype(float)
+    out["temp_outdoor"] = out["temp"].where(out["is_outdoor"] == 1, 70.0).fillna(70.0)
+    out["wind_outdoor"] = out["wind"].where(out["is_outdoor"] == 1, 0.0).fillna(0.0)
+    out["is_grass"] = (out["surface"].astype(str).str.strip() == "grass").astype(float)
+    return out
