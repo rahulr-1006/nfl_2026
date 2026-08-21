@@ -100,6 +100,25 @@
       testing; underdog/narrow do), confirmed the core correlation mechanism 3
       independent ways, multiple-comparison correction changes nothing else
       (`src/backtest/validation.py`)
+- [x] Adversarial audit of the rest of the codebase (§3.10, §4.9, §6.4) — 4 parallel
+      audits targeting arbitrage/EV-backtest timing, the Elo/model pipeline, devig
+      methodology + sizing, and `PointInTimeStore`'s leakage guard itself. Found and
+      fixed 2 real latent gaps (neither had ever produced a wrong result, both would
+      have the moment live multi-poll data reached them): props arbitrage/EV backtest
+      never checked simultaneity, and the live +EV monitor never checked its own
+      `book_time`/`pinnacle_time` gap despite capturing both. `PointInTimeStore` and
+      devig/sizing came back clean. Surfaced one real caveat: the same 2023-2024 test
+      split has been evaluated 8 separate times across this project's history —
+      documented honestly in §6.4
+- [x] Quantified the test-set-reuse risk instead of leaving it a qualitative caveat
+      (§3.7, §6.4) — challenged directly on "why does this need a fresh season if
+      each feature was evaluated separately," which was a fair correction to make:
+      the selection-bias component IS checkable with existing data. Paired-permutation
+      + Benjamini-Hochberg across all 8 model comparisons found only base Elo survives
+      (p=0.0014); QB Elo — this project's own reference model — does NOT (p=0.045
+      uncorrected, fails corrected). Downgraded QB Elo's status from "a real, modest
+      improvement" to "plausible, not confirmed" in §3.7 (`paired_permutation_test_mean_diff`
+      in `src/backtest/validation.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -653,6 +672,24 @@ moved further into null territory, not away from it:** win rate dropped to 47.1%
 more credible and the null EV result more confident -- a consistent, honest
 picture, not two results pulling in different directions.
 
+**A latent gap found and fixed (2026-08-21 adversarial audit), not currently live.**
+Neither `find_arbitrage_spots` nor `find_prop_ev_spots`/`pinnacle_fair_probs` checked
+`capture_time` at all before this fix -- both were safe only by accident, because the
+historical batch-1 pull happens to carry exactly one snapshot per game (verified
+empirically: 0 of 178 games have more than one distinct `capture_time`). The gap was
+never live for the 65-spot/null-EV results reported above -- confirmed by re-running
+both functions against the real data after the fix: identical 65 arb spots, same EV
+result. But it would have activated silently the moment this code was pointed at the
+live props scheduler's data (§3.6, already built, polls twice per event -- entry and
+close, deliberately days apart): `find_arbitrage_spots` would have paired an entry-time
+Over against a close-time Under and reported a "risk-free" arb that was never actually
+simultaneously bettable, and `find_prop_ev_spots` could have compared a stale Pinnacle
+read against a fresh execution-book price. Both functions now require simultaneity --
+arbitrage requires an exact shared `capture_time` between legs (matching this project's
+existing "a single poll writes both sides together" convention from §4.9's live
+scanner), and the EV comparison requires Pinnacle's price within 30 minutes of the
+execution book's. Caught before it could ever produce a wrong live result, not after.
+
 ---
 
 ## 4. Methodology
@@ -840,7 +877,9 @@ GBM brings stops helping and starts adding noise instead. Neither result is larg
 to change the reference model: logistic regression on EPA+Elo (0.2192) remains the best
 result to date. Full sweep and comparison: `notebooks/model_backtest_results.ipynb`.
 
-**QB-level Elo — a real, modest improvement.** Team Elo captures team strength but not
+**QB-level Elo — a modest improvement, later found not to survive multiple-comparison
+correction (§6.4) — read the result below as suggestive, not confirmed.** Team Elo
+captures team strength but not
 who's under center; a backup starting for a strong team and losing isn't the same signal
 as the starter losing. `src/model/qb_elo.py` adds a QB-level residual rating, deliberately
 this project's own simplification rather than a replication of a published model (e.g.
@@ -863,6 +902,14 @@ Josh Allen/Goff/Lamar Jackson/Rodgers/Hurts/Prescott rounding out the top 10, an
 late-career Eli Manning/Joe Flacco, Blake Bortles, Carson Wentz, Daniel Jones at the
 bottom — directionally sound, not noise. Full comparison and rating table:
 `notebooks/model_backtest_results.ipynb`.
+
+**Correction, 2026-08-21 (§6.4):** this 0.2170-vs-0.2192 gap does not survive
+Benjamini-Hochberg correction once judged alongside the 7 other model comparisons this
+project has run against the same 2023-2024 test set (paired-permutation p=0.045
+uncorrected, fails at q=0.05 corrected). The feature set (`COMBINED_QB_FEATURE_COLUMNS`)
+stays in use as the practical baseline for every later comparison in this paper — that
+choice doesn't hinge on this one claim — but "a real, modest improvement" was an
+overclaim; treat this specific gap as plausible, not confirmed.
 
 **Spread-cover and total-points regression -- a genuinely new market target, not
 another moneyline variant.** Every model above predicts moneyline win probability, a
@@ -1330,6 +1377,20 @@ on two different underdog moneylines relative to Pinnacle's fair value at that m
 Confirms the comparison logic end-to-end on real data; not a claim about the strategy's
 long-run edge, which only the live season (§5) can establish.
 
+**A real, live gap found and fixed (2026-08-21 adversarial audit).** `book_time` and
+`pinnacle_time` were both already captured and returned on every spot, but never
+actually checked against each other before flagging or texting an alert. Under normal
+operation this doesn't matter (Pinnacle and the execution books are fetched in one
+combined poll, so the two times land together) -- but if Pinnacle is missing from a
+specific poll cycle, `_latest_two_sided_pinnacle` falls back to an older Pinnacle price
+while the execution book's price stays fresh, and a spot could be flagged from
+comparing a stale "fair" value against a live one, then texted to the user's phone with
+no warning. `find_positive_ev_spots` now takes a `max_capture_gap` (default 30 minutes)
+and drops any spot whose two prices weren't captured close enough together. This was a
+gap in the service that has been running live and sending real SMS alerts since
+2026-08-17 -- not caught by any test before this audit, since every existing fixture
+happened to share one hardcoded capture time.
+
 ### 4.10 Middling: exploiting real line movement over time (2026-08-20)
 
 **A different mechanism than every other strategy in this paper.** §4.5's correlated
@@ -1424,7 +1485,69 @@ against real middle bets, which only the live season can provide.
 ### 6.2 Where the market was hardest to beat
 ### 6.3 Where the drift monitor fired, if it did
 ### 6.4 Limitations
-*Sample size, single-season scope, data provider gaps, single-book anchor risk.*
+
+**Test-set reuse across this project's many experiments — quantified, not just
+flagged (2026-08-21 adversarial audit, then corrected 2026-08-21 same day after a
+direct challenge: "why does the fix require a fresh season? I thought each feature
+was evaluated separately?").** `test_seasons=[2023, 2024]` has been evaluated
+separately 8 times across this project's history. This is distinct from, and not
+caught by, the code-level leakage architecture (`PointInTimeStore`, `time_based_split`)
+— those guard against the *model* seeing future data; this is the *researcher*
+repeatedly observing the same test set's feedback across many experiments. Two
+distinct sub-risks live under this one heading, and only one of them needed a fresh
+season:
+
+- **Adaptive tuning** (using test feedback to decide what to try next) — ruled out.
+  Commit history shows each new feature (QB Elo, receiver Elo, weather, garbage-time)
+  reads as an independently-motivated football hypothesis, not a retuned resubmission
+  chasing a prior failure's test score.
+- **Selection bias / winner's-curse** — real, and NOT ruled out by the above. Even
+  with zero tuning, whichever of 8 honest, independently-run candidates happens to
+  beat its baseline on that specific 570-game slice is expected to look better than
+  its true population performance, purely from which slice it was evaluated against.
+  This is the exact same statistical family as the multiple-comparisons problem
+  `benjamini_hochberg` already corrected for correlated-props' chi-square p-values —
+  and, critically, it's checkable with data already in hand, no new season required.
+
+**Checked it directly.** For each of the 8 comparisons, computed each game's
+paired Brier-score improvement (baseline error minus candidate error) and ran
+`paired_permutation_test_mean_diff` (sign-flip permutation test on the paired
+per-game deltas, no distributional assumption), then corrected all 8 p-values
+together with `benjamini_hochberg`. **Result: only `elo_add_on` (base Elo vs.
+EPA-only) survives — p=0.0014, an improvement (ΔBrier=0.0124) roughly 6x larger than
+QB Elo's.** `qb_elo` — this project's own current "reference model to beat" — does
+**not** survive: its raw p-value (0.045) clears the naive uncorrected 0.05 threshold,
+which is exactly why it read as a confirmed improvement in isolation; corrected for
+having been one of 8 looks at the same test set, it doesn't clear the bar. The other
+6 (GBM, garbage-time, both expanded-feature checks, weather, and the margin/total
+expanded-feature check) were already non-significant before correction, consistent
+with the "5 consecutive negative results" pattern already on record.
+
+**What this does and doesn't change.** `COMBINED_QB_FEATURE_COLUMNS` (EPA + Elo + QB
+Elo) remains the practical feature set every downstream comparison in this paper is
+built against — that choice doesn't depend on this one marginal claim being airtight.
+What changes is the claim itself: "QB Elo is a confirmed, independent improvement
+over base Elo" is downgraded to "plausible, not confirmed" — the honest correction the
+review question asked for. The remaining, deeper issue — a human having now seen 8
+rounds of this exact test set's feedback, which no statistic computed on that same
+data can fully undo — still has no fix without a genuinely fresh holdout season, not
+available until one exists. Full analysis: `notebooks/model_backtest_results.ipynb`.
+
+**Sample size.** The live 2026 CLV result (§5.3) is a single season's worth of bets
+against a fixed $100 bankroll — the paper's own framing throughout (§4.6, §5.5) is that
+this demonstrates correct method, not a claim about long-run profitability at any
+meaningful sample size.
+
+**Single-book anchor risk.** The entire live CLV thesis and the props/correlated-props
+theoretical-edge work are anchored to Pinnacle as the sharp reference price. If
+Pinnacle's own pricing drifts, gets less sharp in a specific market, or stops covering
+a market this project relies on (already a live, unresolved question for player props
+per §3.6), every downstream "beats the close" or "clears vig" number inherits that risk
+silently — there's no second sharp book cross-checked against it.
+
+**Data provider gaps.** §3.3 documents known collection gaps (the 2026-08-14 to
+2026-08-17 pre-service window) and §3.6/§3.10 document the props-coverage uncertainty.
+Not repeated here in full — see those sections for specifics.
 
 ---
 

@@ -36,6 +36,18 @@ from src.store.pit_store import PointInTimeStore
 
 EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers", "williamhill_us")  # williamhill_us = Caesars Sportsbook's Odds API key
 DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked
+# Under normal operation the collector fetches Pinnacle + execution books in
+# one combined poll, so book_time and pinnacle_time land together (gap ~0).
+# The gap only opens when Pinnacle is missing from a specific poll cycle (an
+# event the API didn't return that call) and _latest_two_sided_pinnacle falls
+# back to an OLDER Pinnacle price while the execution book's price stays
+# fresh -- comparing a stale "fair" value against a live price. 30 minutes is
+# comfortably wider than any single-poll write jitter but far tighter than
+# the gap a real stale-fallback would produce (at least one full missed poll
+# cycle). Found via a 2026-08-21 adversarial audit; this was previously
+# unguarded -- book_time/pinnacle_time were captured and returned but never
+# actually checked against each other.
+DEFAULT_MAX_CAPTURE_GAP = pd.Timedelta(minutes=30)
 
 
 def _latest_two_sided_pinnacle(moneyline: pd.DataFrame) -> pd.DataFrame:
@@ -68,10 +80,14 @@ def find_positive_ev_spots(
     threshold: float = DEFAULT_EDGE_THRESHOLD,
     books: Sequence[str] = EXECUTION_BOOKS,
     as_of: datetime | None = None,
+    max_capture_gap: pd.Timedelta = DEFAULT_MAX_CAPTURE_GAP,
 ) -> pd.DataFrame:
     """One row per (event, side, book) where `book`'s latest moneyline price
     beats Pinnacle's latest devigged fair probability by at least
-    `threshold` in expected value (per $1 staked).
+    `threshold` in expected value (per $1 staked) -- and Pinnacle's price
+    was captured within `max_capture_gap` of the execution book's own price,
+    so a spot is never flagged from comparing a stale Pinnacle read against
+    a fresh execution-book one (see `DEFAULT_MAX_CAPTURE_GAP`'s comment).
     """
     as_of = as_of or datetime.now(UTC)
     df = store.read_as_of(as_of)
@@ -97,6 +113,8 @@ def find_positive_ev_spots(
         merged = latest_book.merge(pinnacle_fair, on="event_id", how="inner")
 
         for row in merged.itertuples():
+            if abs(row.capture_time - row.pinnacle_time) > max_capture_gap:
+                continue
             fair = row.home_fair if row.side == "home" else row.away_fair
             edge = expected_value(fair, row.price_decimal)
             if edge < threshold:

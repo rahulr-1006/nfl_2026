@@ -99,6 +99,64 @@ def test_find_positive_ev_spots_empty_store_returns_empty_frame(tmp_path):
     assert find_positive_ev_spots(store).empty
 
 
+# --- max_capture_gap: 2026-08-21 adversarial-audit fix -- a spot must not be
+# flagged from a stale Pinnacle read compared against a fresh execution-book
+# price (e.g. Pinnacle missing from one poll cycle, falling back to an older
+# quote) ---
+
+
+def test_find_positive_ev_spots_ignores_a_spot_with_a_stale_pinnacle_price(tmp_path):
+    store = PointInTimeStore(root=tmp_path / "snapshots")
+    store.write(
+        [
+            # Pinnacle's only quote is from 3 hours before the execution book's --
+            # e.g. Pinnacle dropped out of one poll cycle and this is a stale fallback.
+            _snapshot("pinnacle", Side.HOME, -150, capture_time=CAPTURE_TIME - timedelta(hours=3)),
+            _snapshot("pinnacle", Side.AWAY, 130, capture_time=CAPTURE_TIME - timedelta(hours=3)),
+            _snapshot("fanduel", Side.HOME, 120, capture_time=CAPTURE_TIME),
+            _snapshot("fanduel", Side.AWAY, -140, capture_time=CAPTURE_TIME),
+        ]
+    )
+
+    spots = find_positive_ev_spots(store, threshold=0.02, as_of=CAPTURE_TIME + timedelta(minutes=1))
+    assert spots.empty
+
+
+def test_find_positive_ev_spots_allows_a_small_natural_capture_gap(tmp_path):
+    store = PointInTimeStore(root=tmp_path / "snapshots")
+    store.write(
+        [
+            # A few minutes apart -- normal single-poll write jitter, not a stale fallback.
+            _snapshot("pinnacle", Side.HOME, -150, capture_time=CAPTURE_TIME),
+            _snapshot("pinnacle", Side.AWAY, 130, capture_time=CAPTURE_TIME),
+            _snapshot("fanduel", Side.HOME, 120, capture_time=CAPTURE_TIME + timedelta(minutes=5)),
+            _snapshot("fanduel", Side.AWAY, -140, capture_time=CAPTURE_TIME + timedelta(minutes=5)),
+        ]
+    )
+
+    spots = find_positive_ev_spots(store, threshold=0.02, as_of=CAPTURE_TIME + timedelta(minutes=10))
+    assert len(spots) == 1
+
+
+def test_find_positive_ev_spots_max_capture_gap_is_configurable(tmp_path):
+    store = PointInTimeStore(root=tmp_path / "snapshots")
+    store.write(
+        [
+            _snapshot("pinnacle", Side.HOME, -150, capture_time=CAPTURE_TIME),
+            _snapshot("pinnacle", Side.AWAY, 130, capture_time=CAPTURE_TIME),
+            _snapshot("fanduel", Side.HOME, 120, capture_time=CAPTURE_TIME + timedelta(minutes=5)),
+            _snapshot("fanduel", Side.AWAY, -140, capture_time=CAPTURE_TIME + timedelta(minutes=5)),
+        ]
+    )
+
+    # A gap that's fine under the default 30-minute window is rejected under
+    # a caller-supplied, tighter one.
+    spots = find_positive_ev_spots(
+        store, threshold=0.02, as_of=CAPTURE_TIME + timedelta(minutes=10), max_capture_gap=timedelta(minutes=1)
+    )
+    assert spots.empty
+
+
 def test_format_alert_message_names_the_bet_and_book():
     import pandas as pd
 

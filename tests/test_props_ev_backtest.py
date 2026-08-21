@@ -1,3 +1,5 @@
+from datetime import UTC, datetime, timedelta
+
 import pandas as pd
 import pytest
 
@@ -8,8 +10,10 @@ from src.backtest.props_ev_backtest import (
 )
 from src.devig.convert import american_to_decimal
 
+CAPTURE_TIME = datetime(2026, 9, 10, 12, 0, tzinfo=UTC)
 
-def _row(event_id, player, stat, line, side, book, price_american):
+
+def _row(event_id, player, stat, line, side, book, price_american, capture_time=CAPTURE_TIME):
     return {
         "event_id": event_id,
         "player_name": player,
@@ -19,6 +23,7 @@ def _row(event_id, player, stat, line, side, book, price_american):
         "book": book,
         "price_american": price_american,
         "price_decimal": american_to_decimal(price_american),
+        "capture_time": capture_time,
     }
 
 
@@ -144,3 +149,97 @@ def test_find_arbitrage_spots_picks_the_best_price_when_multiple_books_quote():
     assert len(spots) == 1
     assert spots.iloc[0]["book_over"] == "betmgm"
     assert spots.iloc[0]["price_american_over"] == 120
+
+
+# --- capture_time simultaneity: 2026-08-21 adversarial-audit fix -- neither
+# function used to check capture_time at all, safe only by accident because
+# the historical batch-1 pull happens to carry one capture per game. The live
+# props scheduler polls twice per event (entry + close, days apart), so this
+# would otherwise silently manufacture a fake "risk-free" arb or a fake +EV
+# spot out of two prices that were never simultaneously bettable ---
+
+
+def test_find_arbitrage_spots_does_not_pair_legs_from_different_polls():
+    entry, close = CAPTURE_TIME, CAPTURE_TIME + timedelta(days=3)
+    props = pd.DataFrame(
+        [
+            # A real arb existed at ENTRY (over +120 + under +110 < 100%,
+            # same hand-verified prices as the passing single-poll test above)...
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 120, capture_time=entry),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110, capture_time=entry),
+            # ...but at CLOSE the line moved and there's no real arb anymore.
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", -250, capture_time=close),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", -120, capture_time=close),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "fanduel"))
+    # The real entry-time arb must still be found...
+    assert len(spots) == 1
+    assert spots.iloc[0]["capture_time"] == entry
+    # ...and it must NOT ALSO report a fake arb built by pairing the cheap
+    # entry Over against the close-time Under (or vice versa) from a
+    # different poll.
+    assert (spots["price_american_over"] == -250).sum() == 0
+
+
+def test_find_arbitrage_spots_reports_a_separate_row_per_real_simultaneous_snapshot():
+    entry, close = CAPTURE_TIME, CAPTURE_TIME + timedelta(days=3)
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 120, capture_time=entry),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110, capture_time=entry),
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 120, capture_time=close),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "fanduel", 110, capture_time=close),
+        ]
+    )
+    spots = find_arbitrage_spots(props, books=("draftkings", "fanduel"))
+    assert len(spots) == 2
+    assert set(spots["capture_time"]) == {entry, close}
+
+
+def test_pinnacle_fair_probs_uses_the_latest_capture_time_not_first_row_order():
+    stale, fresh = CAPTURE_TIME, CAPTURE_TIME + timedelta(hours=6)
+    props = pd.DataFrame(
+        [
+            # Stale quote listed FIRST in the DataFrame -- aggfunc="first"
+            # would have silently picked this one.
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -200, capture_time=stale),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "pinnacle", -105, capture_time=stale),
+            # The real, later quote.
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -110, capture_time=fresh),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "pinnacle", -110, capture_time=fresh),
+        ]
+    )
+    fair = pinnacle_fair_probs(props)
+    row = fair.iloc[0]
+    assert row["pinnacle_time"] == fresh
+    assert row["over_fair"] == pytest.approx(0.5, abs=1e-6)
+
+
+def test_find_prop_ev_spots_ignores_a_spot_with_a_stale_pinnacle_price():
+    props = pd.DataFrame(
+        [
+            # Pinnacle's only quote is from 3 hours before the execution book's.
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -110, capture_time=CAPTURE_TIME - timedelta(hours=3)),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "pinnacle", -110, capture_time=CAPTURE_TIME - timedelta(hours=3)),
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 150, capture_time=CAPTURE_TIME),
+        ]
+    )
+    spots = find_prop_ev_spots(props, threshold=0.02, books=("draftkings",))
+    assert spots.empty
+
+
+def test_find_prop_ev_spots_max_capture_gap_is_configurable():
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -110, capture_time=CAPTURE_TIME),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "pinnacle", -110, capture_time=CAPTURE_TIME),
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "draftkings", 150, capture_time=CAPTURE_TIME + timedelta(minutes=5)),
+        ]
+    )
+    # Fine under the default 30-minute window...
+    assert not find_prop_ev_spots(props, threshold=0.02, books=("draftkings",)).empty
+    # ...rejected under a caller-supplied, tighter one.
+    assert find_prop_ev_spots(
+        props, threshold=0.02, books=("draftkings",), max_capture_gap=timedelta(minutes=1)
+    ).empty

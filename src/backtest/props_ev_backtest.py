@@ -34,37 +34,69 @@ from src.signal.sizing import expected_value
 
 EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers", "williamhill_us")  # williamhill_us = Caesars Sportsbook's Odds API key
 DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked, same default as live_scan.py
+# Same reasoning and default as src/signal/live_scan.py::DEFAULT_MAX_CAPTURE_GAP --
+# comfortably wider than normal single-poll write jitter, far tighter than a
+# real stale-Pinnacle-fallback gap. Found via a 2026-08-21 adversarial audit:
+# neither pinnacle_fair_probs nor find_prop_ev_spots ever checked capture_time
+# at all -- safe today only because the historical batch-1 pull happens to
+# carry exactly one capture_time per game (verified empirically), but the live
+# props scheduler (already built, src/collect/props_scheduler.py) polls TWICE
+# per event (entry + close, deliberately days apart) -- unguarded, this code
+# would silently pair an entry-time execution-book price against a close-time
+# Pinnacle read (or vice versa) the moment that data starts flowing through it.
+DEFAULT_MAX_CAPTURE_GAP = pd.Timedelta(minutes=30)
 
 
 def pinnacle_fair_probs(props: pd.DataFrame) -> pd.DataFrame:
-    """One row per (event_id, player_name, prop_stat) with both a Pinnacle
-    Over and Under price at the SAME line: devigged fair Over/Under
-    probabilities. Groups where Pinnacle's Over and Under lines don't match
-    (rare -- 4 of 4998 in the 2024-season pull) are dropped: can't devig a
-    market where the two sides aren't quoting the same number.
+    """One row per (event_id, player_name, prop_stat, line) with both a
+    Pinnacle Over and Under price at the SAME line, from Pinnacle's LATEST
+    capture_time for that group (not `aggfunc="first"`'s arbitrary
+    DataFrame-order pick, which could silently select a stale snapshot once
+    a group has more than one Pinnacle poll -- see `DEFAULT_MAX_CAPTURE_GAP`'s
+    comment): devigged fair Over/Under probabilities, plus that
+    `pinnacle_time` so `find_prop_ev_spots` can check it isn't stale relative
+    to whatever execution-book price it gets compared against. Groups where
+    Pinnacle's Over and Under lines don't match (rare -- 4 of 4998 in the
+    2024-season pull) are dropped: can't devig a market where the two sides
+    aren't quoting the same number.
     """
+    group_cols = ["event_id", "player_name", "prop_stat", "line"]
+    empty = pd.DataFrame(columns=[*group_cols, "over_fair", "under_fair", "pinnacle_time"])
+
     pin = props[props["book"] == "pinnacle"]
-    wide = pin.pivot_table(
-        index=["event_id", "player_name", "prop_stat", "line"], columns="side", values="price_american", aggfunc="first"
-    ).reset_index()
+    if pin.empty:
+        return empty
+
+    latest_time = pin.groupby(group_cols)["capture_time"].transform("max")
+    pin = pin[pin["capture_time"] == latest_time]
+
+    wide = pin.pivot_table(index=group_cols, columns="side", values="price_american", aggfunc="first").reset_index()
     if not {"over", "under"}.issubset(wide.columns):
-        return pd.DataFrame(columns=["event_id", "player_name", "prop_stat", "line", "over_fair", "under_fair"])
+        return empty
+
+    pinnacle_time = pin.groupby(group_cols)["capture_time"].max().reset_index().rename(columns={"capture_time": "pinnacle_time"})
+    wide = wide.merge(pinnacle_time, on=group_cols, how="left")
     wide = wide.dropna(subset=["over", "under"])
     if wide.empty:
-        return pd.DataFrame(columns=["event_id", "player_name", "prop_stat", "line", "over_fair", "under_fair"])
+        return empty
+
     wide["over_fair"] = wide.apply(lambda r: market_baseline([int(r.over), int(r.under)], side_index=0), axis=1)
     wide["under_fair"] = wide.apply(lambda r: market_baseline([int(r.over), int(r.under)], side_index=1), axis=1)
-    return wide[["event_id", "player_name", "prop_stat", "line", "over_fair", "under_fair"]]
+    return wide[[*group_cols, "over_fair", "under_fair", "pinnacle_time"]]
 
 
 def find_prop_ev_spots(
     props: pd.DataFrame,
     threshold: float = DEFAULT_EDGE_THRESHOLD,
     books: Sequence[str] = EXECUTION_BOOKS,
+    max_capture_gap: pd.Timedelta = DEFAULT_MAX_CAPTURE_GAP,
 ) -> pd.DataFrame:
     """One row per (event, player, prop_stat, line, side, book) where
     `book`'s price beats Pinnacle's devigged fair probability by at least
-    `threshold` in expected value, matched on the exact same line.
+    `threshold` in expected value, matched on the exact same line -- and
+    captured within `max_capture_gap` of Pinnacle's own price, so a spot is
+    never flagged from a stale-vs-fresh comparison (see
+    `DEFAULT_MAX_CAPTURE_GAP`'s comment).
     """
     fair = pinnacle_fair_probs(props)
     if fair.empty:
@@ -72,6 +104,10 @@ def find_prop_ev_spots(
 
     exe = props[props["book"].isin(books)].copy()
     merged = exe.merge(fair, on=["event_id", "player_name", "prop_stat", "line"], how="inner")
+    if merged.empty:
+        return pd.DataFrame()
+
+    merged = merged[(merged["capture_time"] - merged["pinnacle_time"]).abs() <= max_capture_gap]
     if merged.empty:
         return pd.DataFrame()
 
@@ -83,29 +119,45 @@ def find_prop_ev_spots(
 
 
 def find_arbitrage_spots(props: pd.DataFrame, books: Sequence[str] = EXECUTION_BOOKS) -> pd.DataFrame:
-    """One row per (event, player, prop_stat, line) where the best available
-    Over price and best available Under price -- both from `books` (real,
-    placeable execution books, no Pinnacle, no fair-value model at all) --
-    sum to less than 100% implied probability: a risk-free lock, bet both
-    sides and win regardless of outcome. Same-book arbitrage can't happen
-    (no bookmaker prices its own two-sided market under 100%, that's the
-    vig it exists to collect) -- a real hit here means the two legs come
-    from two different books that disagree with each other.
+    """One row per (event, player, prop_stat, line, capture_time) where the
+    best available Over price and best available Under price at that SAME
+    capture_time -- both from `books` (real, placeable execution books, no
+    Pinnacle, no fair-value model at all) -- sum to less than 100% implied
+    probability: a risk-free lock, bet both sides and win regardless of
+    outcome. Same-book arbitrage can't happen (no bookmaker prices its own
+    two-sided market under 100%, that's the vig it exists to collect) -- a
+    real hit here means the two legs come from two different books that
+    disagree with each other.
+
+    Requires the two legs to share an EXACT `capture_time`, not just a
+    close one -- matching this project's own established convention
+    (`src/signal/live_scan.py::_latest_two_sided_pinnacle`: "a single poll
+    always writes both outcomes together"). Without this, best Over and
+    best Under were each picked as the single best-EVER price across all
+    time independently, which can silently pair an early-poll Over against
+    a much-later close-poll Under -- never actually simultaneously
+    bettable, not a real arbitrage lock (see `DEFAULT_MAX_CAPTURE_GAP`'s
+    comment on `find_prop_ev_spots` for the same failure mode in this
+    module's other function). One real snapshot can still produce multiple
+    genuine arbs across a game's history as the live props scheduler polls
+    more than once -- each is reported as its own row, not collapsed to
+    one "best ever" number.
     """
     exe = props[props["book"].isin(books)].copy()
     if exe.empty:
         return pd.DataFrame()
 
     group_cols = ["event_id", "player_name", "prop_stat", "line"]
+    snap_cols = [*group_cols, "capture_time"]
     over = exe[exe["side"] == "over"]
     under = exe[exe["side"] == "under"]
     if over.empty or under.empty:
         return pd.DataFrame()
 
-    best_over = over.loc[over.groupby(group_cols)["price_decimal"].idxmax()]
-    best_under = under.loc[under.groupby(group_cols)["price_decimal"].idxmax()]
+    best_over = over.loc[over.groupby(snap_cols)["price_decimal"].idxmax()]
+    best_under = under.loc[under.groupby(snap_cols)["price_decimal"].idxmax()]
 
-    merged = best_over.merge(best_under, on=group_cols, suffixes=("_over", "_under"))
+    merged = best_over.merge(best_under, on=snap_cols, suffixes=("_over", "_under"))
     if merged.empty:
         return pd.DataFrame()
 
@@ -113,5 +165,5 @@ def find_arbitrage_spots(props: pd.DataFrame, books: Sequence[str] = EXECUTION_B
     merged["arb_margin"] = 1 - merged["implied_sum"]
 
     arbs = merged[merged["arb_margin"] > 0].copy()
-    keep = [*group_cols, "book_over", "book_under", "price_american_over", "price_american_under", "arb_margin"]
+    keep = [*snap_cols, "book_over", "book_under", "price_american_over", "price_american_under", "arb_margin"]
     return arbs[keep].sort_values("arb_margin", ascending=False).reset_index(drop=True)
