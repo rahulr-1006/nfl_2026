@@ -2,9 +2,12 @@ import pandas as pd
 import pytest
 
 from src.backtest.correlated_props import (
+    bucket_favorite_strength,
     build_team_game_outcomes,
     correlated_edge,
+    estimate_game_specific_joint_prob,
     measure_leg_correlation,
+    measure_leg_correlation_by_bucket,
     naive_parlay_price,
 )
 
@@ -173,3 +176,58 @@ def test_correlated_edge_reuses_sizing_pys_own_ev_formula():
     d = result["naive_parlay_price"]
     hand_ev = 0.137345 * (d - 1) - (1 - 0.137345)
     assert result["edge"] == pytest.approx(hand_ev)
+
+
+# --- bucket_favorite_strength / measure_leg_correlation_by_bucket / estimate_game_specific_joint_prob ---
+
+
+def test_bucket_favorite_strength_classifies_correctly():
+    assert bucket_favorite_strength(0.20) == "underdog"
+    assert bucket_favorite_strength(0.44) == "underdog"
+    assert bucket_favorite_strength(0.45) == "narrow"
+    assert bucket_favorite_strength(0.50) == "narrow"
+    assert bucket_favorite_strength(0.55) == "favorite"
+    assert bucket_favorite_strength(0.69) == "favorite"
+    assert bucket_favorite_strength(0.70) == "heavy_favorite"
+    assert bucket_favorite_strength(1.0) == "heavy_favorite"
+
+
+def test_bucket_favorite_strength_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        bucket_favorite_strength(1.5)
+
+
+def test_measure_leg_correlation_by_bucket_splits_by_market_prob():
+    # Two clearly separated groups: low market_prob rows have A and B always
+    # co-occurring (or both failing); high market_prob rows have them
+    # perfectly anti-correlated. The two buckets should show opposite lifts.
+    n = 40
+    a_lo = pd.Series([True, True, False, False] * (n // 4))
+    b_lo = pd.Series([True, True, False, False] * (n // 4))
+    p_lo = pd.Series([0.20] * n)
+
+    a_hi = pd.Series([True, False] * (n // 2))
+    b_hi = pd.Series([False, True] * (n // 2))
+    p_hi = pd.Series([0.80] * n)
+
+    a = pd.concat([a_lo, a_hi], ignore_index=True)
+    b = pd.concat([b_lo, b_hi], ignore_index=True)
+    p = pd.concat([p_lo, p_hi], ignore_index=True)
+
+    table = measure_leg_correlation_by_bucket(a, b, p)
+    underdog_lift = table[table["bucket"] == "underdog"]["lift"].iloc[0]
+    heavy_fav_lift = table[table["bucket"] == "heavy_favorite"]["lift"].iloc[0]
+    assert underdog_lift > 1.0
+    assert heavy_fav_lift < 1.0
+
+
+def test_estimate_game_specific_joint_prob_matches_hand_computation():
+    result = estimate_game_specific_joint_prob(team_market_prob=0.30, historical_p_b=0.20, bucket_lift=1.5)
+    assert result == pytest.approx(0.30 * 0.20 * 1.5)
+
+
+def test_estimate_game_specific_joint_prob_is_clipped_to_a_valid_range():
+    # lift=10 would push the raw product (0.5*0.5*10=2.5) far past 1.0 --
+    # must clip to the tighter marginal (min(p_a, p_b) = 0.5), never exceed it.
+    result = estimate_game_specific_joint_prob(team_market_prob=0.5, historical_p_b=0.5, bucket_lift=10.0)
+    assert result == pytest.approx(0.5)
