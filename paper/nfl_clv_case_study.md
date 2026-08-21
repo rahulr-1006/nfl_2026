@@ -539,6 +539,40 @@ exactly who this list should surface, a useful check that the credit-parsing log
 (full sack / half-sack / QB hit columns) is correct. Full results:
 `notebooks/model_backtest_results.ipynb`.
 
+**Correction (2026-08-21): individual pass-rush rating IS buildable after all.** The
+"no free participation data" claim above was true using only nflverse's own trimmed
+play-by-play, but not true of nflverse's broader table menu -- found only after the
+user directly asked whether the cached data reflected everything free and available.
+`load_pfr_advstats(stat_type="def")` (Pro Football Reference, via `nflreadpy`) gives
+real per-player-per-game pressure/hurry/hit/blitz counts; `load_snap_counts` gives the
+missing piece, a genuine denominator (`defense_snaps`). Joined on PFR's own player/game
+IDs at a **verified 100% match rate**, this supplies exactly what raw pbp credit
+couldn't: a player who rushed 40 times and got 0 pressures now looks different from one
+who rushed 5 times and got 0.
+
+`src/model/individual_pass_rush_elo.py` implements this -- restricted to real pass-rush
+positions (DE/DT/NT/EDGE/OLB, where snaps are a reasonable proxy for pass-rush
+opportunity, unlike LBs who split time with coverage), a per-snap Elo update in closed
+form (equivalent to running the same per-play update `defense_snaps` times within one
+game, holding the pre-game expectation fixed for the whole game -- a real
+simplification, not literal play-by-play sequential updating). Base rate measured
+fresh from the 2018-2025 cache (PFR's own coverage floor, narrower than pbp's 2015+):
+**3.84%** pressures per defensive snap (lower than the team-level 13.6% per-dropback
+rate, expected since this is per-snap for one individual, including run-support snaps).
+
+**Sanity-checked the same way as every other rating in this project:** mean final
+rating lands at 1501.1 (offset correctly calibrated, same "check the mean before
+trusting" discipline pass-rush Elo's own build caught a bug with). Real leaderboard
+(min 20 games): Trey Hendrickson, Aidan Hutchinson, Myles Garrett, Nick Bosa, Chris
+Jones at the top -- exactly the players real 2018-2025 football knowledge would put
+there. Bottom: Daron Payne, Johnathan Hankins, Derrick Nnadi, Grover Stewart -- run-
+stuffing nose tackles/DTs, not known as pass-rush specialists, an independent
+real-world check the rating gets right in both directions.
+
+This doesn't replace the team-level rating above -- full 2015+ coverage and a
+genuinely different (team-vs-team) question -- it's a narrower-coverage (2018+),
+individual-level companion, real where it was previously assumed impossible.
+
 ### 3.9 Player status tracking (current team + injury status)
 Every Elo rating above (§3.7, §3.8, §4.5's QB Elo) is already trade-safe by
 construction -- each is keyed by `gsis_id`, so a player's rating carries with them

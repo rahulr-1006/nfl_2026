@@ -53,22 +53,28 @@ _DATA_ROOT = Path("data/static")
 
 
 def fit_residual_stds() -> tuple[float, float]:
-    """(sigma_margin, sigma_total), reusing the exact fitting pipeline
-    already validated in `notebooks/model_backtest_results.ipynb` (same
-    train/calib/test split, same feature set) -- not a fresh model, a
-    reuse of the one this project already trusts. Public (not
-    module-private) because `src/backtest/steam_scan.py` reuses it too --
-    the sigma this scan needs is the same one middling needs, no reason to
-    fit it twice or duplicate this function.
+    """(sigma_margin, sigma_total) for LIVE pricing -- not the research
+    evaluation split used in `notebooks/model_backtest_results.ipynb`
+    (train 2015-2021/calib 2022/test 2023-2024). This is a deployed tool
+    pricing real 2026 games, not a research comparison, so it has no
+    reason to hold back real historical data the way an evaluation split
+    does: trains on 2015-2024 and calibrates (fits residual std) on the
+    freshest complete season, 2025 -- closer to current NFL conditions
+    than the notebook's 2022 calib season, and the exact season this
+    project is now deliberately keeping OUT of every research comparison
+    so it stays a genuine, never-touched holdout (2026-08-21 finding: this
+    project had never pulled 2025 data at all until asked to check whether
+    the cached data was current). `test_seasons=[]` -- this function never
+    reports test metrics, only extracts sigma from the calibration split.
     """
-    schedule = pd.read_parquet(_DATA_ROOT / "schedules_2015_2024.parquet")
-    pbp = pd.read_parquet(_DATA_ROOT / "pbp_2015_2024.parquet")
+    schedule = pd.read_parquet(_DATA_ROOT / "schedules_2015_2025.parquet")
+    pbp = pd.read_parquet(_DATA_ROOT / "pbp_2015_2025.parquet")
 
     elo_ratings = compute_team_elo_ratings(schedule)
     qb_elo_ratings = compute_qb_elo_ratings(schedule, elo_ratings)
     training_df = build_margin_total_frame(pbp, schedule, elo_ratings=elo_ratings, qb_elo_ratings=qb_elo_ratings)
     train_df, calib_df, _test_df = time_based_split(
-        training_df, train_seasons=range(2015, 2022), calib_seasons=[2022], test_seasons=[2023, 2024]
+        training_df, train_seasons=range(2015, 2025), calib_seasons=[2025], test_seasons=[]
     )
 
     margin_model = fit_margin_model(train_df, feature_columns=COMBINED_QB_FEATURE_COLUMNS)

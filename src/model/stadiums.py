@@ -31,7 +31,7 @@ import pandas as pd
 
 # stadium_id -> (latitude, longitude, IANA timezone name). Built from the
 # 44 distinct `stadium_id` values actually present in
-# data/static/schedules_2015_2024.parquet (verified via direct query, not
+# data/static/schedules_2015_2025.parquet (verified via direct query, not
 # guessed) -- city-level coordinate accuracy, which is all a travel-distance
 # feature needs. Includes every international/neutral-site venue (London x3,
 # Mexico City, Munich, Frankfurt, Sao Paulo) since those appear as real
