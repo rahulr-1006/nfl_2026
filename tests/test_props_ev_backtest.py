@@ -216,6 +216,31 @@ def test_pinnacle_fair_probs_uses_the_latest_capture_time_not_first_row_order():
     assert row["over_fair"] == pytest.approx(0.5, abs=1e-6)
 
 
+def test_pinnacle_fair_probs_falls_back_to_the_latest_COMPLETE_pair_not_the_latest_poll_overall():
+    # A real bug caught by code review (2026-08-21): a group's single
+    # latest capture_time can be a ONE-SIDED poll (e.g. Pinnacle re-priced
+    # only the Over that cycle, Under didn't move). Taking "the latest
+    # timestamp" alone would pick up that incomplete snapshot and drop the
+    # whole group -- discarding a perfectly valid, fully simultaneous
+    # EARLIER pair. Must fall back to the latest timestamp where BOTH
+    # sides are actually present.
+    complete_time = CAPTURE_TIME
+    one_sided_time = CAPTURE_TIME + timedelta(hours=6)
+    props = pd.DataFrame(
+        [
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -110, capture_time=complete_time),
+            _row("G1", "P1", "receiving_yards", 65.5, "under", "pinnacle", -110, capture_time=complete_time),
+            # Later poll only re-quoted the Over -- no Under row at this time.
+            _row("G1", "P1", "receiving_yards", 65.5, "over", "pinnacle", -130, capture_time=one_sided_time),
+        ]
+    )
+    fair = pinnacle_fair_probs(props)
+    assert not fair.empty
+    row = fair.iloc[0]
+    assert row["pinnacle_time"] == complete_time
+    assert row["over_fair"] == pytest.approx(0.5, abs=1e-6)
+
+
 def test_find_prop_ev_spots_ignores_a_spot_with_a_stale_pinnacle_price():
     props = pd.DataFrame(
         [

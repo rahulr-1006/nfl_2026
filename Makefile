@@ -1,7 +1,7 @@
 .PHONY: venv install test lint demo collect collect-once preseason-poll preseason-report props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
-	middle-scan-once \
+	middle-scan-once steam-scan-once \
 	props-collect props-collect-once \
 	props-service-install props-service-uninstall props-service-status clean
 
@@ -106,6 +106,14 @@ monitor-scan-once:
 # Odds API cost.
 middle-scan-once:
 	$(PY) -m src.backtest.middle_scan
+
+# Steam detection (src/backtest/): checks the real-season store for
+# synchronized, same-direction line movement across multiple books at once,
+# and flags any real execution book that hasn't joined the move yet. Same
+# manual-only reasoning as middle-scan-once -- real synchronized movement
+# takes time to accumulate, zero live track record yet.
+steam-scan-once:
+	$(PY) -m src.backtest.steam_scan
 
 MONITOR_AGENT := $(HOME)/Library/LaunchAgents/com.nflclv.monitor.plist
 

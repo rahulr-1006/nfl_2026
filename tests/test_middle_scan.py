@@ -52,7 +52,7 @@ def test_run_finds_and_logs_a_real_middle(tmp_path, monkeypatch, caplog):
     # scan/report/log wiring, not re-validating the margin/total model
     # (that's `tests/test_margin_total.py`'s job). Fixed, hand-chosen
     # sigmas keep this test fast and hermetic.
-    monkeypatch.setattr(middle_scan, "_fit_residual_stds", lambda: (13.0, 10.0))
+    monkeypatch.setattr(middle_scan, "fit_residual_stds", lambda: (13.0, 10.0))
 
     import logging
 
@@ -75,7 +75,7 @@ def test_run_returns_empty_when_nothing_moved(tmp_path, monkeypatch):
             _snapshot("draftkings", Side.AWAY, -105, 3.0, LATE),
         ]
     )
-    monkeypatch.setattr(middle_scan, "_fit_residual_stds", lambda: (13.0, 10.0))
+    monkeypatch.setattr(middle_scan, "fit_residual_stds", lambda: (13.0, 10.0))
 
     report = middle_scan.run(store_root=str(store_root))
     assert report.empty
@@ -84,7 +84,7 @@ def test_run_returns_empty_when_nothing_moved(tmp_path, monkeypatch):
 def test_run_filters_out_windows_below_min_ev(tmp_path, monkeypatch):
     store_root = tmp_path / "snapshots"
     _seed_store_with_real_movement(store_root)
-    monkeypatch.setattr(middle_scan, "_fit_residual_stds", lambda: (13.0, 10.0))
+    monkeypatch.setattr(middle_scan, "fit_residual_stds", lambda: (13.0, 10.0))
 
     unfiltered = middle_scan.run(store_root=str(store_root), min_ev=0.0)
     assert not unfiltered.empty
@@ -103,7 +103,7 @@ def test_run_never_calls_any_notification_path(tmp_path, monkeypatch):
 
     calls = []
     monkeypatch.setattr(sms_module, "send_message", lambda *a, **kw: calls.append((a, kw)))
-    monkeypatch.setattr(middle_scan, "_fit_residual_stds", lambda: (13.0, 10.0))
+    monkeypatch.setattr(middle_scan, "fit_residual_stds", lambda: (13.0, 10.0))
 
     store_root = tmp_path / "snapshots"
     _seed_store_with_real_movement(store_root)

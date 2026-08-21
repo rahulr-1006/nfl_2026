@@ -62,10 +62,28 @@ RECEIVER_FEATURE_COLUMNS = [
     "home_receiving_corps_elo", "away_receiving_corps_elo", "home_opp_pass_defense_elo", "away_opp_pass_defense_elo",
 ]
 WEATHER_FEATURE_COLUMNS = ["is_outdoor", "temp_outdoor", "wind_outdoor", "is_grass"]
+# home_rest/away_rest are already in FEATURE_COLUMNS above -- these are a
+# NONLINEAR re-encoding of that same data (differential + threshold flags),
+# not new information, plus genuinely new travel-distance/timezone-crossing
+# features. See src/model/features.py::add_rest_travel_features's docstring.
+REST_TRAVEL_FEATURE_COLUMNS = [
+    "rest_differential",
+    "home_short_week",
+    "away_short_week",
+    "home_bye_week",
+    "away_bye_week",
+    "home_travel_distance",
+    "away_travel_distance",
+    "travel_distance_differential",
+    "home_tz_diff_hours",
+    "away_tz_diff_hours",
+    "tz_diff_differential",
+]
 COMBINED_FEATURE_COLUMNS = FEATURE_COLUMNS + ELO_FEATURE_COLUMNS
 COMBINED_QB_FEATURE_COLUMNS = COMBINED_FEATURE_COLUMNS + QB_FEATURE_COLUMNS
 EXPANDED_FEATURE_COLUMNS = COMBINED_QB_FEATURE_COLUMNS + PASS_RUSH_FEATURE_COLUMNS + RECEIVER_FEATURE_COLUMNS
 WEATHER_EXPANDED_FEATURE_COLUMNS = COMBINED_QB_FEATURE_COLUMNS + WEATHER_FEATURE_COLUMNS
+REST_TRAVEL_EXPANDED_FEATURE_COLUMNS = COMBINED_QB_FEATURE_COLUMNS + REST_TRAVEL_FEATURE_COLUMNS
 
 
 def build_training_frame(

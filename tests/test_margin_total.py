@@ -65,6 +65,8 @@ def _schedule_fixture(spread_line=3.0, total_line=45.0, push_spread=False, push_
     df["season"] = 2023
     for col in ["home_rest", "away_rest", "div_game", "roof", "surface", "temp", "wind"]:
         df[col] = 0
+    for col in ["weekday", "stadium_id", "location"]:
+        df[col] = None
     df["spread_line"] = spread_line
     df["total_line"] = total_line
     df["home_spread_odds"] = -110

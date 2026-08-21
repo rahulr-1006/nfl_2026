@@ -155,6 +155,7 @@ def build_game_features(
         "season",
         "week",
         "gameday",
+        "weekday",
         "home_team",
         "away_team",
         "home_rest",
@@ -166,6 +167,8 @@ def build_game_features(
         "wind",
         "spread_line",
         "total_line",
+        "stadium_id",
+        "location",
     ]
     context = schedule[context_cols].copy()
 
@@ -216,3 +219,103 @@ def add_weather_features(df: pd.DataFrame) -> pd.DataFrame:
     out["wind_outdoor"] = out["wind"].where(out["is_outdoor"] == 1, 0.0).fillna(0.0)
     out["is_grass"] = (out["surface"].astype(str).str.strip() == "grass").astype(float)
     return out
+
+
+def add_rest_travel_features(df: pd.DataFrame, schedule: pd.DataFrame) -> pd.DataFrame:
+    """Rest re-encoding + travel-distance/timezone-crossing features from
+    `build_game_features()`'s output (needs `schedule` too, unlike
+    `add_weather_features` -- see below for why).
+
+    **Honest framing, stated plainly like `add_weather_features` states its
+    own imputation choices: `home_rest`/`away_rest` are NOT new information.**
+    They've been in `FEATURE_COLUMNS` since this project's very first model
+    -- every prior feature-engineering attempt (GBM, garbage-time, expanded
+    receiver/pass-rush, weather, margin/total expansion -- all 5 negative)
+    already had raw rest-days as a linear input. `rest_differential`/
+    `home_short_week`/`away_short_week`/`home_bye_week`/`away_bye_week` only
+    test whether a NONLINEAR/threshold encoding of that same data captures
+    something a linear term on the raw days doesn't. Thresholds (`<=4` for
+    short week, `>=14` for bye week) chosen directly from the real
+    distribution (158 games at exactly 4 days' rest, virtually all Thursday
+    games; 152 games at exactly 14 days, the post-bye value), not tuned.
+
+    **Travel distance and timezone-crossing ARE genuinely new information**
+    -- nothing else in this project has stadium coordinates or timezones.
+    Requires `schedule` (not just `df`) because each team's own home
+    stadium for a given season has to be derived from ALL of that team's
+    home games that season (`src/model/stadiums.py::team_home_stadium_by_season`),
+    which a single game's own row can't supply.
+
+    **Neutral-site games (53 of 2,743, 1.9%) get real, nonzero distance for
+    BOTH sides, not "0 for the home team always."** A naive design would
+    treat `home_travel_distance` as always 0 -- wrong for e.g. a Super Bowl
+    where the designated "home" team traveled from its own city just like
+    the away team did. Both sides' distance is computed the same way: from
+    that team's own derived home stadium to the game's actual stadium.
+
+    Missing-lookup fallback (should not occur -- every real `stadium_id` in
+    the cached schedule has a `STADIUM_COORDINATES` entry, verified by
+    `tests/test_stadiums.py`): a team with no recorded home game in a given
+    season falls back to 0 distance/0 timezone-crossing for that side,
+    rather than raising, so a single gap in coverage doesn't take down the
+    whole feature build.
+    """
+    from src.model.stadiums import (
+        STADIUM_COORDINATES,
+        haversine_miles,
+        team_home_stadium_by_season,
+        timezone_offset_hours,
+    )
+
+    out = df.copy()
+    out["rest_differential"] = out["home_rest"] - out["away_rest"]  # NaN propagates correctly on its own
+    # `<=`/`>=` against a NaN rest value evaluates to False, which would
+    # otherwise silently encode "missing" as "not short week" instead of
+    # propagating the missingness (real 2015-2024/2026 data has zero NaN
+    # rest values today, verified -- but nothing guarantees that stays
+    # true, and the stadium lookups below already guard NaN explicitly;
+    # these four should match that same discipline, caught by code review
+    # 2026-08-21).
+    out["home_short_week"] = (out["home_rest"] <= 4).astype(float)
+    out.loc[out["home_rest"].isna(), "home_short_week"] = float("nan")
+    out["away_short_week"] = (out["away_rest"] <= 4).astype(float)
+    out.loc[out["away_rest"].isna(), "away_short_week"] = float("nan")
+    out["home_bye_week"] = (out["home_rest"] >= 14).astype(float)
+    out.loc[out["home_rest"].isna(), "home_bye_week"] = float("nan")
+    out["away_bye_week"] = (out["away_rest"] >= 14).astype(float)
+    out.loc[out["away_rest"].isna(), "away_bye_week"] = float("nan")
+
+    # Computed once, reused for both sides -- team_home_stadium_by_season
+    # does a full groupby+idxmax over the whole schedule and is
+    # deterministic on identical input, so calling it twice with the same
+    # `schedule` argument (caught by code review 2026-08-21) just repeats
+    # the same work under a different column name.
+    team_venue = team_home_stadium_by_season(schedule)
+    home_venue = team_venue.rename(columns={"stadium_id": "home_own_stadium_id"})
+    away_venue = team_venue.rename(columns={"stadium_id": "away_own_stadium_id"})
+    out = out.merge(home_venue, left_on=["season", "home_team"], right_on=["season", "team"], how="left").drop(columns=["team"])
+    out = out.merge(away_venue, left_on=["season", "away_team"], right_on=["season", "team"], how="left").drop(columns=["team"])
+
+    def _distance_and_tz(row, own_stadium_col):
+        own_id = row[own_stadium_col]
+        game_id_stadium = row["stadium_id"]
+        game_date = row["gameday"]
+        if pd.isna(own_id) or own_id not in STADIUM_COORDINATES or game_id_stadium not in STADIUM_COORDINATES:
+            return pd.Series({"distance": 0.0, "tz_diff": 0.0})
+        own_lat, own_lon, own_tz = STADIUM_COORDINATES[own_id]
+        game_lat, game_lon, game_tz = STADIUM_COORDINATES[game_id_stadium]
+        distance = haversine_miles(own_lat, own_lon, game_lat, game_lon)
+        game_dt = pd.Timestamp(game_date).date()
+        tz_diff = abs(timezone_offset_hours(own_tz, game_dt) - timezone_offset_hours(game_tz, game_dt))
+        return pd.Series({"distance": distance, "tz_diff": tz_diff})
+
+    home_result = out.apply(lambda r: _distance_and_tz(r, "home_own_stadium_id"), axis=1)
+    away_result = out.apply(lambda r: _distance_and_tz(r, "away_own_stadium_id"), axis=1)
+    out["home_travel_distance"] = home_result["distance"]
+    out["away_travel_distance"] = away_result["distance"]
+    out["home_tz_diff_hours"] = home_result["tz_diff"]
+    out["away_tz_diff_hours"] = away_result["tz_diff"]
+    out["travel_distance_differential"] = out["away_travel_distance"] - out["home_travel_distance"]
+    out["tz_diff_differential"] = out["away_tz_diff_hours"] - out["home_tz_diff_hours"]
+
+    return out.drop(columns=["home_own_stadium_id", "away_own_stadium_id"])

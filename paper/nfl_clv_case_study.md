@@ -93,6 +93,11 @@
       never lose both legs, checked numerically; first live smoke test against the
       real 2026 collector found two real, small, bettable windows from cross-book
       disagreement (`src/backtest/middling.py`, `make middle-scan-once`)
+- [x] Steam detection (§4.11) — a third distinct live mechanism (synchronized
+      same-direction movement across multiple books, not one line drifting or one
+      book vs. Pinnacle); reuses middling's pricing wholesale rather than
+      reinventing it; first live smoke test found 5 real opportunities immediately
+      (`src/backtest/steam.py`, `make steam-scan-once`)
 - [x] Portfolio validation (§4.5) — leakage-safe splitting, walk-forward folds,
       permutation nulls, and Benjamini-Hochberg correction across all 57 real p-values
       this project has produced; found and fixed a real in-sample leak in the bucket
@@ -119,6 +124,14 @@
       uncorrected, fails corrected). Downgraded QB Elo's status from "a real, modest
       improvement" to "plausible, not confirmed" in §3.7 (`paired_permutation_test_mean_diff`
       in `src/backtest/validation.py`)
+- [x] Rest/travel differential (§3.7, §6.4) — the first new feature tested after the
+      test-set-reuse correction, evaluated as comparison #9 in the same corrected
+      registry from the start. Rest re-encoding (differential + short-week/bye-week
+      flags) tests a nonlinear effect on data already in the model since day one;
+      travel distance/timezone-crossing is genuinely new (a hand-built 44-stadium
+      coordinate/timezone table, `src/model/stadiums.py`). Result: negative, the 6th
+      consecutive feature-engineering attempt in the same direction (ΔBrier=-0.0014,
+      p=0.84) (`add_rest_travel_features` in `src/model/features.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -689,6 +702,18 @@ arbitrage requires an exact shared `capture_time` between legs (matching this pr
 existing "a single poll writes both sides together" convention from §4.9's live
 scanner), and the EV comparison requires Pinnacle's price within 30 minutes of the
 execution book's. Caught before it could ever produce a wrong live result, not after.
+
+**A second, related gap caught by a follow-up code review (2026-08-21).** The
+simultaneity fix above still had a bug: `pinnacle_fair_probs` picked Pinnacle's
+single latest capture_time per group, but if THAT specific poll only updated one
+side (e.g. Pinnacle re-priced the Over but the Under didn't move that cycle), the
+group would fail the Over/Under completeness check and get dropped entirely --
+discarding a perfectly valid, fully simultaneous EARLIER pair in the process. Fixed
+to find the latest capture_time where BOTH sides are actually present, not just the
+latest timestamp overall. Same as the first fix, empirically confirmed to be a no-op
+on the real batch-1 data (65 arb spots, same EV result) -- this dataset has exactly
+one capture per game, so the bug was never live; it protects the live props
+scheduler's multi-poll data the same way the first fix does.
 
 ---
 
@@ -1462,6 +1487,54 @@ pricing -> EV) works end-to-end on live data, not just synthetic test fixtures. 
 yet a claim about this strategy's long-run edge -- that requires real games completing
 against real middle bets, which only the live season can provide.
 
+### 4.11 Steam detection: synchronized cross-book movement (2026-08-21)
+
+**A third, distinct mechanism from middling and the live scanner.** §4.10's middling
+exploits ONE line drifting over time (or across books) into a double-win window.
+§4.9's live scanner compares ONE execution book against Pinnacle at a single instant.
+Steam is neither: when several INDEPENDENT books move their price in the SAME
+direction within a tight time window, that's a real signal professional/sharp money
+hit the market broadly, not just one book's own line-setting choice. The actionable
+follow-through: any real execution book that hasn't joined the move yet is still
+quoting the pre-steam price -- worth betting before it corrects.
+
+**Mechanism (`src/backtest/steam.py`).** `book_moves` computes each book's own
+earliest-to-latest line change for a game/market/side. `detect_steam_move` requires
+at least `min_books` (default 3) DISTINCT books to have moved the SAME direction,
+with all of those moves clustering within `window` (default 1 hour) --
+`_largest_time_cluster` is a straightforward max-points-in-a-sliding-window scan over
+the small number of books this project tracks. `stale_books` are the real execution
+books that haven't joined the cluster -- the part that has to be a genuine, placeable
+bet, unlike the detection step itself (which counts every quoted book, Pinnacle
+included, since a real steam move is market-wide, not specific to which books happen
+to be bettable accounts here).
+
+**Pricing reuses §4.10's math wholesale, not reinvented.** `win_interval` and
+`pinnacle_reference_line` are imported directly from `middling.py` -- the "true
+outcome" region a bet wins in and the market-consensus estimate of it are exactly the
+same questions here. `price_stale_book_opportunity` is a single-leg analogue of
+`middle_ev`'s Normal(mu, sigma) pricing, `mu` from Pinnacle's POST-steam line
+(already incorporating the move) rather than a model prediction, same reasoning as
+§4.10. `expected_value`/`fractional_kelly`/`apply_bankroll_caps` are `sizing.py`,
+unchanged.
+
+**Deployment: `make steam-scan-once`, deliberately manual, same reasoning as
+middling** -- real synchronized movement takes time to accumulate, and this strategy
+has zero live track record yet. `src/backtest/middle_scan.py`'s residual-std fitting
+was promoted from a private helper to `fit_residual_stds()` so both scan scripts
+reuse the exact same sigma-fitting pipeline rather than duplicating it.
+
+**First real smoke test (2026-08-21), against the live 2026 collector's actual
+data.** `make steam-scan-once` found 5 real opportunities immediately -- e.g. 3 books
+(coolbet, draftkings, tipico_de) moved ATL/PIT's total the same direction within the
+window, with BetMGM still quoting the stale total; a similar 3-book cluster on
+DAL/NYG's total left BetMGM, DraftKings, and FanDuel all stale simultaneously. Small
+(EV $0.009-$0.010, stakes $0.34-$0.42) -- consistent with the modest scale middling's
+own first smoke test found, and confirmation the full pipeline (detection ->
+Pinnacle-referenced pricing -> EV) works end-to-end on live data. Same honest ceiling
+as middling: real, live, and priced correctly, not yet a claim about long-run edge --
+that needs real games completing against real steam bets.
+
 ---
 
 ## 5. Results
@@ -1532,6 +1605,25 @@ review question asked for. The remaining, deeper issue — a human having now se
 rounds of this exact test set's feedback, which no statistic computed on that same
 data can fully undo — still has no fix without a genuinely fresh holdout season, not
 available until one exists. Full analysis: `notebooks/model_backtest_results.ipynb`.
+
+**Comparison #9, same day: rest/travel differential, evaluated correctly from the
+start.** The first new feature tried after this correction was added as a 9th entry
+in this same registry immediately, not benchmarked in isolation first and corrected
+later. `add_rest_travel_features` (`src/model/features.py`) re-encodes `home_rest`/
+`away_rest` (already in the base feature set since day one) as an explicit
+differential plus short-week/bye-week binary flags, and adds genuinely new
+information -- travel distance and timezone-crossing, via a hand-built 44-stadium
+coordinate/timezone table (`src/model/stadiums.py`, each team's home venue derived
+empirically per season from real schedule data, which handles the Rams/Chargers/
+Raiders relocations and neutral-site games like Super Bowls correctly without a
+hand-maintained relocation table). **Result: negative, like 6 of the other 8.**
+ΔBrier=-0.0014 (the model got slightly worse), p=0.84 uncorrected -- not remotely
+close to significant even before the multiple-comparison correction that would make
+it harder still. Extends the "5 consecutive negative results in the same direction"
+pattern (§3.9) to 6: garbage-time, GBM, both expanded-feature checks, weather, and
+now rest/travel all fail the same way, on a mechanistically different feature each
+time. That consistency keeps pointing at the same conclusion -- the constraint is
+dataset size (~1,690-1,740 training games), not a missing feature.
 
 **Sample size.** The live 2026 CLV result (§5.3) is a single season's worth of bets
 against a fixed $100 bankroll — the paper's own framing throughout (§4.6, §5.5) is that
