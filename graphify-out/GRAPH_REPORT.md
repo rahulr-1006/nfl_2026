@@ -5,12 +5,12 @@
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1134 nodes · 2846 edges · 52 communities (45 shown, 7 thin omitted)
+- 1136 nodes · 2842 edges · 55 communities (46 shown, 9 thin omitted)
 - Extraction: 87% EXTRACTED · 13% INFERRED · 0% AMBIGUOUS · INFERRED: 368 edges (avg confidence: 0.51)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `f4ec57d6`
+- Built from commit: `fd1da23a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -38,6 +38,9 @@
 - CLAUDE.md
 - .claude/CLAUDE.md
 - extraction-spec.md
+- test_sizing.py
+- DataFrame
+- Series
 - 3. Data
 - test_elo.py
 - NFL CLV Case Study: Blueprint
@@ -69,21 +72,21 @@
 10. `MatchResult` - 26 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `test_get_odds_raises_odds_api_error_on_other_bad_status()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_client.py → src/collect/client.py
-- `test_get_odds_retries_network_errors_then_raises()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_client.py → src/collect/client.py
-- `test_poll_once_never_raises_on_api_error()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_preseason.py → src/collect/client.py
-- `test_poll_all_props_records_failed_calls_without_raising()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_props.py → src/collect/client.py
-- `test_tick_raises_collector_halted_after_too_many_failures()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_scheduler.py → src/collect/client.py
+- `test_event_odds_to_prop_snapshots_parses_over_under_pair()` --uses--> `Market`  [INFERRED]
+  tests/test_collect_props.py → src/store/schema.py
+- `test_event_to_snapshots_maps_markets_and_sides()` --uses--> `Market`  [INFERRED]
+  tests/test_collect_transform.py → src/store/schema.py
+- `_snapshot()` --uses--> `Market`  [INFERRED]
+  tests/test_live_scan.py → src/store/schema.py
+- `_snapshot()` --uses--> `Market`  [INFERRED]
+  tests/test_monitor_run.py → src/store/schema.py
+- `_snap()` --uses--> `Market`  [INFERRED]
+  tests/test_pit_store.py → src/store/schema.py
 
 ## Import Cycles
 - None detected.
 
-## Communities (52 total, 7 thin omitted)
+## Communities (55 total, 9 thin omitted)
 
 ### Community 0 - "Side"
 Cohesion: 0.05
@@ -149,6 +152,10 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
+### Community 35 - "test_sizing.py"
+Cohesion: 0.14
+Nodes (27): apply_bankroll_caps(), expected_value(), fractional_kelly(), kelly_fraction(), Expected value and Kelly bet sizing (blueprint Part B.4). Full Kelly is too…, EV of a unit bet at fair win probability p and decimal odds d., Full Kelly fraction of bankroll. Can be negative when the price is bad at this…, k * full Kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the… (+19 more)
+
 ### Community 38 - "3. Data"
 Cohesion: 0.18
 Nodes (11): 3.10 Player-prop cross-book strategies (historical, not the live CLV headline), 3.1 Sources, 3.2 Live snapshot collection, 3.3 Known data limitations, 3.4 Bet execution venues, 3.5 Preseason dry run (infrastructure validation, not a result), 3.6 Player props (infrastructure prepped, not active), 3.7 Receiver-level Elo (player-prop pricing infrastructure) (+3 more)
@@ -170,8 +177,8 @@ Cohesion: 0.05
 Nodes (69): model_validator, find_arbitrage_spots(), find_prop_ev_spots(), pinnacle_fair_probs(), DataFrame, Cross-book player-prop strategies that don't rely on market timing: (1) a…, One row per (event_id, player_name, prop_stat) with both a Pinnacle Over and…, One row per (event, player, prop_stat, line, side, book) where `book`'s price… (+61 more)
 
 ### Community 44 - "test_correlated_props.py"
-Cohesion: 0.06
-Nodes (67): bucket_favorite_strength(), build_team_game_outcomes(), correlated_edge(), estimate_game_specific_joint_prob(), measure_leg_correlation(), measure_leg_correlation_by_bucket(), naive_parlay_price(), DataFrame (+59 more)
+Cohesion: 0.10
+Nodes (40): DataFrame, Series, bucket_favorite_strength(), build_team_game_outcomes(), correlated_edge(), estimate_game_specific_joint_prob(), measure_leg_correlation(), measure_leg_correlation_by_bucket() (+32 more)
 
 ### Community 45 - "OddsApiClient"
 Cohesion: 0.24
@@ -218,19 +225,19 @@ Cohesion: 0.15
 Nodes (11): Response, _parse_int_header(), _parse_iso(), datetime, Thin HTTP wrapper around The Odds API. Talks to The Odds API directly (not…, Historical per-event odds, snapshotted at the nearest available timestamp <=…, Shared retry/error-handling for both endpoints. Returns the raw successful…, Bulk endpoint: one call returns every event in the sport's current slate. This… (+3 more)
 
 ## Knowledge Gaps
-- **113 isolated node(s):** `nfl-clv`, `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)` (+108 more)
+- **113 isolated node(s):** `Abstract`, `1.1 Motivation`, `1.2 Thesis`, `1.3 Contributions`, `1.4 What success means here` (+108 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **9 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `PointInTimeStore` connect `PointInTimeStore` to `Side`, `scheduler.py`, `props.py`, `market_baseline`, `test_props_scheduler.py`, `preseason.py`, `OddsApiResponse`?**
-  _High betweenness centrality (0.192) - this node is a cross-community bridge._
+  _High betweenness centrality (0.188) - this node is a cross-community bridge._
 - **Why does `market_baseline()` connect `market_baseline` to `test_margin_total.py`, `PointInTimeStore`?**
-  _High betweenness centrality (0.142) - this node is a cross-community bridge._
-- **Why does `expected_value()` connect `test_correlated_props.py` to `market_baseline`, `PointInTimeStore`?**
-  _High betweenness centrality (0.091) - this node is a cross-community bridge._
+  _High betweenness centrality (0.116) - this node is a cross-community bridge._
+- **Why does `Side` connect `Side` to `market_baseline`, `props.py`, `transform.py`, `PointInTimeStore`?**
+  _High betweenness centrality (0.093) - this node is a cross-community bridge._
 - **Are the 64 inferred relationships involving `Side` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
   _`Side` has 64 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 54 inferred relationships involving `PointInTimeStore` (e.g. with `BacktestEngine` and `clv_movement_report()`) actually correct?**
