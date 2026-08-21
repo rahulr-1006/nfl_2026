@@ -6,8 +6,8 @@ from src.features.load_static import PBP_COLUMNS, home_spread_line
 from src.store.schema import Market, Side
 from src.store.settlement import build_results_index, settle
 
-SCHEDULE_PATH = Path("data/static/schedules_2015_2024.parquet")
-PBP_PATH = Path("data/static/pbp_2015_2024.parquet")
+SCHEDULE_PATH = Path("data/static/schedules_2015_2025.parquet")
+PBP_PATH = Path("data/static/pbp_2015_2025.parquet")
 
 
 def test_home_spread_line_negates():
@@ -49,5 +49,5 @@ def test_cached_pbp_matches_trimmed_schema_and_covers_the_cached_seasons():
     """
     pbp = pd.read_parquet(PBP_PATH)
     assert list(pbp.columns) == PBP_COLUMNS
-    assert set(pbp["season"].unique()) == set(range(2015, 2025))
+    assert set(pbp["season"].unique()) == set(range(2015, 2026))
     assert len(pbp) > 400_000  # sanity: ten seasons of real plays, not an empty/partial pull

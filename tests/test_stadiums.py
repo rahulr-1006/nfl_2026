@@ -56,7 +56,7 @@ def test_timezone_offset_london_vs_new_york_gap_during_the_nfl_season():
 
 
 def test_stadium_coordinates_covers_every_real_stadium_id_in_the_cached_schedule():
-    schedule = pd.read_parquet("data/static/schedules_2015_2024.parquet")
+    schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
     real_ids = set(schedule["stadium_id"].unique())
     missing = real_ids - set(STADIUM_COORDINATES)
     assert missing == set(), f"STADIUM_COORDINATES is missing real stadium_id(s): {missing}"
@@ -79,7 +79,7 @@ def test_stadium_coordinates_has_no_stale_unused_entries():
     # Guards the table from silently drifting out of sync with the data --
     # a stadium_id here that's no longer in the real schedule is a signal
     # something upstream changed and this table needs a look.
-    schedule = pd.read_parquet("data/static/schedules_2015_2024.parquet")
+    schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
     real_ids = set(schedule["stadium_id"].unique())
     stale = set(STADIUM_COORDINATES) - real_ids
     assert stale == set(), f"STADIUM_COORDINATES has stale stadium_id(s) not in the real schedule: {stale}"
@@ -127,7 +127,7 @@ def test_team_home_stadium_by_season_on_real_cached_data_finds_the_rams_relocati
     # End-to-end check against the real 2015-2024 schedule, not a synthetic
     # fixture -- confirms the empirical-derivation approach actually works
     # on the data it was built for.
-    schedule = pd.read_parquet("data/static/schedules_2015_2024.parquet")
+    schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
     result = team_home_stadium_by_season(schedule)
     stl_2015 = result[(result["team"] == "STL") & (result["season"] == 2015)]
     la_2018 = result[(result["team"] == "LA") & (result["season"] == 2018)]

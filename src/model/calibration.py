@@ -113,8 +113,8 @@ if __name__ == "__main__":
         time_based_split,
     )
 
-    pbp = pd.read_parquet("data/static/pbp_2015_2024.parquet")
-    schedule = pd.read_parquet("data/static/schedules_2015_2024.parquet")
+    pbp = pd.read_parquet("data/static/pbp_2015_2025.parquet")
+    schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
     df = build_training_frame(pbp, schedule)
 
     train_df, calib_df, test_df = time_based_split(

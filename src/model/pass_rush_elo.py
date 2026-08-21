@@ -2,16 +2,28 @@
 pass-protection strength, for player-prop pricing (sack props, QB-under-
 pressure props) rather than game outcomes.
 
-**Why team-level, not player-level like `receiver_elo.py`.** Free nflverse
-play-by-play records *who got credit* for a sack or QB hit, but not who was
-rushing (and being blocked) on the plays where nobody did -- there's no full
-pass-rush participation list. A player-level Elo built only from credited
-plays would only ever see wins, never losses: that's not a fair two-sided
-Elo contest, it's raw production volume wearing an Elo costume, and it would
-fail this project's own sanity-check discipline (see `qb_elo.py`,
-`receiver_elo.py`). So this rates the two units that ARE fully observed on
-every dropback: the offense's pass protection (`posteam`) and the defense's
-pass rush (`defteam`).
+**Why team-level, not player-level like `receiver_elo.py` -- CORRECTED
+2026-08-21, see `src/model/individual_pass_rush_elo.py`.** This module was
+originally built on the assumption that free nflverse play-by-play records
+*who got credit* for a sack or QB hit, but not who was rushing (and being
+blocked) on the plays where nobody did -- no full pass-rush participation
+list, so a player-level Elo built only from credited plays would only ever
+see wins, never losses. **That was true using only nflverse's own trimmed
+play-by-play, but not true of nflverse's broader table menu**: joining
+`load_pfr_advstats(stat_type="def")`'s per-player pressure counts against
+`load_snap_counts`'s `defense_snaps` (on PFR's own player/game IDs, 100%
+match rate) supplies exactly the missing denominator, for real pass-rush
+positions where snaps are a reasonable proxy for pass-rush opportunity.
+See `individual_pass_rush_elo.py`'s module docstring for the full design
+and its own honest limits (2018+ coverage only, a rate-based rating not a
+literal play-by-play sequential one). This team-level module remains real
+and useful in its own right -- full 2015+ coverage, and a genuinely
+different (team-vs-team, not individual) question -- not superseded, just
+no longer the only option.
+
+This module rates the two units that ARE fully observed on every dropback
+from nflverse's own play-by-play alone: the offense's pass protection
+(`posteam`) and the defense's pass rush (`defteam`).
 
 **Design, same mechanic as `receiver_elo.py`:** every dropback (`pass == 1`,
 including sacks -- nflverse's `pass` flag already covers them) is a
@@ -42,9 +54,11 @@ Derived from the 2015-2024 cache's own measured pressure rate (`p`):
 parity -- not an arbitrary guess, the same spirit as `DEFAULT_HOME_FIELD_ADVANTAGE`.
 
 **A separate, explicitly-not-Elo companion:** `credited_pressure_counts()`
-below is a raw per-player count of sacks/half-sacks/QB hits -- useful as a
-named-player leaderboard for context, but deliberately not blended into the
-Elo rating above, for the participation-data reason stated up top.
+below is a raw per-player count of sacks/half-sacks/QB hits from nflverse's
+own play-by-play alone -- useful as a named-player leaderboard for context,
+still deliberately not blended into the Elo rating above (raw pbp still has
+no exposure denominator on its own). For an actual individual-level rating
+with a real denominator, see `individual_pass_rush_elo.py` instead.
 """
 
 from __future__ import annotations

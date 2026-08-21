@@ -85,6 +85,55 @@ live multi-poll prop odds — the props scheduler is built
 ~9/2 for the 9/9-10 Week 1 opener. Natural next step once that data exists,
 not buildable meaningfully before then.
 
+## 5. Referee tendencies — **checked, no signal found (correcting an earlier wrong "blocked" claim)**
+
+This was previously listed under "blocked on data" below with the claim that
+nflverse doesn't carry usable referee data. **That was wrong, never actually
+checked.** `data/static/schedules_2015_2024.parquet` has a real `referee`
+column: 2,742/2,743 games populated, 32 distinct referees, 95-167 games each
+across all 10 seasons — a genuinely usable sample, already cached, zero new
+data needed.
+
+**Checked directly (2026-08-21), three ways, all null:**
+- Game-level margin/total residuals (from the existing fitted models) by
+  referee, 852 holdout games, 18 refs with ≥15 games each: ANOVA F=0.72,
+  p=0.79 (total); F=1.15, p=0.30 (margin).
+- The props-relevant version of the hypothesis (ref tendencies -> game flow
+  -> props, not just final score): total passing yards and total receptions
+  per game by referee, 2,658 games, 26 refs with ≥40 games each: F=0.81,
+  p=0.73 (passing yards); F=0.79, p=0.76 (receptions).
+- Penalty-call rate (the most mechanistically direct link) isn't checkable
+  with this project's cached play-by-play — a trimmed 29-column version with
+  no penalty fields. Would need a fresh (free) nflverse pull to test
+  properly, but given the aggregate outcome checks above are already flat,
+  not prioritized — if penalty tendencies mattered, *some* signal should
+  have shown up in aggregate passing yards, and none did.
+
+**Don't re-propose without new evidence** — same standing rule as the other
+negative results. If ever revisited, the penalty-rate pull is the one
+untried angle, not a retry of the outcome-level checks already done here.
+
+---
+
+## 6. Individual pass-rush rating — **built, corrects an earlier wrong "not buildable" claim**
+
+`src/model/pass_rush_elo.py`'s docstring claimed individual-level pass-rush Elo wasn't
+buildable on free data at all (no participation/exposure data). That was true using
+only nflverse's own trimmed play-by-play, and never checked against nflverse's full
+table menu. It's wrong: `load_pfr_advstats(stat_type="def")` (real per-player pressure
+counts) joined against `load_snap_counts`'s `defense_snaps` (100% ID match rate) gives
+a real denominator for true pass-rush positions (DE/DT/NT/EDGE/OLB), 2018+ coverage.
+
+Built as `src/model/individual_pass_rush_elo.py` (2026-08-21) — rate-based per-game
+Elo vs. a fixed 1500 baseline, base rate 3.84%/snap measured fresh from the cache.
+Sanity-checked: mean rating 1501.1, leaderboard top (Hendrickson, Hutchinson, Garrett,
+Bosa, Jones) and bottom (Payne, Hankins, Nnadi, Stewart — run-stuffing DTs) both match
+real football knowledge. 12 tests passing. See `individual_pass_rush_elo` memory.
+
+Not itself a betting strategy yet — a rating, same status as team-level pass-rush Elo
+and receiver Elo (standalone infrastructure, not wired into pricing). Next step if
+pursued further: sack-prop / QB-pressure-prop pricing using this as a feature.
+
 ---
 
 ## Blocked on data, not on ideas
@@ -93,6 +142,3 @@ not buildable meaningfully before then.
   well-known angle, but needs a paid bet-percentage feed (Action Network,
   VSiN, or similar) this project doesn't have. Revisit if/when such a source
   gets added.
-- **Referee-crew tendencies.** Real, well-documented effect (penalty rates,
-  game-flow impact on totals), but nflverse doesn't carry referee-crew-level
-  data usable for this, and no other free source is wired into this project.
