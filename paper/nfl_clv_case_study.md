@@ -72,6 +72,15 @@
       prop vig, not a guess; 6 of 7 pairs clear the vig hurdle, and the two
       strongest survive a vig sensitivity sweep up to 10%
       (`correlated_edge`/`naive_parlay_price` in `src/backtest/correlated_props.py`)
+- [x] Game-specific correlated-edge pricing (§4.5) — extracts value from the
+      existing moneyline/spread architecture's real per-game market probabilities;
+      found lift varies monotonically with favorite strength (not the constant
+      the pooled model assumed), then found the resulting edge collapses to a
+      bucket-level constant algebraically (`edge = lift/(1+vig)^2 - 1`) with a
+      correct clip-driven falloff for extreme favorites — per-game granularity
+      shows up in the Kelly stake, not the edge percentage
+      (`measure_leg_correlation_by_bucket`/`estimate_game_specific_joint_prob` in
+      `src/backtest/correlated_props.py`)
 - [x] A receiver-level Elo (§3.7) — play-level rating for pass-catchers vs. a
       companion pass-defense Elo, built for player-prop pricing rather than game
       outcomes; sanity-checked, rates per-target efficiency not volume
@@ -1024,6 +1033,62 @@ ever revisited, is comparing this model's predicted naive price against a real p
 SGP price the moment one becomes available -- that comparison, not more analysis on
 top of this one, is what would turn "quantified theoretical edge" into "confirmed
 mispricing." Full results: `notebooks/model_backtest_results.ipynb`.
+
+**Making the edge game-specific, not just pooled -- and a real finding along the
+way about what "game-specific" actually buys here.** The pricing above uses one
+pooled lift for each leg pair across all games. The natural next question, prompted
+directly by the moneyline/spread architecture already built in this project: can the
+market's own real, per-game devigged win probability (`market_prob_home` from
+`build_training_frame`, already computed for every game) replace that pooled average
+with something specific to the actual matchup being priced?
+
+Checked before trusting a pooled lift for that purpose: **it isn't constant.** Lift
+for `team_won x leading_rusher_100plus` runs from 1.76 for underdogs
+(market win prob < 0.45) down to 1.12 for heavy favorites (> 0.70), monotonically,
+across four fixed probability buckets (`FAVORITE_BUCKETS` in
+`correlated_props.py`), all individually significant (p from 4.8e-5 to 5.1e-24, n
+700-2,245 per bucket). Same direction for `game_over x qb_2plus_tds` (1.49 down to
+1.25). The interpretation is football-plausible: an underdog's win is
+disproportionately likely to come via grinding out a big rushing performance
+(clock control in an upset), while a heavy favorite's win is more "routine" and
+doesn't need the same correlated performance to happen.
+`measure_leg_correlation_by_bucket` and `estimate_game_specific_joint_prob` (both in
+`correlated_props.py`) implement the stratified version.
+
+**Applying this to real 2024 test-season games surfaced something worth stating
+precisely, not glossing over: the resulting edge is not actually a smooth per-game
+number.** Algebraically, under the multiplicative model, `naive_parlay_price`
+scales as `1/p_a` while the estimated joint probability scales as `p_a` directly --
+they cancel. Worked through: `edge = lift/(1+vig)^2 - 1`, a constant that depends
+only on which bucket a game falls into, not on the exact market probability within
+it (confirmed against real games: every underdog-bucket game priced to the *same*
++57.5% edge, whether the team's market win probability was 7% or 32%). The genuinely
+per-game number that *does* vary continuously with the specific matchup is the
+recommended Kelly stake -- because Kelly sizing depends on the actual decimal price
+offered, and that price still varies with `p_a` even though the EV percentage
+doesn't. Real examples from the 2024 test games: underdog-bucket edge is a flat
++57.5% regardless of exact market probability, with stakes ranging ~$0.34-$1.51
+across games depending on how big an underdog; heavy-favorite-bucket edge is a
+near-zero +0.5% before an additional effect takes over near the extreme tail.
+
+That tail effect is the second real finding: once a team's market win probability
+climbs high enough that the raw joint-probability estimate would exceed the pooled
+marginal `P(B)` -- concretely, above `p_a = 1/lift` (≈0.89 for the heavy-favorite
+bucket's 1.12 lift) -- the clip in `estimate_game_specific_joint_prob` binds, and
+the model correctly refuses to let `P(A∩B)` exceed `P(B)`. Past that point the edge
+erodes and turns negative for the very heaviest favorites (observed: -0.2% to -3.4%
+for teams above 90% market win probability in the 2024 test season) -- a sensible
+constraint, not a bug: if a team is already a 92% favorite, "team wins AND their
+leading rusher goes for 100+" cannot be meaningfully more likely than the leading
+rusher hitting 100+ on its own, since the win is already close to certain.
+
+**Honest summary:** the moneyline/spread architecture's market probabilities do add
+real, verified information here -- which bucket (and, near the tail, which side of
+the clip) a specific game falls into -- but under this multiplicative pricing model
+that information is coarser than "a continuous per-game edge," collapsing to four
+discrete edge levels plus a tail correction. The Kelly stake, not the edge
+percentage, is where per-game granularity actually shows up. Full bucket table and
+real-game examples: `notebooks/model_backtest_results.ipynb`.
 
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:

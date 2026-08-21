@@ -76,6 +76,84 @@ def measure_leg_correlation(indicator_a: pd.Series, indicator_b: pd.Series) -> d
     }
 
 
+# Fixed, round bucket edges on the market's own devigged win probability for
+# the team on the "A" side of a leg pair -- NOT data-derived quantiles, a
+# deliberate choice for robustness/explainability over a marginal precision
+# gain. Checked before using: pooled ("constant lift") was the original
+# design, and it's wrong -- lift for team_won x leading_rusher_100plus runs
+# 1.92 (biggest underdogs) down to 1.17 (heaviest favorites), monotonically
+# decreasing across all four buckets, same direction for game_over x
+# qb_2plus_tds. An underdog's win is disproportionately likely to come via
+# grinding out a big rushing performance; a heavy favorite's win is more
+# "routine" and doesn't need the same correlated performance to happen.
+FAVORITE_BUCKETS = [
+    (0.0, 0.45, "underdog"),
+    (0.45, 0.55, "narrow"),
+    (0.55, 0.70, "favorite"),
+    (0.70, 1.000001, "heavy_favorite"),  # +epsilon so p=1.0 falls in-bucket, not out-of-range
+]
+
+
+def bucket_favorite_strength(team_market_prob: float, buckets: list[tuple[float, float, str]] = FAVORITE_BUCKETS) -> str:
+    """Which `FAVORITE_BUCKETS` bucket a team's real market-implied win
+    probability (for THIS specific game -- e.g. `market_prob_home` from
+    `build_training_frame`, flipped for the away team) falls into.
+    """
+    for lo, hi, label in buckets:
+        if lo <= team_market_prob < hi:
+            return label
+    raise ValueError(f"team_market_prob {team_market_prob} not in [0, 1]")
+
+
+def measure_leg_correlation_by_bucket(
+    indicator_a: pd.Series,
+    indicator_b: pd.Series,
+    team_market_prob: pd.Series,
+    buckets: list[tuple[float, float, str]] = FAVORITE_BUCKETS,
+) -> pd.DataFrame:
+    """`measure_leg_correlation`, stratified by favorite strength -- see
+    `FAVORITE_BUCKETS`'s docstring for why pooled ("constant") lift is
+    misleading and shouldn't be used for a specific game.
+    """
+    df = pd.DataFrame(
+        {
+            "a": indicator_a.reset_index(drop=True),
+            "b": indicator_b.reset_index(drop=True),
+            "p": team_market_prob.reset_index(drop=True),
+        }
+    )
+    df["bucket"] = df["p"].apply(lambda p: bucket_favorite_strength(p, buckets))
+
+    rows = []
+    for _lo, _hi, label in buckets:
+        sub = df[df["bucket"] == label]
+        if sub.empty:
+            continue
+        r = measure_leg_correlation(sub["a"], sub["b"])
+        rows.append({"bucket": label, "mean_market_prob": float(sub["p"].mean()), **r})
+    return pd.DataFrame(rows)
+
+
+def estimate_game_specific_joint_prob(team_market_prob: float, historical_p_b: float, bucket_lift: float) -> float:
+    """Game-specific estimate of P(A and B), for pricing one particular
+    upcoming game rather than reporting a pooled statistic. Uses THIS
+    game's real market-implied P(A) (a bettor's actual best pre-game
+    estimate of the leg-A probability -- not the pooled historical
+    average, which is exactly 0.5 by construction when home/away are
+    pooled and tells you nothing about this specific matchup), the pooled
+    historical P(B) (no per-game model exists yet for the prop-threshold
+    leg), and the bucket-specific lift for this game's favorite strength
+    (`measure_leg_correlation_by_bucket` -- constant/pooled lift was
+    tested and rejected, see `FAVORITE_BUCKETS`).
+
+    Clipped to a valid joint-probability range: P(A and B) can never
+    exceed either marginal, and a naive `lift * p_a * p_b` product isn't
+    guaranteed to respect that on its own.
+    """
+    raw = bucket_lift * team_market_prob * historical_p_b
+    return min(raw, team_market_prob, historical_p_b)
+
+
 def naive_parlay_price(p_a: float, p_b: float, vig: float = MEASURED_PROP_VIG) -> float:
     """Decimal price a same-game parlay would carry if a book priced it by
     multiplying each leg's own *vigged* single-leg price together -- the
