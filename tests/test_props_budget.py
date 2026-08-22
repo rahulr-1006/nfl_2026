@@ -55,19 +55,19 @@ def test_later_polls_walk_through_the_target_list_in_order():
 def test_dense_poll_targets_hours_produces_the_expected_default_schedule():
     from src.collect.props_budget import dense_poll_targets_hours
 
-    targets = dense_poll_targets_hours(dense_window_hours=48.0, dense_poll_interval_hours=2.0)
-    assert len(targets) == 24
+    targets = dense_poll_targets_hours(dense_window_hours=48.0, dense_poll_interval_hours=3.0)
+    assert len(targets) == 16
     assert targets[0] == 48.0
-    assert targets[-1] == 2.0
+    assert targets[-1] == 3.0
 
 
 def test_sparse_poll_targets_hours_covers_the_gap_before_the_dense_window():
     from src.collect.props_budget import sparse_poll_targets_hours
 
-    targets = sparse_poll_targets_hours(posting_window_days=5.0, dense_window_hours=48.0, sparse_poll_interval_hours=8.0)
-    assert len(targets) == 9  # (120 - 48) / 8
+    targets = sparse_poll_targets_hours(posting_window_days=5.0, dense_window_hours=48.0, sparse_poll_interval_hours=12.0)
+    assert len(targets) == 6  # (120 - 48) / 12
     assert targets[0] == 120.0  # fires as soon as the event enters the 5-day posting window
-    assert targets[-1] == 56.0  # last sparse target, just above the 48h dense-tier boundary
+    assert targets[-1] == 60.0  # last sparse target, just above the 48h dense-tier boundary
     assert all(t > 48.0 for t in targets)  # sparse tier never overlaps the dense tier's own range
 
 
@@ -76,7 +76,7 @@ def test_combined_poll_targets_hours_is_sparse_then_dense_in_descending_order():
 
     assert list(POLL_TARGETS_HOURS) == sorted(POLL_TARGETS_HOURS, reverse=True)
     assert POLL_TARGETS_HOURS[0] == 120.0  # first sparse target
-    assert POLL_TARGETS_HOURS[-1] == 2.0  # last dense target
+    assert POLL_TARGETS_HOURS[-1] == 3.0  # last dense target
 
 
 def test_already_fully_polled_events_are_skipped():

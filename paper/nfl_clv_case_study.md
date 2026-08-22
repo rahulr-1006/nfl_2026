@@ -1338,6 +1338,45 @@ and `correlated_edge` themselves are unchanged and still have no notion of which
 bucket is trustworthy — their docstrings now point to `price_bucket_bet` so a future
 reader lands on the safe path rather than the raw one.
 
+**Extension: team-total rushing/passing yards vs. moneyline, real market-implied legs
+(2026-08-22, methodology_backlog.md #9).** The correlated-props legs above are fixed
+thresholds (100+ rush yards, 2+ pass TDs) checked against population base rates. Once
+real per-player Pinnacle prop lines existed for the full 2023-2024 test set
+(`src/collect/mainline_historical.py`, `src/collect/props_historical.py`), the same
+underlying question -- do books fail to jointly calibrate correlated same-game
+outcomes -- became testable with a genuinely different leg construction: "team
+cleared its own real market-implied total" (sum of every player's real posted line,
+`src/backtest/team_total_props.py::build_team_total_lines`) instead of a fixed
+threshold. Team-total pricing uncertainty is measured directly from real data
+(`actual_team_total - implied_team_total_line`, on real historical games) rather
+than assumed from summed per-player variances under an independence assumption known
+to be wrong (running backs share touches) -- one real team-level parameter,
+calibrated, not guessed.
+
+**Result: the underdog bucket replicates the exact same pattern the fixed-threshold
+legs found, using an independently-constructed leg definition.** Rushing (lift 1.19,
+p=2.8e-5) and passing (lift 1.28, p=6.0e-5) team-total-over legs correlate with
+`team_won` in the underdog bucket, survive the assumption-free permutation test, and
+survive an honest 2023-train/2024-test out-of-sample split (rushing: 1.226 train ->
+1.167 realized; passing: 1.311 -> 1.216 realized -- both hold up). Priced edge (same
+`bucket_edge` formula, same measured 5.75% prop vig): rushing underdog **+6.6%**,
+passing underdog **+14.1%**. The favorite bucket (rushing only) repeats the exact
+failure mode already found for the fixed-threshold legs: nominally significant
+pooled (p=0.00026) but priced edge is already negative (-2.4%) and shrinks further
+out-of-sample (1.129 -> 1.051) -- not a real, tradeable signal.
+
+Folded into the same 57-p-value multiple-comparison family (now 67) rather than a
+fresh q=0.05 family of its own -- 58/67 survive BH correction, and all 3
+individually-significant team-total tests (rushing pooled, rushing underdog bucket,
+passing underdog bucket) survive even in this larger, stricter family.
+
+**Same honest limitation the original correlated-props edge numbers already carry,
+stated plainly again here:** there's no real posted price for "sum of individual
+player lines" -- the priced edge confirms the correlation mechanism is real, not
+proof a specific book misprices exactly this combination. Passing yards (usually one
+real starting QB) is a cleaner construction than rushing (2-3 backs sharing touches).
+Full validation, including the out-of-sample table: `notebooks/model_backtest_results.ipynb`.
+
 ### 4.6 Bet sizing
 Implemented in `src/signal/sizing.py`:
 - `expected_value(p, d) = p(d-1) - (1-p)`.
@@ -1697,6 +1736,19 @@ test cutting the existing window down, not extending further back.
 against a fixed $100 bankroll — the paper's own framing throughout (§4.6, §5.5) is that
 this demonstrates correct method, not a claim about long-run profitability at any
 meaningful sample size.
+
+**Market-baseline source, checked directly rather than assumed (2026-08-22).** Every
+comparison above scored `market_baseline` from nflverse's own `home_moneyline`
+column, which this paper's own §3.x already flags as "not confirmed to be Pinnacle."
+Pulled real, confirmed-Pinnacle closing-line moneyline odds for all 570 2023-2024
+test-set games (`src/collect/mainline_historical.py`) and re-scored the baseline
+directly. Result: `market_baseline_real_pinnacle` Brier = 0.209724 vs.
+`market_baseline_nflverse` = 0.209862 -- a 0.000138 difference, dwarfed by the
+0.007-0.022 gap between either market baseline and every model tested. Correlation
+between the two sources across all 570 games: 0.9976. **The unconfirmed-source
+concern was legitimate to raise, and worth actually checking rather than assuming
+away -- but once measured, it changes no conclusion this project has drawn.** Full
+detail: `methodology_backlog.md` #8.
 
 **Single-book anchor risk.** The entire live CLV thesis and the props/correlated-props
 theoretical-edge work are anchored to Pinnacle as the sharp reference price. If

@@ -78,7 +78,7 @@ class BacktestBet:
     payout: float | None
 
 
-def _latest_fair_prob(
+def latest_fair_prob(
     snapshots: pd.DataFrame,
     book: str,
     market: Market,
@@ -89,6 +89,11 @@ def _latest_fair_prob(
     """Fair probability for `side`, devigged from `book`'s most recent
     two-sided quote at or before `as_of`. None if `book` never quoted both
     sides of `market` by `as_of`.
+
+    Public (2026-08-22, promoted from `_latest_fair_prob`) -- reused outside
+    `BacktestEngine` to extract real Pinnacle fair probabilities from the new
+    mainline historical pull for re-scoring the model comparison registry's
+    market baseline (see `mainline_historical_odds_reconsidered` memory).
     """
     candidates = snapshots[
         (snapshots["book"] == book)
@@ -180,12 +185,12 @@ class BacktestEngine:
                 f"not visible at decision_time={decision_time} for event {event_id}"
             )
 
-        entry_prob_fair = _latest_fair_prob(
+        entry_prob_fair = latest_fair_prob(
             visible, self.closing_book, order.market, order.side, decision_time, self.devig_method
         )
         close = _latest_price(pre_kickoff, self.closing_book, order.market, order.side, kickoff)
         close_price_decimal = float(close["price_decimal"]) if close is not None else None
-        close_prob_fair = _latest_fair_prob(
+        close_prob_fair = latest_fair_prob(
             pre_kickoff, self.closing_book, order.market, order.side, kickoff, self.devig_method
         )
 

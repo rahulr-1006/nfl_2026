@@ -170,7 +170,7 @@ down, not extending it further back.
 
 ---
 
-## 8. Mainline historical odds pull — **real gap found, fix queued for 2026-08-22**
+## 8. Mainline historical odds pull — **executed, gap confirmed real but numerically inconsequential**
 
 Every one of the 11 comparisons above (#1-#7, plus base Elo/GBM/garbage-time/QB Elo)
 scores "model vs. market" against **nflverse's own `home_moneyline`/`spread_line`
@@ -194,10 +194,122 @@ than hypothetical.
 credits/game vs. ~101/game. Pulling closing-line Pinnacle odds for the 570 test-set
 games (2023-2024) would cost ~17,100 credits.
 
-**Queued, not built:** fold into 2026-08-22's credit reset alongside the already-planned
-props batch 2 pull (~10,800 credits), one deliberate spending decision. See
-`mainline_historical_odds_reconsidered` memory for the exact reuse plan
-(`props_historical.py`'s pattern with `markets="h2h,spreads,totals"`).
+**Executed 2026-08-22.** Built `src/collect/mainline_historical.py` (reuses
+`transform.py::event_to_snapshots`, the live mainline parser). A 3-game test caught a
+real mistake before the full spend: `regions="us"` returns **zero Pinnacle** (only
+`eu` has it) — fixed, cost came in at ~61 credits/game (2x the original 30/game
+estimate). Full run: **570/570 games, 0 failures, 570/570 with real Pinnacle
+coverage**, 34,772 credits.
+
+**Result: the gap was real but numerically inconsequential.** Re-scored the
+market-baseline reference in `model_backtest_results.ipynb` against real Pinnacle
+instead of nflverse's column. `market_baseline_real_pinnacle` Brier = 0.209724 vs.
+`market_baseline_nflverse` = 0.209862 — a difference of 0.000138, dwarfed by the
+0.007-0.022 gap between either market baseline and every model tested (best model,
+`epa_elo_qb`: 0.216964). Correlation between the two baseline sources across all 570
+games: 0.9976 (mean abs diff 1.0%, max 5.2%, only 1 game >5%). **Every conclusion
+this project has drawn from "the market beats the model" holds regardless of which
+market source is used** — the unconfirmed-source concern was legitimate to raise and
+worth checking, but didn't change any finding once actually measured.
+
+---
+
+## 9. Team-total rushing/passing O/U vs moneyline — **built, validated, real underdog-bucket edge found**
+
+The natural extension of `correlated_props.py` once real per-player Pinnacle prop
+lines exist for enough games: does a team's real *market-implied* total rushing/
+passing output correlate with its real *market-implied* win probability beyond what
+independent pricing predicts? If the books aren't jointly calibrating these, that's
+a genuine, real mispricing mechanism -- the user's own framing for why this is worth
+building, not just another leg-pair variant of the existing pooled sweep.
+
+**Why this needed its own design pass, not a quick add-on to `correlated_props.py`:**
+the existing methodology's legs are fixed-threshold booleans (leading rusher clears
+100 yards, QB throws 2+ TDs) checked against *population base rates* or a single
+real market probability (`team_market_prob`, moneyline only). "Team total rushing/
+passing yards" isn't a market Odds API posts directly -- there's no single quoted
+line to devig. And real per-player lines almost never sit exactly at the fixed
+100/75-yard thresholds already validated, since props post for every roster player,
+not just the leading one.
+
+**Design decisions made (2026-08-22, via direct back-and-forth, not assumed):**
+1. **Legs are redefined around the real book line, not the fixed threshold.** Instead
+   of "cleared 100 yards," each leg is "cleared its own real market-implied
+   threshold" -- more market-native, avoids interpolation, but is a genuinely new
+   leg definition, not directly comparable to the already-validated underdog/narrow
+   buckets (which used the fixed thresholds).
+2. **Team total = sum of each eligible player's own real posted O/U line**, not a
+   synthesized single number invented from scratch -- uses the book's own set points
+   directly.
+3. **v1 includes real pricing/EV, not just a correlation/lift check.** Requires
+   synthesizing a team-total *distribution* (assume each player's yardage is
+   Normal around their own line, sum across players **assuming independence
+   between teammates** -- a real, stated v1 simplification, not hidden: running
+   backs likely have some negative correlation via shared touches, unmodeled here),
+   then assigning the resulting team-total leg a vig via the same `MEASURED_PROP_VIG`
+   constant (5.75%) the rest of this module already uses, rather than inventing a
+   separate vig model.
+4. **Data: pull the matching 2023 props batch first** — **executed 2026-08-22, same
+   day as scoping.** 285/285 games, 0 missing/failed/malformed, ~28,808 credits (a
+   2-game test confirmed Pinnacle first). This analysis now has the full 570-game
+   2023-2024 overlap the mainline historical pull already covers, matching it
+   exactly.
+
+**Real risks to watch when building, stated up front:**
+- The independence-across-teammates assumption is the single biggest simplification
+  -- if it's wrong in a specific, correctable direction (e.g., a bell-cow back who
+  vultures nearly all carries makes teammate correlation near-irrelevant, but a
+  committee backfield doesn't), the synthesized team-total price could be
+  systematically miscalibrated in a way this v1 won't detect on its own. Worth a
+  sanity check (does the synthesized team-total's realized hit-rate land near 50%,
+  the same "check the mean before trusting" discipline every Elo/pricing build in
+  this project already follows) before trusting any edge number it produces.
+- Passing yards has a much more natural "team total" reading (usually one real
+  starting QB per team per game) than rushing (often 2-3 backs with real shared
+  touches) -- the passing-yards version of this leg is likely more trustworthy than
+  the rushing-yards version out of the gate.
+
+**Built and run 2026-08-22 — same day as scoping.** `src/backtest/team_total_props.py`
+(3 functions: `build_team_total_lines`, `fit_team_total_residual_std`,
+`team_total_over_indicator`), 9 tests, reuses `correlated_props.py`'s
+`measure_leg_correlation`/`measure_leg_correlation_by_bucket`/`bucket_edge` unchanged.
+One real design refinement made during the build, not in the original scope: instead
+of summing assumed per-player variances under an independence assumption (needs
+unknown per-player sigma, and the assumption is known-wrong), `fit_team_total_residual_std`
+calibrates ONE real team-level residual std directly from
+`actual_team_total - implied_team_total_line` on real historical games — same leg
+definition, same sum-of-lines threshold, same pricing goal, just measured instead of
+guessed. Found a real, large systematic bias worth knowing about: summed player
+lines under-count real team totals by **+38.3 yards (rushing)** and **+10.1 yards
+(passing)** on average — expected, since only players with a posted prop line get
+summed, missing backup-RB/scramble/jet-sweep yardage; correctly bias-corrected
+before pricing, not ignored.
+
+**Result: real, and it replicates the exact same pattern the fixed-threshold legs
+found, using an independently-constructed leg definition.**
+
+| Stat | Bucket | n | Lift | p-value | Priced edge | 2023→2024 OOS |
+|---|---|---|---|---|---|---|
+| rushing | underdog | 473 | 1.192 | 2.8e-5 | **+6.6%** | 1.226→1.167 (holds) |
+| rushing | favorite | 303 | 1.091 | 2.6e-4 | -2.4% | 1.129→1.051 (shrinks, same leak as before) |
+| passing | underdog | 410 | 1.276 | 6.0e-5 | **+14.1%** | 1.311→1.216 (holds) |
+
+Permutation test (assumption-free, 10K shuffles): rushing pooled p=0.0001, passing
+pooled p=0.029 — both confirm the chi-square result independent of its asymptotic
+assumption. Folded into the existing 57-p-value BH-correction family (now 67) rather
+than a fresh one — 58/67 survive, all 3 significant team-total tests included.
+
+**Verdict: underdog-bucket team-total-clearing-its-own-line is a real, validated
+finding for both rushing and passing — same status as `correlated_props.py`'s own
+underdog/narrow buckets** (chi-square + permutation + honest out-of-sample, all
+three). The favorite-bucket rushing result repeats the EXACT failure mode
+`portfolio_validation` already found for the fixed-threshold legs: significant
+pooled, doesn't clear vig, shrinks out-of-sample — not tradeable, don't treat it as
+one. **Same honest ceiling as the original correlated-props edge numbers:** no real
+posted price exists for "sum of individual player lines," so this confirms the
+correlation mechanism is real, not a confirmed live exploit. Full write-up: paper
+§4.5 (new subsection), `notebooks/model_backtest_results.ipynb` (new section, 6
+cells).
 
 ---
 

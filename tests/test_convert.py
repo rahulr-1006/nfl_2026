@@ -3,7 +3,10 @@ import pytest
 from src.devig.convert import (
     american_to_decimal,
     american_to_implied_prob,
+    decimal_to_american,
     decimal_to_implied_prob,
+    implied_prob_to_american,
+    implied_prob_to_decimal,
 )
 
 
@@ -43,3 +46,38 @@ def test_round_trip_decimal_and_prob_stay_consistent(odds):
     p_direct = american_to_implied_prob(odds)
     assert p_via_decimal == pytest.approx(p_direct, rel=1e-9)
     assert 0 < p_direct < 1
+
+
+def test_implied_prob_to_decimal_is_one_over_p():
+    assert implied_prob_to_decimal(0.5) == pytest.approx(2.0)
+    assert implied_prob_to_decimal(0.25) == pytest.approx(4.0)
+
+
+def test_implied_prob_to_decimal_rejects_out_of_range():
+    with pytest.raises(ValueError):
+        implied_prob_to_decimal(0.0)
+    with pytest.raises(ValueError):
+        implied_prob_to_decimal(1.0)
+
+
+def test_decimal_to_american_known_values():
+    assert decimal_to_american(1.9090909) == -110
+    assert decimal_to_american(2.5) == 150
+
+
+def test_decimal_to_american_boundary_at_two_favors_positive_side():
+    # decimal == 2.0 is the even-money boundary -- should round-trip to +100, not
+    # fall into the negative-odds branch (off-by-one boundary bug this checks for).
+    assert decimal_to_american(2.0) == 100
+
+
+@pytest.mark.parametrize("odds", [-500, -200, -110, 100, 110, 200, 500])
+def test_american_decimal_american_round_trips(odds):
+    d = american_to_decimal(odds)
+    assert decimal_to_american(d) == odds
+
+
+@pytest.mark.parametrize("odds", [-500, -200, -110, 100, 110, 200, 500])
+def test_implied_prob_to_american_round_trips_through_the_forward_conversion(odds):
+    p = american_to_implied_prob(odds)
+    assert implied_prob_to_american(p) == odds
