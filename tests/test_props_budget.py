@@ -25,26 +25,64 @@ def test_entry_poll_does_not_fire_too_far_before_kickoff():
     assert decision.reason == "not_yet_in_window"
 
 
-def test_close_poll_fires_once_inside_the_closing_window():
-    kickoff = NOW + timedelta(hours=3)  # inside the default 6-hour closing window
+def test_second_target_poll_fires_once_inside_its_window():
+    # poll_targets_hours=[100.0, 10.0] -> poll #1 (poll_count=1) fires once <=10h to kickoff
+    kickoff = NOW + timedelta(hours=3)
     state = EventPollState(poll_count=1, last_polled_at=NOW - timedelta(days=2))
-    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000)
+    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000, poll_targets_hours=[100.0, 10.0])
     assert decision.should_poll
     assert decision.reason == "ok"
 
 
-def test_close_poll_does_not_fire_too_far_before_kickoff():
-    kickoff = NOW + timedelta(hours=20)  # outside the 6-hour closing window
+def test_second_target_poll_does_not_fire_too_far_before_its_target():
+    kickoff = NOW + timedelta(hours=20)
     state = EventPollState(poll_count=1, last_polled_at=NOW - timedelta(days=2))
-    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000)
+    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000, poll_targets_hours=[100.0, 10.0])
     assert not decision.should_poll
     assert decision.reason == "not_yet_in_window"
 
 
+def test_later_polls_walk_through_the_target_list_in_order():
+    # poll_targets_hours=[100.0, 10.0, 4.0] -> poll #2 (poll_count=2) waits
+    # for the THIRD target (4h), not the second (10h) -- confirms indexing.
+    kickoff = NOW + timedelta(hours=6)
+    state = EventPollState(poll_count=2, last_polled_at=NOW - timedelta(hours=4))
+    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000, poll_targets_hours=[100.0, 10.0, 4.0])
+    assert not decision.should_poll
+    assert decision.reason == "not_yet_in_window"
+
+
+def test_dense_poll_targets_hours_produces_the_expected_default_schedule():
+    from src.collect.props_budget import dense_poll_targets_hours
+
+    targets = dense_poll_targets_hours(dense_window_hours=48.0, dense_poll_interval_hours=2.0)
+    assert len(targets) == 24
+    assert targets[0] == 48.0
+    assert targets[-1] == 2.0
+
+
+def test_sparse_poll_targets_hours_covers_the_gap_before_the_dense_window():
+    from src.collect.props_budget import sparse_poll_targets_hours
+
+    targets = sparse_poll_targets_hours(posting_window_days=5.0, dense_window_hours=48.0, sparse_poll_interval_hours=8.0)
+    assert len(targets) == 9  # (120 - 48) / 8
+    assert targets[0] == 120.0  # fires as soon as the event enters the 5-day posting window
+    assert targets[-1] == 56.0  # last sparse target, just above the 48h dense-tier boundary
+    assert all(t > 48.0 for t in targets)  # sparse tier never overlaps the dense tier's own range
+
+
+def test_combined_poll_targets_hours_is_sparse_then_dense_in_descending_order():
+    from src.collect.props_budget import POLL_TARGETS_HOURS
+
+    assert list(POLL_TARGETS_HOURS) == sorted(POLL_TARGETS_HOURS, reverse=True)
+    assert POLL_TARGETS_HOURS[0] == 120.0  # first sparse target
+    assert POLL_TARGETS_HOURS[-1] == 2.0  # last dense target
+
+
 def test_already_fully_polled_events_are_skipped():
     kickoff = NOW + timedelta(hours=1)
-    state = EventPollState(poll_count=2, last_polled_at=NOW - timedelta(hours=5))
-    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000)
+    state = EventPollState(poll_count=1, last_polled_at=NOW - timedelta(hours=5))
+    decision = decide_props_poll(NOW, kickoff, state, remaining_credits=10000, poll_targets_hours=[10.0])
     assert not decision.should_poll
     assert decision.reason == "already_fully_polled"
 
@@ -72,14 +110,13 @@ def test_budget_exhaustion_is_ignored_when_credits_are_unknown():
     assert decision.should_poll
 
 
-def test_missed_entry_window_still_takes_a_first_poll_inside_closing_window():
-    # poll_count still 0 (entry never happened, e.g. service was down) but
-    # we're now inside the closing window -- better one late poll than none.
+def test_missed_first_poll_still_fires_close_to_kickoff():
+    # poll_count still 0 (first poll never happened, e.g. service was down)
+    # but we're now close to kickoff -- better one late poll than none.
+    # hours_to_kickoff=2 is well inside every target in the default combined
+    # schedule (first target is 120h out), so this should still fire.
     kickoff = NOW + timedelta(hours=2)
-    decision = decide_props_poll(NOW, kickoff, EventPollState(poll_count=0), remaining_credits=10000, closing_window_hours=6.0)
-    # Entry-poll branch only checks posting_window_days, and 2 hours is well
-    # inside the 5-day posting window too, so this should still fire as an
-    # entry poll -- confirms it doesn't fall through the cracks.
+    decision = decide_props_poll(NOW, kickoff, EventPollState(poll_count=0), remaining_credits=10000)
     assert decision.should_poll
 
 

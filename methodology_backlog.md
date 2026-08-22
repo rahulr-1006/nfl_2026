@@ -136,6 +136,71 @@ pursued further: sack-prop / QB-pressure-prop pricing using this as a feature.
 
 ---
 
+## 7. Training-window size — **checked, real effect, first non-Elo comparison to survive BH correction (in the negative direction)**
+
+Directly answers "are we using the full potential of the free data" — never actually
+tested before (only feature *content* was tested in #1-#6/the 6 failed feature
+attempts, never window *size*). Uses only already-cached `schedules_2015_2024.parquet`
+/`pbp_2015_2024.parquet` — zero new pull, nothing contingent on the Aug 22 Odds API
+credit reset (that's a separate data source, historical prop lines).
+
+3 window configs, same fixed holdout (`calib=[2022]`, `test=[2023,2024]`,
+`COMBINED_QB_FEATURE_COLUMNS`) as every other comparison; Elo/QB Elo recomputed from
+scratch per window (ratings restart at 1500 from the window's own start season, a
+faithful "what if we'd only ever had N years" simulation, not a row-count truncation):
+
+| Window | Train seasons | Games | Test Brier | Δ vs 7yr full | p-value | BH q=0.05 |
+|---|---|---|---|---|---|---|
+| 3yr_recent | 2019-2021 | 788 | 0.2265 | +0.0095 worse | **0.998** | survives (as a real degradation) |
+| 5yr_mid | 2017-2021 | 1285 | 0.2173 | +0.0003 worse | 0.63 | no (noise) |
+| 7yr_full (baseline) | 2015-2021 | 1743 | 0.2170 | — | — | — |
+
+Test set (570 games) verified byte-identical across all 3 configs via an in-notebook
+assertion. Final Elo rating mean landed at 1502.5 in all three (well-calibrated, no
+drift).
+
+**Result: cutting training to 3 recent seasons is a real, robust degradation — not
+noise (p=0.998, essentially the extreme tail of the permutation null). 5 seasons is
+statistically indistinguishable from 7 (p=0.63) — no measurable penalty from dropping
+2015-2016.** More history does matter, but with clear diminishing returns past ~5
+years within the currently-cached range. This does NOT test whether pre-2015 data
+(the R packages' 1999+ range) would help further — that's a separate, larger pull,
+still out of scope today; this experiment could only test cutting the existing window
+down, not extending it further back.
+
+---
+
+## 8. Mainline historical odds pull — **real gap found, fix queued for 2026-08-22**
+
+Every one of the 11 comparisons above (#1-#7, plus base Elo/GBM/garbage-time/QB Elo)
+scores "model vs. market" against **nflverse's own `home_moneyline`/`spread_line`
+columns** — `src/model/train.py`'s own docstring already flags this as "NOT confirmed
+to be Pinnacle." Every historical Odds API pull this project has done or planned
+(`props_historical.py`) has been player-props only — there has never been a
+game-level (h2h/spreads/totals) historical odds pull, so the "market baseline" every
+comparison above is benchmarked against has never been swapped for a confirmed-sharp
+price. Caught 2026-08-21 by the user directly questioning the rigor of the testing
+mechanic.
+
+Raised and rejected once before (2026-08-17) on the grounds that the Odds API's
+historical archive only starts 2020-06-06, so most of the 2015-2021 training window
+can't be Pinnacle-confirmed at any price. Still true — but that rejection
+under-weighted that **the current test set (2023-2024) is 100% inside the reachable
+2020+ range**, and #7 above just showed a 5-year training window performs identically
+to the full 7-year one, making a recent-years-leaning setup newly attractive rather
+than hypothetical.
+
+**Cost:** mainline markets (1-3 markets) are far cheaper than props (7 markets) — ~30
+credits/game vs. ~101/game. Pulling closing-line Pinnacle odds for the 570 test-set
+games (2023-2024) would cost ~17,100 credits.
+
+**Queued, not built:** fold into 2026-08-22's credit reset alongside the already-planned
+props batch 2 pull (~10,800 credits), one deliberate spending decision. See
+`mainline_historical_odds_reconsidered` memory for the exact reuse plan
+(`props_historical.py`'s pattern with `markets="h2h,spreads,totals"`).
+
+---
+
 ## Blocked on data, not on ideas
 
 - **Public betting-percentage fade / reverse line movement via bet %.** Real,

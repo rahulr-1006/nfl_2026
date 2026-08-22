@@ -26,6 +26,7 @@ from src.collect.props import (
     event_odds_to_prop_snapshots,
 )
 from src.collect.props_budget import (
+    POLLS_PER_EVENT,
     EventPollState,
     PropsCollectorState,
     decide_props_poll,
@@ -117,8 +118,8 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
             remaining_credits = response.remaining_credits
         polled += 1
         log.info(
-            "props tick: polled %s (%s), wrote %d snapshots, poll #%d/2, credits_remaining=%s",
-            match.event_id, event_id, len(snapshots), events[event_id].poll_count, response.remaining_credits,
+            "props tick: polled %s (%s), wrote %d snapshots, poll #%d/%d, credits_remaining=%s",
+            match.event_id, event_id, len(snapshots), events[event_id].poll_count, POLLS_PER_EVENT, response.remaining_credits,
         )
 
     save_state(ctx.state_path, PropsCollectorState(events=events, remaining_credits=remaining_credits))
