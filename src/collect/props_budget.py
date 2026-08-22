@@ -9,13 +9,29 @@ own week, not on a fixed calendar schedule. So this module decides, per
 event, whether to poll it *right now*: has it entered the posting window,
 has it already gotten its scheduled polls, and is there budget for it.
 
-**Two real polls per event, not one -- a genuine improvement over the
+**A two-tier schedule -- sparse "basic" polls, then dense rolling CLV
+polls -- not just an entry/close pair. A genuine improvement over the
 historical pull.** The historical props backfill (`props_historical.py`)
 was forced to a single near-kickoff snapshot per game because the
 historical endpoint costs 10x per call. Live polling doesn't have that
-multiplier, so this schedules an "entry" poll (as soon as the event enters
-the posting window) and a "close" poll (near kickoff) -- a real CLV pair
-for props, not just a closing-line snapshot, for the first time.
+multiplier, so this schedules two tiers: a **sparse** tier covering the
+period from when an event enters the `POSTING_WINDOW_DAYS` window down to
+`DENSE_WINDOW_HOURS` before kickoff (a "basic" poll every
+`SPARSE_POLL_INTERVAL_HOURS`, catching early posting and slow drift), then
+a **dense** tier for the final `DENSE_WINDOW_HOURS` before kickoff (every
+`DENSE_POLL_INTERVAL_HOURS`) -- real rolling CLV movement through the
+window that actually matters most, not just two point-in-time snapshots.
+Mirrors the mainline collector's own dense-window-near-kickoff philosophy
+(`src/collect/budget.py`'s `dense_window_hours`) rather than inventing a
+new schedule shape.
+
+**2026-08-22 correction: credits were never the real constraint on this --
+the schedule shape was.** At `DEFAULT_COST_PER_POLL` (14 credits, live
+per-event rate, no 10x historical multiplier), even this two-tier default
+costs well under the paid plan's monthly headroom for a full 285-game
+season -- see `props_polling_density` in project memory. The old 2-poll
+(entry+close) design undersampled movement not because credits ran out,
+but because nothing asked for more.
 
 **Uses the paid key, not the free one -- a deliberate resource-contention
 call.** The mainline collector's dense pre-kickoff polling (the actual
@@ -30,15 +46,51 @@ without touching the free tier at all -- see `src/collect/props_run.py`.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
 POSTING_WINDOW_DAYS = 5.0  # start attempting once a game is this close -- props rarely post earlier (confirmed live-checked multiple times this project, e.g. player_props_infra memory)
-CLOSING_WINDOW_HOURS = 6.0  # take the second ("close") poll once inside this window before kickoff
-POLLS_PER_EVENT = 2  # "entry" + "close" -- see module docstring
+DENSE_WINDOW_HOURS = 48.0  # the most critical window: dense rolling-CLV polling covers this many hours before kickoff -- matches the mainline collector's own "48h pre-slate" dense window
+DENSE_POLL_INTERVAL_HOURS = 2.0  # spacing between dense polls -- tune this (not POLLS_PER_EVENT directly) to go denser/sparser
+SPARSE_POLL_INTERVAL_HOURS = 8.0  # spacing for "basic" polls covering the period BEFORE the dense window kicks in (POSTING_WINDOW_DAYS out down to DENSE_WINDOW_HOURS)
 DEFAULT_COST_PER_POLL = 14  # regions=us,eu x 7 markets, theoretical max (real blended cost runs lower -- see props_ev_backtest memory, ~101/10=~10/event on the historical endpoint's 10x rate)
 DEFAULT_SAFETY_RESERVE_CREDITS = 500  # large relative to a single poll's cost -- props credits are meant to leave headroom for a possible future historical batch 2, not be spent to the floor
+
+
+def dense_poll_targets_hours(dense_window_hours: float = DENSE_WINDOW_HOURS, dense_poll_interval_hours: float = DENSE_POLL_INTERVAL_HOURS) -> list[float]:
+    """Descending list of hours-before-kickoff targets for the dense
+    ("most critical") polling tier, from `dense_window_hours` out down to
+    one interval before kickoff -- default 48/2 = 24 targets.
+    """
+    n = max(1, round(dense_window_hours / dense_poll_interval_hours))
+    return [dense_window_hours - i * dense_poll_interval_hours for i in range(n)]
+
+
+def sparse_poll_targets_hours(
+    posting_window_days: float = POSTING_WINDOW_DAYS,
+    dense_window_hours: float = DENSE_WINDOW_HOURS,
+    sparse_poll_interval_hours: float = SPARSE_POLL_INTERVAL_HOURS,
+) -> list[float]:
+    """Descending list of hours-before-kickoff targets for the sparse
+    ("basic") polling tier -- covers the gap between an event entering the
+    `posting_window_days` window and the dense tier taking over at
+    `dense_window_hours`. The first target lands exactly at
+    `posting_window_days*24` hours before kickoff, so this tier's first
+    poll fires as soon as the event enters the window (same "catch it
+    early" behavior the old single entry poll had) -- default 8h spacing
+    across the 120h-to-48h gap = 9 targets.
+    """
+    span_hours = posting_window_days * 24.0 - dense_window_hours
+    n = max(1, round(span_hours / sparse_poll_interval_hours))
+    return [dense_window_hours + span_hours - i * sparse_poll_interval_hours for i in range(n)]
+
+
+SPARSE_POLL_TARGETS_HOURS = sparse_poll_targets_hours()
+DENSE_POLL_TARGETS_HOURS = dense_poll_targets_hours()
+POLL_TARGETS_HOURS = SPARSE_POLL_TARGETS_HOURS + DENSE_POLL_TARGETS_HOURS  # combined, descending -- what decide_props_poll actually walks
+POLLS_PER_EVENT = len(POLL_TARGETS_HOURS)  # derived, don't hardcode this elsewhere
 
 
 @dataclass(frozen=True)
@@ -108,22 +160,24 @@ def decide_props_poll(
     event_state: EventPollState,
     remaining_credits: int | None,
     *,
-    posting_window_days: float = POSTING_WINDOW_DAYS,
-    closing_window_hours: float = CLOSING_WINDOW_HOURS,
-    polls_per_event: int = POLLS_PER_EVENT,
+    poll_targets_hours: Sequence[float] = POLL_TARGETS_HOURS,
     cost_per_poll: int = DEFAULT_COST_PER_POLL,
     safety_reserve_credits: int = DEFAULT_SAFETY_RESERVE_CREDITS,
 ) -> PropsPollDecision:
     """Should this specific event be polled right now?
 
-    Entry poll: fires once the event is within `posting_window_days` of
-    kickoff and hasn't been polled yet. Close poll: fires once inside
-    `closing_window_hours` of kickoff, if the entry poll already happened
-    (or, if the entry window was somehow missed entirely -- e.g. the
-    service was down -- this still takes a first poll here rather than
-    getting nothing at all).
+    `poll_targets_hours` is a single descending list of hours-before-kickoff
+    targets -- the sparse ("basic") tier concatenated with the dense
+    ("most critical," 48h pre-kickoff) tier, see `sparse_poll_targets_hours()`
+    / `dense_poll_targets_hours()`. Poll N (`event_state.poll_count == N`)
+    fires once `now` has crossed `poll_targets_hours[N]`. The first target
+    sits at exactly `POSTING_WINDOW_DAYS*24` hours before kickoff, so poll 0
+    fires as soon as the event enters the posting window -- if that window
+    was somehow missed entirely (e.g. the service was down), this still
+    fires on whatever the next un-taken target is, rather than waiting for
+    every earlier target to "catch up" -- better a late poll than none.
     """
-    if event_state.poll_count >= polls_per_event:
+    if event_state.poll_count >= len(poll_targets_hours):
         return PropsPollDecision(False, "already_fully_polled")
 
     if now >= kickoff:
@@ -133,14 +187,7 @@ def decide_props_poll(
         return PropsPollDecision(False, "budget_exhausted")
 
     hours_to_kickoff = (kickoff - now).total_seconds() / 3600.0
-    days_to_kickoff = hours_to_kickoff / 24.0
-
-    if event_state.poll_count == 0:
-        if days_to_kickoff <= posting_window_days:
-            return PropsPollDecision(True, "ok")
-        return PropsPollDecision(False, "not_yet_in_window")
-
-    # poll_count == 1: waiting for the closing window
-    if hours_to_kickoff <= closing_window_hours:
+    next_target = poll_targets_hours[event_state.poll_count]
+    if hours_to_kickoff <= next_target:
         return PropsPollDecision(True, "ok")
     return PropsPollDecision(False, "not_yet_in_window")

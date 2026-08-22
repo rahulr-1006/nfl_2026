@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 
 from src.collect.client import OddsApiError, OddsApiResponse
 from src.collect.props_budget import (
+    POLLS_PER_EVENT,
     EventPollState,
     PropsCollectorState,
     load_state,
@@ -108,7 +109,7 @@ def test_tick_persists_per_event_poll_state(tmp_path):
     assert state.remaining_credits == 19900
 
 
-def test_tick_does_not_repoll_an_event_already_at_two_polls(tmp_path):
+def test_tick_does_not_repoll_an_event_already_fully_polled(tmp_path):
     client = MagicMock()
     commence = (NOW + timedelta(hours=3)).isoformat().replace("+00:00", "Z")
     client.get_events.return_value = OddsApiResponse(
@@ -117,7 +118,7 @@ def test_tick_does_not_repoll_an_event_already_at_two_polls(tmp_path):
     )
     save_state(
         tmp_path / "props_state.json",
-        PropsCollectorState(events={"evt_done": EventPollState(poll_count=2, last_polled_at=NOW - timedelta(days=1))}),
+        PropsCollectorState(events={"evt_done": EventPollState(poll_count=POLLS_PER_EVENT, last_polled_at=NOW - timedelta(days=1))}),
     )
     ctx = _ctx(tmp_path, client)
 

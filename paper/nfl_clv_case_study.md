@@ -1659,6 +1659,40 @@ now rest/travel all fail the same way, on a mechanistically different feature ea
 time. That consistency keeps pointing at the same conclusion -- the constraint is
 dataset size (~1,690-1,740 training games), not a missing feature.
 
+**Comparison #10 & #11, training-window size — the first direct test of the "dataset
+size" claim above, not another feature-content check.** Every comparison #1-#9 tested
+whether adding a new feature helps; none tested whether the training window's *size*
+itself was the real constraint, despite the paragraph above naming dataset size as the
+likely cause. Prompted directly by the user questioning whether this project was
+"using the full potential" of free `nflverse` data (whose R packages advertise
+coverage back to 1999). Tested with data already cached (`schedules_2015_2024.parquet`
+/`pbp_2015_2024.parquet`) — no new pull. Same fixed holdout as #1-#9
+(`calib_seasons=[2022]`, `test_seasons=[2023, 2024]`), same `COMBINED_QB_FEATURE_COLUMNS`,
+3 window configs with Elo/QB Elo **recomputed from scratch per window** (ratings
+restart at 1500 from that window's own start season -- a faithful "what if we'd only
+ever had N years" simulation, not a row-count truncation of features fit on the full
+history). Test set (570 games) verified byte-identical across all 3 configs.
+
+| Window | Train seasons | Games | Test Brier | Δ vs 7yr full | p-value |
+|---|---|---|---|---|---|
+| 3yr_recent | 2019-2021 | 788 | 0.2265 | +0.0095 worse | **0.998** |
+| 5yr_mid | 2017-2021 | 1285 | 0.2173 | +0.0003 worse | 0.63 (noise) |
+| 7yr_full (baseline) | 2015-2021 | 1743 | 0.2170 | -- | -- |
+
+**Result: real, and it complicates the "dataset size" framing above rather than
+simply confirming it.** Cutting to 3 recent seasons is a genuine, robust degradation
+(p=0.998 -- essentially the extreme tail of the permutation null, not noise) -- more
+history clearly does help down to a point. But 5 seasons is statistically
+indistinguishable from 7 (p=0.63) -- the marginal 2015-2016 seasons add nothing
+detectable. So "dataset size" isn't simply linear-more-is-better within the cached
+range; there's a real floor around 3 years and a plateau by ~5. That plateau is itself
+evidence *against* one version of the "just needs more data" hypothesis for the 6
+failed feature attempts above -- if those features' true signal were being masked by
+insufficient sample size, adding 2015-2016 back in (going from 5yr to 7yr) should have
+moved something, and it didn't. This does not test whether pre-2015 data (1999+) would
+help -- that's a separate, larger pull, out of scope here; this experiment could only
+test cutting the existing window down, not extending further back.
+
 **Sample size.** The live 2026 CLV result (§5.3) is a single season's worth of bets
 against a fixed $100 bankroll — the paper's own framing throughout (§4.6, §5.5) is that
 this demonstrates correct method, not a claim about long-run profitability at any
