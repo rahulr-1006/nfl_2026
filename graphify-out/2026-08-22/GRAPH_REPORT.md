@@ -1,16 +1,16 @@
-# Graph Report - nfl_2026  (2026-08-21)
+# Graph Report - nfl_2026  (2026-08-22)
 
 ## Corpus Check
-- 126 files · ~98,763 words
+- 129 files · ~102,746 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1442 nodes · 3734 edges · 72 communities (65 shown, 7 thin omitted)
-- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 533 edges (avg confidence: 0.52)
+- 1480 nodes · 3836 edges · 76 communities (69 shown, 7 thin omitted)
+- Extraction: 86% EXTRACTED · 14% INFERRED · 0% AMBIGUOUS · INFERRED: 545 edges (avg confidence: 0.52)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `e2fbe52f`
+- Built from commit: `7a5cc9b6`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -18,8 +18,8 @@
 - Side
 - scheduler.py
 - test_evaluate.py
-- preseason.py
-- test_train.py
+- OddsApiError
+- test_margin_total.py
 - props.py
 - 4. Methodology
 - Parking lot
@@ -38,16 +38,16 @@
 - CLAUDE.md
 - .claude/CLAUDE.md
 - extraction-spec.md
-- Outcome
-- test_middling.py
-- test_props_ev_backtest.py
+- test_prop_settlement.py
+- Market
+- PointInTimeStore
 - 3. Data
 - test_elo.py
 - NFL CLV Case Study: Blueprint
 - OddsSnapshot
-- transform.py
+- MatchResult
 - Methodology backlog
-- test_correlated_props.py
+- correlated_props.py
 - OddsApiClient
 - Beating the Close, Not the Book: A CLV-First Case Study of NFL Betting Markets
 - 5. Results
@@ -55,46 +55,50 @@
 - 6. Discussion
 - 2. Background and Related Work
 - test_props_scheduler.py
-- calibration.py
 - schema.py
+- market_baseline
 - test_individual_pass_rush_elo.py
 - test_game_level_features.py
 - test_validation.py
 - test_backtest_engine.py
 - test_steam.py
 - test_pass_rush_elo.py
-- PointInTimeStore
-- middle_scan.py
+- test_sizing.py
 - engine.py
-- fit_margin_model
+- test_train.py
+- calibration.py
 - compute_qb_elo_ratings
-- test_margin_total.py
-- market_baseline
-- ValueError
+- OddsApiResponse
+- middle_scan.py
+- test_load_static.py
 - compute_receiver_elo_ratings
-- train.py
-- props_scheduler.py
+- test_correlated_props.py
+- test_steam_scan.py
+- measure_leg_correlation
+- correlated_edge
 - elo_win_probability
+- build_training_frame
+- bucket_favorite_strength
 
 ## God Nodes (most connected - your core abstractions)
 1. `Side` - 140 edges
 2. `Market` - 122 edges
-3. `PointInTimeStore` - 108 edges
-4. `OddsApiClient` - 43 edges
-5. `OddsSnapshot` - 43 edges
+3. `PointInTimeStore` - 110 edges
+4. `OddsApiClient` - 46 edges
+5. `OddsSnapshot` - 46 edges
 6. `Outcome` - 32 edges
 7. `OddsApiResponse` - 31 edges
 8. `settle()` - 30 edges
-9. `OddsApiError` - 27 edges
-10. `MatchResult` - 26 edges
+9. `OddsApiError` - 29 edges
+10. `MatchResult` - 29 edges
 
 ## Surprising Connections (you probably didn't know these)
-- `test_middle_opportunity_rejects_an_invalid_window()` --uses--> `MiddleOpportunity`  [INFERRED]
-  tests/test_middling.py → src/backtest/middling.py
-- `test_middle_opportunity_window_width()` --uses--> `MiddleOpportunity`  [INFERRED]
-  tests/test_middling.py → src/backtest/middling.py
-- `test_poll_once_never_raises_on_api_error()` --uses--> `OddsApiError`  [INFERRED]
-  tests/test_collect_preseason.py → src/collect/client.py
+- `test_favorite_and_underdog_decimal_conversion()` --calls--> `american_to_decimal()`  [INFERRED]
+  tests/test_schema.py → src/devig/convert.py
+- `test_get_odds_raises_odds_api_error_on_other_bad_status()` --uses--> `OddsApiError`  [INFERRED]
+  tests/test_collect_client.py → src/collect/client.py
+- `test_get_odds_retries_network_errors_then_raises()` --uses--> `OddsApiError`  [INFERRED]
+  tests/test_collect_client.py → src/collect/client.py
 - `test_backfill_historical_props_records_api_failures_without_raising()` --uses--> `OddsApiError`  [INFERRED]
   tests/test_collect_props_historical.py → src/collect/client.py
 - `test_poll_all_props_records_failed_calls_without_raising()` --uses--> `OddsApiError`  [INFERRED]
@@ -103,11 +107,11 @@
 ## Import Cycles
 - None detected.
 
-## Communities (72 total, 7 thin omitted)
+## Communities (76 total, 7 thin omitted)
 
 ### Community 0 - "Side"
-Cohesion: 0.24
-Nodes (26): Market, str, Side, Batch-grade snapshot-shaped rows (event_id, market, side, line columns) against…, Grade a single (market, side, line) bet against a final score., settle(), settle_snapshots(), test_middle_opportunity_rejects_an_invalid_window() (+18 more)
+Cohesion: 0.16
+Nodes (36): Side, build_results_index(), GameResult, Outcome, _outcome_from_margin(), DataFrame, Enum, str (+28 more)
 
 ### Community 1 - "scheduler.py"
 Cohesion: 0.05
@@ -117,13 +121,13 @@ Nodes (82): CollectorState, current_period_end(), decide_poll(), _game_interval_
 Cohesion: 0.12
 Nodes (27): brier_score(), log_loss(), power_analysis(), DataFrame, ndarray, Model evaluation (blueprint Part B.5). "This section is where you prove you are…, mean((p - y)^2). Lower is better., -mean(y*log(p) + (1-y)*log(1-p)). p is clipped away from exactly 0/1 so a… (+19 more)
 
-### Community 3 - "preseason.py"
-Cohesion: 0.18
-Nodes (20): build_preseason_match(), main(), poll_once(), Preseason dry-run collector: same collection mechanics as the real season…, One poll: fetch, match, transform, write. Returns counts for logging/testing --…, Build a MatchResult straight from the Odds API event, no nflverse schedule…, load_team_name_map(), Path (+12 more)
+### Community 3 - "OddsApiError"
+Cohesion: 0.16
+Nodes (23): OddsApiError, RuntimeError, Network or unexpected-response failure talking to The Odds API., build_preseason_match(), main(), poll_once(), Preseason dry-run collector: same collection mechanics as the real season…, One poll: fetch, match, transform, write. Returns counts for logging/testing --… (+15 more)
 
-### Community 4 - "test_train.py"
-Cohesion: 0.21
-Nodes (22): HistGradientBoostingClassifier, build_training_frame(), fit_gbm_model(), DataFrame, Three-way, out-of-time split: fit the model on `train_seasons`, fit the…, Gradient-boosted trees on `feature_columns` -- blueprint Part E's other…, One row per game: `build_game_features()` output plus the home-win label and…, time_based_split() (+14 more)
+### Community 4 - "test_margin_total.py"
+Cohesion: 0.20
+Nodes (23): fit_residual_std(), predict_over_proba(), Std of (actual - predicted) on `calib_df` -- a regression analogue of…, P(actual > line) under Normal(predicted_mean, residual_std) -- a v1…, build_margin_total_frame(), fit_margin_model(), `build_training_frame()`'s output plus spread/total regression targets and…, Standardized linear regression predicting `margin` (home_score - away_score) --… (+15 more)
 
 ### Community 5 - "props.py"
 Cohesion: 0.16
@@ -169,17 +173,17 @@ Nodes (3): For git commit hook, For native CLAUDE.md integration, graphify refer
 Cohesion: 0.50
 Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphify reference: incremental update and cluster-only
 
-### Community 35 - "Outcome"
-Cohesion: 0.15
-Nodes (27): build_player_stats_index(), normalize_player_name(), DataFrame, Settlement for player-prop (Over/Under) bets against nflverse's per-player game…, Batch-grade prop-shaped rows (event_id/game_id, player_name, prop_stat, side,…, Collapse punctuation/whitespace differences between an odds book's player name…, (game_id, player_display_name) -> {stat_column: value}, from nflreadpy's…, Grade a single Over/Under prop bet. Pushes are real for integer-valued stats… (+19 more)
+### Community 35 - "test_prop_settlement.py"
+Cohesion: 0.09
+Nodes (45): build_team_total_lines(), fit_team_total_residual_std(), DataFrame, Series, Team-total rushing/passing yards vs. moneyline correlation…, (mean_residual, residual_std) of `actual_team_total - implied_team_total_line`…, Boolean: did the team's real total clear its own real implied line -- the leg…, One row per (event_id, team) with real Pinnacle data for `prop_stat`:… (+37 more)
 
-### Community 36 - "test_middling.py"
-Cohesion: 0.07
-Nodes (58): best_middle_for_game(), find_middle_opportunities(), _interval_prob(), line_threshold(), middle_ev(), middle_window(), MiddleOpportunity, pinnacle_reference_line() (+50 more)
-
-### Community 37 - "test_props_ev_backtest.py"
+### Community 36 - "Market"
 Cohesion: 0.08
-Nodes (52): find_arbitrage_spots(), find_prop_ev_spots(), pinnacle_fair_probs(), DataFrame, Timedelta, Cross-book player-prop strategies that don't rely on market timing: (1) a…, One row per (event, player, prop_stat, line, side, book) where `book`'s price…, One row per (event, player, prop_stat, line, capture_time) where the best… (+44 more)
+Nodes (65): _best_line(), best_middle_for_game(), find_middle_opportunities(), _interval_prob(), line_threshold(), middle_ev(), middle_window(), MiddleOpportunity (+57 more)
+
+### Community 37 - "PointInTimeStore"
+Cohesion: 0.06
+Nodes (77): main(), make_synthetic_snapshots(), datetime, End-to-end pipeline demo: pull -> store -> compare -> decide -> notify. `make…, _step(), main(), Live +EV monitor entrypoint: `python -m src.notify.monitor_run`. Meant to be…, One scan-and-alert cycle. Returns the number of alerts actually sent. Never… (+69 more)
 
 ### Community 38 - "3. Data"
 Cohesion: 0.18
@@ -194,24 +198,24 @@ Cohesion: 0.06
 Nodes (34): A simple, honest first model, B.1 Odds to implied probability, B.2 The vig, and why devigging is the real work, B.3 Closing Line Value, B.4 Bet sizing, B.5 Evaluation and, above all, sample size, Free static data, for backtester and baselines (cost: 0), Live intraday data, self-collected (the thing you cannot buy cheap) (+26 more)
 
 ### Community 41 - "OddsSnapshot"
-Cohesion: 0.16
-Nodes (22): BaseModel, OddsApiResponse, backfill_historical_props(), find_historical_event_id(), pull_historical_prop_snapshot(), datetime, Historical player-prop odds backfill for backtesting. **Blocked on paid…, 1 credit. Looks up the historical events list as of `date` and returns the Odds… (+14 more)
+Cohesion: 0.15
+Nodes (21): BaseModel, backfill_historical_props(), find_historical_event_id(), pull_historical_prop_snapshot(), datetime, Historical player-prop odds backfill for backtesting. **Blocked on paid…, 1 credit. Looks up the historical events list as of `date` and returns the Odds…, One historical snapshot (nearest available <= `date`) for one or more markets… (+13 more)
 
-### Community 42 - "transform.py"
-Cohesion: 0.17
-Nodes (28): build_team_name_map(), DataFrame, full team name -> abbreviation, restricted to abbrs used in `schedule`., build_schedule_index(), event_to_snapshots(), match_event(), MatchResult, DataFrame (+20 more)
+### Community 42 - "MatchResult"
+Cohesion: 0.13
+Nodes (34): backfill_historical_mainline(), pull_historical_mainline_snapshot(), datetime, Historical mainline (h2h/spreads/totals) odds backfill. **The rigor fix from…, One historical mainline snapshot (nearest available <= `date`) for one event --…, `games`: iterable of (match, home_name, away_name, kickoff) -- same shape as…, build_team_name_map(), DataFrame (+26 more)
 
 ### Community 43 - "Methodology backlog"
-Cohesion: 0.18
-Nodes (10): 1. Rest/travel differential — **tested, negative result**, 2. Joint margin/total correlated distribution — **checked, premise doesn't hold**, 3. Steam detection — **built and live-validated**, 4. Player-prop middling — idea, blocked on live props posting, 5. Referee tendencies — **checked, no signal found (correcting an earlier wrong "blocked" claim)**, 6. Individual pass-rush rating — **built, corrects an earlier wrong "not buildable" claim**, 7. Training-window size — **checked, real effect, first non-Elo comparison to survive BH correction (in the negative direction)**, 8. Mainline historical odds pull — **real gap found, fix queued for 2026-08-22** (+2 more)
+Cohesion: 0.17
+Nodes (11): 1. Rest/travel differential — **tested, negative result**, 2. Joint margin/total correlated distribution — **checked, premise doesn't hold**, 3. Steam detection — **built and live-validated**, 4. Player-prop middling — idea, blocked on live props posting, 5. Referee tendencies — **checked, no signal found (correcting an earlier wrong "blocked" claim)**, 6. Individual pass-rush rating — **built, corrects an earlier wrong "not buildable" claim**, 7. Training-window size — **checked, real effect, first non-Elo comparison to survive BH correction (in the negative direction)**, 8. Mainline historical odds pull — **executed, gap confirmed real but numerically inconsequential** (+3 more)
 
-### Community 44 - "test_correlated_props.py"
-Cohesion: 0.07
-Nodes (59): bucket_edge(), bucket_favorite_strength(), build_team_game_outcomes(), correlated_edge(), estimate_game_specific_joint_prob(), is_bucket_validated(), measure_leg_correlation(), measure_leg_correlation_by_bucket() (+51 more)
+### Community 44 - "correlated_props.py"
+Cohesion: 0.16
+Nodes (17): estimate_game_specific_joint_prob(), is_bucket_validated(), price_bucket_bet(), Correlated same-game outcome mispricing: do event pairs from the same game co-…, Game-specific estimate of P(A and B), for pricing one particular upcoming game…, Whether `bucket` (one of `FAVORITE_BUCKETS`' labels) has survived an honest…, Raised by `price_bucket_bet` when asked to price a favorite/ heavy_favorite…, The one real pricing entrypoint any future live correlated-props scanner should… (+9 more)
 
 ### Community 45 - "OddsApiClient"
-Cohesion: 0.10
-Nodes (34): Response, Session, OddsApiClient, OddsApiError, _parse_int_header(), _parse_iso(), datetime, RuntimeError (+26 more)
+Cohesion: 0.22
+Nodes (20): Session, OddsApiClient, RateLimitExceeded, The API rejected the request for quota/auth reasons (401/402/429)., parametrize, _response(), test_get_event_odds_hits_the_per_event_url(), test_get_event_odds_raises_rate_limit_exceeded_like_get_odds() (+12 more)
 
 ### Community 46 - "Beating the Close, Not the Book: A CLV-First Case Study of NFL Betting Markets"
 Cohesion: 0.25
@@ -234,16 +238,16 @@ Cohesion: 0.50
 Nodes (4): 2.1 Market efficiency in sports betting, 2.2 Closing Line Value as an edge proxy, 2.3 Prior work, 2. Background and Related Work
 
 ### Community 51 - "test_props_scheduler.py"
-Cohesion: 0.13
-Nodes (36): decide_props_poll(), EventPollState, load_state(), PropsCollectorState, PropsPollDecision, datetime, Path, Budget-aware polling cadence for player props -- a different scheduling problem… (+28 more)
+Cohesion: 0.09
+Nodes (50): decide_props_poll(), dense_poll_targets_hours(), EventPollState, load_state(), PropsCollectorState, PropsPollDecision, datetime, Path (+42 more)
 
-### Community 52 - "calibration.py"
-Cohesion: 0.18
-Nodes (17): CalibratedClassifierCV, compare_to_baseline(), fit_calibrated_model(), predict_calibrated_proba(), Pipeline, Series, Calibration layer (blueprint Part E): Platt scaling / isotonic regression on…, `method`: "isotonic" (non-parametric, flexible, can overfit a small calibration… (+9 more)
+### Community 52 - "schema.py"
+Cohesion: 0.20
+Nodes (12): datetime, Enum, Point-in-time odds snapshot schema. One row = one price, for one side, at one…, Build a snapshot from an American price, deriving decimal + implied prob., utcnow(), _snap(), test_favorite_and_underdog_decimal_conversion(), test_from_american_derives_decimal_and_prob() (+4 more)
 
-### Community 53 - "schema.py"
-Cohesion: 0.06
-Nodes (56): model_validator, beat_rate(), bootstrap_ci(), clv_price(), clv_probability(), Closing Line Value metrics (blueprint Part B.3). CLV is measured two ways --…, How far the fair market moved toward your side after you bet. Positive means…, Whether the decimal price you took beats the closing price for the same side.… (+48 more)
+### Community 53 - "market_baseline"
+Cohesion: 0.05
+Nodes (75): model_validator, find_arbitrage_spots(), find_prop_ev_spots(), pinnacle_fair_probs(), DataFrame, Timedelta, Cross-book player-prop strategies that don't rely on market timing: (1) a…, One row per (event, player, prop_stat, line, side, book) where `book`'s price… (+67 more)
 
 ### Community 54 - "test_individual_pass_rush_elo.py"
 Cohesion: 0.21
@@ -262,80 +266,96 @@ Cohesion: 0.37
 Nodes (17): BacktestEngine, BetOrder, DecisionPoint, What a strategy sees when it's given a chance to act. `visible_snapshots` is…, A strategy's decision to bet, returned from a Strategy callable. None means "no…, _always_bet_home_spread(), _never_bet(), _schedule() (+9 more)
 
 ### Community 58 - "test_steam.py"
-Cohesion: 0.07
-Nodes (52): book_moves(), BookMove, detect_steam_move(), find_steam_opportunities(), _interval_prob(), _largest_time_cluster(), price_stale_book_opportunity(), DataFrame (+44 more)
+Cohesion: 0.10
+Nodes (41): book_moves(), BookMove, detect_steam_move(), find_steam_opportunities(), _interval_prob(), _largest_time_cluster(), price_stale_book_opportunity(), DataFrame (+33 more)
 
 ### Community 59 - "test_pass_rush_elo.py"
 Cohesion: 0.22
 Nodes (17): compute_pass_rush_elo_ratings(), credited_pressure_counts(), DataFrame, Pass-rush Elo: a play-level, team-level rating of pass-rush vs. pass-protection…, Raw per-player counts of sacks (full credit), half-sacks (0.5 credit), and QB…, One row per dropback: `posteam`'s pass-protection Elo and `defteam`'s pass-rush…, _pbp(), test_clean_pocket_lowers_rush_elo_and_raises_protection_elo() (+9 more)
 
-### Community 60 - "PointInTimeStore"
-Cohesion: 0.06
-Nodes (77): main(), make_synthetic_snapshots(), datetime, End-to-end pipeline demo: pull -> store -> compare -> decide -> notify. `make…, _step(), main(), Live +EV monitor entrypoint: `python -m src.notify.monitor_run`. Meant to be…, One scan-and-alert cycle. Returns the number of alerts actually sent. Never… (+69 more)
+### Community 60 - "test_sizing.py"
+Cohesion: 0.14
+Nodes (27): apply_bankroll_caps(), expected_value(), fractional_kelly(), kelly_fraction(), Expected value and Kelly bet sizing (blueprint Part B.4). Full Kelly is too…, EV of a unit bet at fair win probability p and decimal odds d., Full Kelly fraction of bankroll. Can be negative when the price is bad at this…, k * full Kelly. k in [0.25, 0.5] per the blueprint; default 0.375 is the… (+19 more)
 
-### Community 61 - "middle_scan.py"
-Cohesion: 0.18
-Nodes (17): fit_residual_stds(), main(), DataFrame, Middle-scan entrypoint: `python -m src.backtest.middle_scan`. A manual, run-by-…, (sigma_margin, sigma_total) for LIVE pricing -- not the research evaluation…, One scan. Returns the report DataFrame (also logged); never sends any…, run(), fit_total_model() (+9 more)
-
-### Community 62 - "engine.py"
+### Community 61 - "engine.py"
 Cohesion: 0.23
-Nodes (12): BacktestBet, _latest_fair_prob(), _latest_price(), _parse_kickoffs(), _payout(), DataFrame, datetime, Series (+4 more)
+Nodes (12): BacktestBet, latest_fair_prob(), _latest_price(), _parse_kickoffs(), _payout(), DataFrame, datetime, Series (+4 more)
 
-### Community 63 - "fit_margin_model"
-Cohesion: 0.22
-Nodes (14): fit_residual_std(), predict_over_proba(), predict_over_proba_empirical(), DataFrame, ndarray, Std of (actual - predicted) on `calib_df` -- a regression analogue of…, P(actual > line) under Normal(predicted_mean, residual_std) -- a v1…, Same question as `predict_over_proba` -- P(actual > line) -- but without… (+6 more)
+### Community 62 - "test_train.py"
+Cohesion: 0.20
+Nodes (19): HistGradientBoostingClassifier, Protocol, fit_gbm_model(), fit_win_probability_model(), predict_home_win_proba(), _ProbaClassifier, DataFrame, ndarray (+11 more)
+
+### Community 63 - "calibration.py"
+Cohesion: 0.16
+Nodes (19): CalibratedClassifierCV, compare_to_baseline(), fit_calibrated_model(), predict_calibrated_proba(), predict_over_proba_empirical(), DataFrame, ndarray, Pipeline (+11 more)
 
 ### Community 64 - "compute_qb_elo_ratings"
 Cohesion: 0.33
 Nodes (10): compute_qb_elo_ratings(), DataFrame, QB-level Elo: a residual rating crediting individual quarterback performance…, One row per game: each starting QB's Elo rating *entering* that game (pre-game,…, _schedule(), test_backup_qb_starts_are_tracked_as_a_distinct_rating_from_the_starter(), test_first_start_for_every_qb_begins_at_initial_rating(), test_qb_rating_carries_across_games_not_reset() (+2 more)
 
-### Community 65 - "test_margin_total.py"
-Cohesion: 0.42
-Nodes (12): build_margin_total_frame(), `build_training_frame()`'s output plus spread/total regression targets and…, _pbp_fixture(), _plays(), DataFrame, _schedule_fixture(), test_build_margin_total_frame_computes_margin_and_total(), test_home_covers_flips_when_home_is_a_big_enough_underdog() (+4 more)
+### Community 65 - "OddsApiResponse"
+Cohesion: 0.17
+Nodes (12): Response, OddsApiResponse, _parse_int_header(), _parse_iso(), datetime, Thin HTTP wrapper around The Odds API. Talks to The Odds API directly (not…, Historical per-event odds, snapshotted at the nearest available timestamp <=…, Shared retry/error-handling for both endpoints. Returns the raw successful… (+4 more)
 
-### Community 66 - "market_baseline"
-Cohesion: 0.39
-Nodes (6): market_baseline(), Market baseline (blueprint Part E). "Your baseline is the devigged Pinnacle…, Fair probability for the side at `side_index`, from Pinnacle's raw American…, test_default_method_is_shin(), test_side_index_selects_the_right_side(), test_symmetric_market_gives_half_regardless_of_method()
+### Community 66 - "middle_scan.py"
+Cohesion: 0.19
+Nodes (16): fit_residual_stds(), main(), DataFrame, Middle-scan entrypoint: `python -m src.backtest.middle_scan`. A manual, run-by-…, (sigma_margin, sigma_total) for LIVE pricing -- not the research evaluation…, One scan. Returns the report DataFrame (also logged); never sends any…, run(), fit_total_model() (+8 more)
 
-### Community 67 - "ValueError"
-Cohesion: 0.13
-Nodes (22): _best_line(), Series, The single most favorable real line observed for this side, exploiting…, home_spread_line(), Convert nflverse's spread_line into the sportsbook side-line convention that…, build_results_index(), GameResult, _outcome_from_margin() (+14 more)
+### Community 67 - "test_load_static.py"
+Cohesion: 0.32
+Nodes (7): home_spread_line(), Convert nflverse's spread_line into the sportsbook side-line convention that…, Regression guard for the sign-convention bug: feeding nflverse's raw…, Regression guard for the trimmed-schema cache: src/model/features.py depends on…, test_cached_pbp_matches_trimmed_schema_and_covers_the_cached_seasons(), test_home_spread_line_negates(), test_home_spread_line_sign_convention_matches_an_efficient_market()
 
 ### Community 68 - "compute_receiver_elo_ratings"
 Cohesion: 0.29
 Nodes (13): compute_receiver_elo_ratings(), DataFrame, Receiver-level Elo: a play-level rating for pass-catchers, run against a…, One row per target (pass play with a recorded receiver): the receiver's and the…, _pbp(), test_different_receivers_and_defenses_tracked_independently(), test_failed_target_lowers_receiver_and_raises_defense(), test_first_target_begins_at_initial_rating() (+5 more)
 
-### Community 69 - "train.py"
-Cohesion: 0.38
-Nodes (5): Protocol, predict_home_win_proba(), _ProbaClassifier, ndarray, Model training (blueprint Part E): first outcome model + time-based split.…
+### Community 69 - "test_correlated_props.py"
+Cohesion: 0.29
+Nodes (16): build_team_game_outcomes(), naive_parlay_price(), Decimal price a same-game parlay would carry if a book priced it by multiplying…, One row per team per game, home and away pooled (2x the game count, each team's…, _player_stats_fixture(), _schedule_fixture(), test_game_over_is_shared_across_both_perspectives(), test_leading_receiver_and_rusher_thresholds() (+8 more)
 
-### Community 71 - "props_scheduler.py"
-Cohesion: 0.39
-Nodes (7): build_context(), main(), Entrypoint: `python -m src.collect.props_run [--once]`. Live player-prop…, build_scheduler(), PropsCollectorContext, BlockingScheduler, Scheduler wiring for player-prop polling -- one `tick()` per opportunity,…
+### Community 70 - "test_steam_scan.py"
+Cohesion: 0.28
+Nodes (11): main(), DataFrame, Steam-scan entrypoint: `python -m src.backtest.steam_scan`. Manual, run-by-…, One scan. Returns the report DataFrame (also logged); never sends any…, run(), _seed_store_with_real_steam(), _snapshot(), test_run_filters_out_spots_below_min_ev() (+3 more)
+
+### Community 71 - "measure_leg_correlation"
+Cohesion: 0.18
+Nodes (12): measure_leg_correlation(), measure_leg_correlation_by_bucket(), DataFrame, Series, `measure_leg_correlation`, stratified by favorite strength -- see…, `indicator_a`/`indicator_b`: aligned boolean/0-1 Series, one row per game (or…, test_independent_legs_give_a_lift_near_one(), test_measure_leg_correlation_by_bucket_splits_by_market_prob() (+4 more)
+
+### Community 72 - "correlated_edge"
+Cohesion: 0.22
+Nodes (10): bucket_edge(), correlated_edge(), Closed-form edge for one `FAVORITE_BUCKETS` bucket, under this module's…, The bettor-relevant number this module exists to produce: if a book prices a…, test_bucket_edge_is_independent_of_market_probability(), test_bucket_edge_matches_correlated_edge_when_unclipped(), test_bucket_edge_uses_measured_prop_vig_by_default(), test_correlated_edge_gives_no_stake_when_legs_are_actually_independent() (+2 more)
 
 ### Community 73 - "elo_win_probability"
 Cohesion: 0.29
 Nodes (7): elo_win_probability(), Standard Elo logistic transform: P(a beats b), with `a` treated as the side…, test_400_point_gap_is_the_classic_10_to_1_elo_property(), test_equal_ratings_no_hfa_is_a_coin_flip(), test_home_field_advantage_shifts_probability_toward_home(), test_base_pressure_offset_recenters_expectation_to_the_measured_base_rate(), test_base_pressure_offset_recenters_expectation_to_the_measured_base_rate()
 
+### Community 74 - "build_training_frame"
+Cohesion: 0.38
+Nodes (10): build_training_frame(), One row per game: `build_game_features()` output plus the home-win label and…, _pbp_fixture(), _plays(), DataFrame, _schedule_fixture(), test_build_training_frame_drops_rows_elo_ratings_does_not_cover(), test_build_training_frame_drops_ties_and_first_week_rows() (+2 more)
+
+### Community 75 - "bucket_favorite_strength"
+Cohesion: 0.50
+Nodes (4): bucket_favorite_strength(), Which `FAVORITE_BUCKETS` bucket a team's real market-implied win probability…, test_bucket_favorite_strength_classifies_correctly(), test_bucket_favorite_strength_rejects_out_of_range()
+
 ## Knowledge Gaps
-- **124 isolated node(s):** `nfl-clv`, `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)` (+119 more)
+- **125 isolated node(s):** `nfl-clv`, `graphify`, `Usage`, `What graphify is for`, `Step 0 - GitHub repos and multi-path merge (only if a URL or several paths)` (+120 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **7 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `PointInTimeStore` connect `PointInTimeStore` to `scheduler.py`, `preseason.py`, `test_middling.py`, `props.py`, `props_scheduler.py`, `OddsSnapshot`, `test_props_scheduler.py`, `schema.py`, `test_backtest_engine.py`, `test_steam.py`, `middle_scan.py`, `engine.py`?**
-  _High betweenness centrality (0.162) - this node is a cross-community bridge._
-- **Why does `Side` connect `Side` to `ValueError`, `test_middling.py`, `props.py`, `Outcome`, `transform.py`, `schema.py`, `test_backtest_engine.py`, `test_steam.py`, `PointInTimeStore`, `middle_scan.py`, `engine.py`?**
-  _High betweenness centrality (0.075) - this node is a cross-community bridge._
-- **Why does `market_baseline()` connect `market_baseline` to `test_margin_total.py`, `test_train.py`, `train.py`, `test_props_ev_backtest.py`, `schema.py`, `PointInTimeStore`?**
-  _High betweenness centrality (0.057) - this node is a cross-community bridge._
+- **Why does `PointInTimeStore` connect `PointInTimeStore` to `scheduler.py`, `middle_scan.py`, `OddsApiError`, `Market`, `props.py`, `test_steam_scan.py`, `OddsSnapshot`, `MatchResult`, `test_props_scheduler.py`, `market_baseline`, `test_backtest_engine.py`, `test_steam.py`, `engine.py`?**
+  _High betweenness centrality (0.194) - this node is a cross-community bridge._
+- **Why does `Side` connect `Side` to `middle_scan.py`, `test_prop_settlement.py`, `Market`, `props.py`, `PointInTimeStore`, `test_load_static.py`, `test_steam_scan.py`, `MatchResult`, `schema.py`, `market_baseline`, `test_backtest_engine.py`, `test_steam.py`, `engine.py`?**
+  _High betweenness centrality (0.060) - this node is a cross-community bridge._
+- **Why does `market_baseline()` connect `market_baseline` to `build_training_frame`, `test_margin_total.py`, `PointInTimeStore`, `test_train.py`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
 - **Are the 113 inferred relationships involving `Side` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
   _`Side` has 113 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 97 inferred relationships involving `Market` (e.g. with `BacktestBet` and `BetOrder`) actually correct?**
   _`Market` has 97 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 71 inferred relationships involving `PointInTimeStore` (e.g. with `BacktestEngine` and `run()`) actually correct?**
-  _`PointInTimeStore` has 71 INFERRED edges - model-reasoned connections that need verification._
-- **Are the 26 inferred relationships involving `OddsApiClient` (e.g. with `main()` and `poll_once()`) actually correct?**
-  _`OddsApiClient` has 26 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 72 inferred relationships involving `PointInTimeStore` (e.g. with `BacktestEngine` and `run()`) actually correct?**
+  _`PointInTimeStore` has 72 INFERRED edges - model-reasoned connections that need verification._
+- **Are the 28 inferred relationships involving `OddsApiClient` (e.g. with `backfill_historical_mainline()` and `pull_historical_mainline_snapshot()`) actually correct?**
+  _`OddsApiClient` has 28 INFERRED edges - model-reasoned connections that need verification._

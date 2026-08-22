@@ -53,8 +53,16 @@ from pathlib import Path
 
 POSTING_WINDOW_DAYS = 5.0  # start attempting once a game is this close -- props rarely post earlier (confirmed live-checked multiple times this project, e.g. player_props_infra memory)
 DENSE_WINDOW_HOURS = 48.0  # the most critical window: dense rolling-CLV polling covers this many hours before kickoff -- matches the mainline collector's own "48h pre-slate" dense window
-DENSE_POLL_INTERVAL_HOURS = 2.0  # spacing between dense polls -- tune this (not POLLS_PER_EVENT directly) to go denser/sparser
-SPARSE_POLL_INTERVAL_HOURS = 8.0  # spacing for "basic" polls covering the period BEFORE the dense window kicks in (POSTING_WINDOW_DAYS out down to DENSE_WINDOW_HOURS)
+DENSE_POLL_INTERVAL_HOURS = 3.0  # spacing between dense polls -- tune this (not POLLS_PER_EVENT directly) to go denser/sparser
+SPARSE_POLL_INTERVAL_HOURS = 12.0  # spacing for "basic" polls covering the period BEFORE the dense window kicks in (POSTING_WINDOW_DAYS out down to DENSE_WINDOW_HOURS)
+# 2026-08-22: trimmed from 2h/8h (33 polls/event, ~94K blended season cost) to 3h/12h
+# (22 polls/event, ~62.7K blended) after confirming the paid plan is a ONE-TIME ~100K
+# grant (resets 9/1, no rollover, user isn't renewing past that) rather than recurring
+# monthly -- the tighter schedule left ~6K margin for a whole season, this leaves ~37K.
+# Costs almost nothing methodologically: the core CLV metric only needs an entry price
+# and a closing price (2 points), not dense intermediate sampling -- see
+# props_polling_density memory. Trimming only reduces live props arb/middling catch
+# rate, an already-secondary strategy, not any validated finding.
 DEFAULT_COST_PER_POLL = 14  # regions=us,eu x 7 markets, theoretical max (real blended cost runs lower -- see props_ev_backtest memory, ~101/10=~10/event on the historical endpoint's 10x rate)
 DEFAULT_SAFETY_RESERVE_CREDITS = 500  # large relative to a single poll's cost -- props credits are meant to leave headroom for a possible future historical batch 2, not be spent to the floor
 
