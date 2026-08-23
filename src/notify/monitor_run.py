@@ -30,6 +30,7 @@ from collections.abc import Callable
 import pandas as pd
 from dotenv import load_dotenv
 
+from src.notify.health_check import check_all, unhealthy_messages
 from src.notify.sms import SmsError, send_message
 from src.signal.live_scan import (
     DEFAULT_EDGE_THRESHOLD,
@@ -162,6 +163,22 @@ def run(
     store = PointInTimeStore(root=store_root)
     state = load_alert_state()
     all_sent: list[pd.Series] = []
+
+    # Liveness first, and OUTSIDE the spot-alert dedup: if the collector has
+    # stopped, the scanners below will quietly find nothing and this tick would
+    # otherwise look like a clean "no opportunities" cycle. Silence from a dead
+    # collector and silence from a quiet market are indistinguishable downstream,
+    # which is exactly how a 58-hour outage went unnoticed in live collection.
+    try:
+        for message in unhealthy_messages(check_all(store)):
+            log.error(message)
+            if phone_number:
+                try:
+                    send_message(message, phone_number)
+                except SmsError as exc:
+                    log.error("failed to send health alert: %s", exc)
+    except Exception:
+        log.exception("health check failed, continuing with scans")
 
     # Each scan is independently guarded: a malformed props frame must not
     # stop the moneyline scan (or vice versa) on an unattended run.
