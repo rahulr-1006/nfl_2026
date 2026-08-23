@@ -28,10 +28,19 @@ def test_entry_poll_fires_once_inside_the_posting_window():
 
 
 def test_entry_poll_does_not_fire_too_far_before_kickoff():
-    kickoff = NOW + timedelta(days=10)  # outside the 5-day posting window
+    kickoff = NOW + timedelta(days=40)  # outside the 21-day posting window
     decision = decide_props_poll(NOW, kickoff, EventPollState(), remaining_credits=10000)
     assert not decision.should_poll
     assert decision.reason == "not_yet_in_window"
+
+
+def test_early_probing_starts_weeks_out_not_days():
+    """Props for the 2026-09-09 opener posted 17 days ahead; the old 5-day
+    window silently skipped them, losing unrecoverable entry-price data.
+    """
+    decision = decide_props_poll(NOW, NOW + timedelta(days=17), EventPollState(), remaining_credits=10000)
+    assert decision.should_poll
+    assert decision.tier == "early"
 
 
 def test_second_target_poll_fires_once_inside_its_window():
@@ -73,7 +82,7 @@ def test_dense_poll_targets_hours_produces_the_expected_default_schedule():
 def test_sparse_poll_targets_hours_covers_the_gap_before_the_dense_window():
     from src.collect.props_budget import sparse_poll_targets_hours
 
-    targets = sparse_poll_targets_hours(posting_window_days=5.0, dense_window_hours=48.0, sparse_poll_interval_hours=12.0)
+    targets = sparse_poll_targets_hours(dense_window_hours=48.0, sparse_poll_interval_hours=12.0, sparse_window_hours=120.0)
     assert len(targets) == 6  # (120 - 48) / 12
     assert targets[0] == 120.0  # fires as soon as the event enters the 5-day posting window
     assert targets[-1] == 60.0  # last sparse target, just above the 48h dense-tier boundary
@@ -84,9 +93,9 @@ def test_combined_poll_targets_are_time_ordered_across_all_three_tiers():
     from src.collect.props_budget import POLL_TARGETS, POLL_TARGETS_HOURS
 
     assert list(POLL_TARGETS_HOURS) == sorted(POLL_TARGETS_HOURS, reverse=True)
-    assert POLL_TARGETS_HOURS[0] == 120.0  # first sparse target
+    assert POLL_TARGETS_HOURS[0] == 504.0  # first early-probe target (21 days)
     assert POLL_TARGETS_HOURS[-1] == 0.5  # last arb target, closest to kickoff
-    assert {t.tier for t in POLL_TARGETS} == {"sparse", "dense", "arb"}
+    assert {t.tier for t in POLL_TARGETS} == {"early", "sparse", "dense", "arb"}
 
 
 def test_dense_and_arb_tiers_interleave_in_the_final_hours_by_design():
@@ -173,13 +182,25 @@ def test_decision_carries_the_markets_the_scheduler_must_request():
     assert decision.tier == "arb"
 
 
-def test_season_cost_is_summed_from_real_tiers_and_fits_the_budget():
-    from src.collect.props_budget import season_credit_cost
+def test_realistic_season_cost_fits_the_grant_and_worst_case_is_labelled_unreachable():
+    """The worst case assumes every early probe returns data at full price. It
+    cannot happen: empty polls bill 0 credits, and on 2026-08-23 exactly 2 of
+    272 upcoming games had props posted. `realistic_season_credit_cost` is the
+    planning number.
+    """
+    from src.collect.props_budget import realistic_season_credit_cost, season_credit_cost
 
-    theoretical = season_credit_cost(285)
-    blended = theoretical * 10 / 14  # real observed rate runs below the theoretical max
-    assert theoretical < 100_000  # fits the one-time September grant even at worst case
-    assert blended < 80_000  # comfortable margin at the realistic rate
+    assert realistic_season_credit_cost(285) < 80_000  # comfortable margin
+    assert season_credit_cost(285) > realistic_season_credit_cost(285)  # ceiling is above it
+
+
+def test_early_probes_dominate_the_gap_between_worst_and_realistic_cost():
+    from src.collect.props_budget import POLL_TARGETS, realistic_season_credit_cost, season_credit_cost
+
+    assert any(t.tier == "early" for t in POLL_TARGETS)
+    # With every early probe capturing, realistic converges toward worst case.
+    near_worst = realistic_season_credit_cost(285, early_capture_rate=1.0, returned_market_fraction=1.0)
+    assert near_worst == season_credit_cost(285)
 
 
 def test_already_fully_polled_events_are_skipped():

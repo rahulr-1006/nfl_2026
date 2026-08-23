@@ -9,11 +9,15 @@ own week, not on a fixed calendar schedule. So this module decides, per
 event, whether to poll it *right now*: has it entered the posting window,
 has it already gotten its scheduled polls, and is there budget for it.
 
-**A three-tier schedule, each tier buying a different thing.** The
+**A four-tier schedule, each tier buying a different thing.** The
 historical props backfill (`props_historical.py`) was forced to a single
 near-kickoff snapshot per game because the historical endpoint costs 10x
 per call. Live polling doesn't have that multiplier, so:
-  - **sparse** (`POSTING_WINDOW_DAYS` -> `DENSE_WINDOW_HOURS`, every
+  - **early** (`POSTING_WINDOW_DAYS` -> `SPARSE_WINDOW_HOURS`, every
+    `EARLY_POLL_INTERVAL_HOURS`): coarse, mostly-free probes to catch the
+    moment props first appear. Added 2026-08-23 after the opener posted 17
+    days out and a 5-day window skipped it.
+  - **sparse** (`SPARSE_WINDOW_HOURS` -> `DENSE_WINDOW_HOURS`, every
     `SPARSE_POLL_INTERVAL_HOURS`, all 7 markets): catches early posting and
     slow drift.
   - **dense** (final `DENSE_WINDOW_HOURS`, every `DENSE_POLL_INTERVAL_HOURS`,
@@ -24,7 +28,7 @@ per call. Live polling doesn't have that multiplier, so:
     `ARB_MARKETS` only): cheap high-frequency coverage for the one signal
     that genuinely needs density -- see the `ARB_MARKETS` block below.
 
-`build_poll_targets` merges all three into one time-ordered schedule and
+`build_poll_targets` merges all four into one time-ordered schedule and
 deduplicates colliding hours **keeping the full-market poll**, so a cheap
 2-market arb poll never shadows a 7-market one and silently drops CLV
 coverage on five markets.
@@ -59,10 +63,31 @@ from src.collect.props import (
     DEFAULT_MARKETS as _ALL_PROP_MARKETS,  # single source of truth for the 7 O/U prop markets
 )
 
-POSTING_WINDOW_DAYS = 5.0  # start attempting once a game is this close -- props rarely post earlier (confirmed live-checked multiple times this project, e.g. player_props_infra memory)
+# Start attempting once a game is this close. **Widened 5.0 -> 21.0 on
+# 2026-08-23 after the 5-day assumption was proven wrong by live data.** Props
+# for the 2026-09-09 opener were already posted on 08-23 -- 17 days out, with
+# FanDuel and BetRivers quoting 5 markets each -- and the 5-day window was
+# silently skipping them. Every skipped day is entry-price data that cannot be
+# recovered, and CLV is undefined without an entry price.
+#
+# Safe to widen this far only because of two measured facts:
+#   1. The live per-event endpoint bills **only for markets that return data**,
+#      so probing a game with no props posted costs **0 credits** (verified on
+#      three real games).
+#   2. `props_scheduler` no longer advances `poll_count` on an empty poll, so
+#      free probes cannot exhaust the ~29-slot schedule before props exist.
+# Without (2), widening this would be actively harmful.
+POSTING_WINDOW_DAYS = 21.0
 DENSE_WINDOW_HOURS = 48.0  # the most critical window: dense rolling-CLV polling covers this many hours before kickoff -- matches the mainline collector's own "48h pre-slate" dense window
 DENSE_POLL_INTERVAL_HOURS = 4.0  # spacing between dense polls -- tune this (not POLLS_PER_EVENT directly) to go denser/sparser
-SPARSE_POLL_INTERVAL_HOURS = 12.0  # spacing for "basic" polls covering the period BEFORE the dense window kicks in (POSTING_WINDOW_DAYS out down to DENSE_WINDOW_HOURS)
+SPARSE_POLL_INTERVAL_HOURS = 12.0  # spacing for "basic" polls covering the period BEFORE the dense window kicks in
+# The sparse tier now starts here rather than at POSTING_WINDOW_DAYS. Widening the
+# posting window to 21 days must NOT mean 21 days of 12-hourly polling -- that
+# would be 38 sparse polls per event (~212K credits worst case, double the grant).
+# The early period gets its own coarse tier instead: cheap probes to catch the
+# moment props appear, then the real schedule takes over.
+SPARSE_WINDOW_HOURS = 120.0
+EARLY_POLL_INTERVAL_HOURS = 72.0  # coarse probing across the 21-day -> 5-day stretch
 # 2026-08-22: trimmed from 2h/8h (33 polls/event, ~94K blended season cost) to 3h/12h
 # after confirming the paid plan is a ONE-TIME ~100K grant (resets 9/1, no rollover,
 # user isn't renewing past that) rather than recurring monthly.
@@ -110,10 +135,32 @@ def dense_poll_targets_hours(dense_window_hours: float = DENSE_WINDOW_HOURS, den
     return [dense_window_hours - i * dense_poll_interval_hours for i in range(n)]
 
 
+def early_poll_targets_hours(
+    posting_window_days: float = POSTING_WINDOW_DAYS,
+    sparse_window_hours: float = SPARSE_WINDOW_HOURS,
+    early_poll_interval_hours: float = EARLY_POLL_INTERVAL_HOURS,
+) -> list[float]:
+    """Coarse probes across the far-out stretch (21 days -> 5 days).
+
+    These exist to CATCH THE MOMENT props appear, not to sample movement. Props
+    for the 2026-09-09 opener posted 17 days out, and a 5-day window skipped them
+    entirely. Because the live endpoint bills only for markets that return data,
+    a probe on a game with no props posted costs 0 credits -- and
+    `props_scheduler` does not advance `poll_count` on an empty poll, so these
+    probes cannot consume the real schedule.
+    """
+    span = posting_window_days * 24.0 - sparse_window_hours
+    if span <= 0:
+        return []
+    n = max(1, round(span / early_poll_interval_hours))
+    return [posting_window_days * 24.0 - i * early_poll_interval_hours for i in range(n)]
+
+
 def sparse_poll_targets_hours(
     posting_window_days: float = POSTING_WINDOW_DAYS,
     dense_window_hours: float = DENSE_WINDOW_HOURS,
     sparse_poll_interval_hours: float = SPARSE_POLL_INTERVAL_HOURS,
+    sparse_window_hours: float = SPARSE_WINDOW_HOURS,
 ) -> list[float]:
     """Descending list of hours-before-kickoff targets for the sparse
     ("basic") polling tier -- covers the gap between an event entering the
@@ -124,9 +171,9 @@ def sparse_poll_targets_hours(
     early" behavior the old single entry poll had) -- default 8h spacing
     across the 120h-to-48h gap = 9 targets.
     """
-    span_hours = posting_window_days * 24.0 - dense_window_hours
+    span_hours = sparse_window_hours - dense_window_hours
     n = max(1, round(span_hours / sparse_poll_interval_hours))
-    return [dense_window_hours + span_hours - i * sparse_poll_interval_hours for i in range(n)]
+    return [sparse_window_hours - i * sparse_poll_interval_hours for i in range(n)]
 
 
 def arb_poll_targets_hours(
@@ -173,7 +220,8 @@ def build_poll_targets(
     CLV coverage on five markets.
     """
     targets = (
-        [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "sparse") for h in sparse_poll_targets_hours()]
+        [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "early") for h in early_poll_targets_hours()]
+        + [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "sparse") for h in sparse_poll_targets_hours()]
         + [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "dense") for h in dense_poll_targets_hours()]
         + [PollTarget(h, arb_markets, ARB_COST_PER_POLL, "arb") for h in arb_poll_targets_hours()]
     )
@@ -189,6 +237,7 @@ def build_poll_targets(
     return deduped
 
 
+EARLY_POLL_TARGETS_HOURS = early_poll_targets_hours()
 SPARSE_POLL_TARGETS_HOURS = sparse_poll_targets_hours()
 DENSE_POLL_TARGETS_HOURS = dense_poll_targets_hours()
 ARB_POLL_TARGETS_HOURS = arb_poll_targets_hours()
@@ -198,13 +247,45 @@ POLLS_PER_EVENT = len(POLL_TARGETS)  # derived, don't hardcode this elsewhere
 
 
 def season_credit_cost(n_games: int, targets: list[PollTarget] | None = None) -> int:
-    """Total credits to poll `n_games` at this schedule -- the real
-    projection, summed from the actual tier definitions rather than
-    multiplying an average. Use this to check a schedule change against the
-    budget instead of recomputing arithmetic by hand.
+    """**Worst case** credits to poll `n_games` at this schedule: every poll
+    returns data and bills full price.
+
+    Summed from the actual tier definitions rather than multiplying an average.
+    Use `realistic_season_credit_cost` for planning -- this number is a ceiling
+    that the `early` tier makes structurally unreachable (see below).
     """
     targets = targets if targets is not None else POLL_TARGETS
     return n_games * sum(t.cost for t in targets)
+
+
+def realistic_season_credit_cost(
+    n_games: int,
+    targets: list[PollTarget] | None = None,
+    early_capture_rate: float = 0.15,
+    returned_market_fraction: float = 5 / 7,
+) -> int:
+    """A planning estimate that accounts for two measured facts the worst case
+    ignores.
+
+    1. **Empty polls are free.** The live per-event endpoint bills only for
+       markets that actually return data, so an `early`-tier probe on a game
+       whose props have not posted costs **0 credits** (verified on three real
+       games, 2026-08-23). Only marquee games post ~3 weeks out --
+       `early_capture_rate` is the fraction of early probes expected to find
+       anything. 0.15 is a deliberate over-estimate; on 2026-08-23 exactly 2 of
+       272 upcoming games had props (0.7%).
+    2. **Partial market coverage.** Even when props exist, not all 7 markets
+       return -- the real opener poll billed 10, not 14 (5 of 7 markets), hence
+       `returned_market_fraction`.
+
+    Both are stated as parameters rather than baked in, so a future session can
+    re-measure them instead of trusting these figures.
+    """
+    targets = targets if targets is not None else POLL_TARGETS
+    early = sum(t.cost for t in targets if t.tier == "early")
+    rest = sum(t.cost for t in targets if t.tier != "early")
+    per_game = early * early_capture_rate + rest * returned_market_fraction
+    return int(n_games * per_game)
 
 
 @dataclass(frozen=True)

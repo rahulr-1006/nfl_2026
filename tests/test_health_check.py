@@ -4,6 +4,8 @@ from src.notify.health_check import (
     check_all,
     check_collector_health,
     market_write_freshness,
+    pinnacle_arrival_message,
+    prop_book_coverage,
     unhealthy_messages,
 )
 from src.store.pit_store import PointInTimeStore
@@ -133,3 +135,56 @@ def test_market_freshness_on_empty_store_returns_empty_frame():
     out = market_write_freshness(PointInTimeStore(root="/tmp/definitely-not-a-store-xyz"))
     assert out.empty
     assert "hours_ago" in out.columns
+
+
+# --- Pinnacle arrival: the state change that switches three capabilities on ---
+
+
+def _prop(book, capture, kickoff, side=Side.OVER, price=-110):
+    return OddsSnapshot.from_american(
+        capture_time=capture, event_id="2026_01_KC_LAC", season=2026, week=1,
+        home_team="LAC", away_team="KC", event_start_time=kickoff, book=book,
+        market=Market.PLAYER_PROP, side=side, price_american=price, line=45.5,
+        player_name="Star Receiver", prop_stat="receiving_yards",
+    )
+
+
+def test_coverage_reports_pinnacle_absent_with_the_books_that_are_quoting(tmp_path):
+    """The real state on 2026-08-23: FanDuel/BetRivers quoting the opener 17
+    days out, Pinnacle not yet.
+    """
+    kickoff = NOW + timedelta(days=17)
+    store = _store(tmp_path, [_prop("fanduel", NOW, kickoff), _prop("betrivers", NOW, kickoff)])
+    cov = prop_book_coverage(store, now=NOW)
+
+    assert cov["pinnacle_present"] is False
+    assert cov["books"] == ["betrivers", "fanduel"]
+    assert cov["n_prop_rows"] == 2 and cov["n_games"] == 1
+    assert pinnacle_arrival_message(cov) is None  # nothing to announce yet
+
+
+def test_coverage_detects_pinnacle_and_produces_the_announcement(tmp_path):
+    kickoff = NOW + timedelta(days=17)
+    store = _store(tmp_path, [_prop("fanduel", NOW, kickoff), _prop("pinnacle", NOW, kickoff)])
+    cov = prop_book_coverage(store, now=NOW)
+
+    assert cov["pinnacle_present"] is True
+    msg = pinnacle_arrival_message(cov)
+    assert "PINNACLE NOW QUOTING" in msg
+    assert "anchored EV" in msg  # says WHAT switched on, not just that something did
+
+
+def test_coverage_ignores_props_on_games_already_played(tmp_path):
+    """The historical backfill lives in the same store; a 2023 Pinnacle prop
+    must not read as "Pinnacle is quoting now".
+    """
+    past_kick = NOW - timedelta(days=2)
+    store = _store(tmp_path, [_prop("pinnacle", past_kick - timedelta(hours=2), past_kick)])
+    assert prop_book_coverage(store, now=NOW)["pinnacle_present"] is False
+
+
+def test_coverage_on_a_store_with_no_props_is_empty_not_a_crash(tmp_path):
+    kickoff = NOW + timedelta(hours=5)
+    store = _store(tmp_path, [_snap(NOW, kickoff, Market.MONEYLINE)])
+    cov = prop_book_coverage(store, now=NOW)
+    assert cov["pinnacle_present"] is False and cov["books"] == []

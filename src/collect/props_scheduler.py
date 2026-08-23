@@ -114,9 +114,24 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
             continue
 
         snapshots = event_odds_to_prop_snapshots(response.events[0], response.fetched_at, match)
-        if snapshots:
-            ctx.store.write(snapshots)
+        if not snapshots:
+            # **Do NOT advance poll_count on an empty poll** (2026-08-23). The
+            # live per-event endpoint bills only for markets that actually
+            # return data, so probing a game whose props haven't posted costs
+            # **0 credits** -- verified against three real games. But the poll
+            # schedule is a fixed budget of ~29 slots per event, so counting
+            # these free empty probes would burn the entire schedule during the
+            # weeks before props exist and leave nothing for the pre-kickoff
+            # window that actually matters.
+            #
+            # The schedule must track *captures*, not API calls. This is what
+            # makes a wide POSTING_WINDOW_DAYS safe: we can probe early and
+            # often for free, and the real schedule only starts advancing once
+            # there is something to capture.
+            skipped += 1
+            continue
 
+        ctx.store.write(snapshots)
         events[event_id] = EventPollState(poll_count=event_state.poll_count + 1, last_polled_at=now)
         if response.remaining_credits is not None:
             remaining_credits = response.remaining_credits

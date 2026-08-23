@@ -44,6 +44,46 @@ none of which require out-predicting Pinnacle.
 **Before proposing a prop strategy, state which shape it is.** If it is
 probability estimation, state where the >4.7% is coming from.
 
+### What to expect once Pinnacle starts quoting props (measured 2026-08-23)
+
+Live props posted on 2026-08-23 for the 9/9 opener — 17 days out, far earlier
+than the ~9/2 this project assumed. FanDuel and BetRivers are quoting;
+**Pinnacle is not yet**. Three answers recorded here so a future session
+recognises predicted behaviour instead of re-deriving it:
+
+**1. The posting window needs no retuning when Pinnacle appears.** Simulated the
+real `decide_props_poll` walk against the actual opener kickoff with Pinnacle
+withheld until 4 days out: **34 of 34 slots used**, 27 captures after Pinnacle
+appears, **23 inside the CLV-critical final 48h**. The poll targets are absolute
+*hours-before-kickoff*, not intervals, so a lagging `poll_count` catches up and
+then waits — early capture cannot steal slots from the pre-kickoff window.
+Retuning `POSTING_WINDOW_DAYS` to Pinnacle's posting time would add risk and buy
+nothing.
+
+**2. Seasonal drift in their posting time is already absorbed** by that same
+property, plus empty probes costing 0 credits and `poll_count` advancing only on
+capture. Pinnacle posting at 14 days or 2 days, September or January, needs no
+config change.
+
+**3. Anchored EV will fire ~14 alerts/week, and they should not be expected to
+convert.** Measured over 32,226 real historical contract-sides (57/game):
+
+| Threshold | Sides firing | Rate | Per 16-game slate |
+|---|---|---|---|
+| ≥2% | 2,179 | 6.76% | ~61/wk |
+| **≥5% (production default)** | **479** | **1.49%** | **~14/wk** |
+| ≥10% | 24 | 0.07% | ~1/wk |
+
+Those same spots tested **null** on 6,812 settled bets, and the vig table above
+explains why. The signal stays `[EXPERIMENTAL]`-labeled and gated at 5%. A
+stream of prop-EV texts starting the week Pinnacle appears is **the predicted
+behaviour, not a finding**. It is worth watching rather than deleting only
+because the live setting may differ from a single historical snapshot.
+
+`health_check.prop_book_coverage` + the `monitor_run` one-time announcement exist
+so Pinnacle's first appearance is surfaced explicitly — until then the anchored
+paths return empty, which is indistinguishable from "no spots today".
+
 ---
 
 ## 1. Rest/travel differential — **tested, negative result**

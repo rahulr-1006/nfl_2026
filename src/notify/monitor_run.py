@@ -26,11 +26,17 @@ from __future__ import annotations
 import logging
 import os
 from collections.abc import Callable
+from datetime import UTC, datetime
 
 import pandas as pd
 from dotenv import load_dotenv
 
-from src.notify.health_check import check_all, unhealthy_messages
+from src.notify.health_check import (
+    check_all,
+    pinnacle_arrival_message,
+    prop_book_coverage,
+    unhealthy_messages,
+)
 from src.notify.sms import SmsError, send_message
 from src.signal.live_scan import (
     DEFAULT_EDGE_THRESHOLD,
@@ -63,6 +69,11 @@ log = logging.getLogger(__name__)
 # theoretical -- a single slate can produce many prop alerts at once, unlike
 # the one-per-game moneyline case this monitor was built for.
 DEFAULT_MAX_SUGGESTED_EXPOSURE = 20.0
+
+# Sentinel key in the shared alert state marking that the Pinnacle-arrival
+# announcement has already fired. Namespaced so it can never collide with a
+# real spot key (those are event/side/book or prop-contract shaped).
+PINNACLE_ARRIVAL_KEY = "__pinnacle_props_arrival__"
 
 
 def _apply_exposure_cap(
@@ -179,6 +190,26 @@ def run(
                     log.error("failed to send health alert: %s", exc)
     except Exception:
         log.exception("health check failed, continuing with scans")
+
+    # One-time announcement when Pinnacle starts quoting props. Deduped through
+    # the SAME alert state the spot scanners use, so a persistent condition
+    # texts once rather than every 30 minutes forever. Worth an alert because
+    # three capabilities switch on at that moment (anchored EV, props CLV,
+    # team-total scanning) and until then they return empty indistinguishably
+    # from "no spots found".
+    try:
+        arrival = pinnacle_arrival_message(prop_book_coverage(store))
+        if arrival and PINNACLE_ARRIVAL_KEY not in state:
+            log.info(arrival)
+            if phone_number:
+                try:
+                    send_message(arrival, phone_number)
+                except SmsError as exc:
+                    log.error("failed to send Pinnacle-arrival alert: %s", exc)
+            state = {**state, PINNACLE_ARRIVAL_KEY: AlertRecord(edge=1.0, alerted_at=datetime.now(UTC))}
+            save_alert_state(state)
+    except Exception:
+        log.exception("pinnacle-arrival check failed, continuing with scans")
 
     # Each scan is independently guarded: a malformed props frame must not
     # stop the moneyline scan (or vice versa) on an unattended run.

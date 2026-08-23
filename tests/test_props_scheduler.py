@@ -80,7 +80,7 @@ def test_tick_polls_an_eligible_event_and_writes_snapshots(tmp_path):
 def test_tick_skips_an_event_outside_the_posting_window(tmp_path):
     client = MagicMock()
     client.get_events.return_value = OddsApiResponse(
-        events=[_event(commence_time=(NOW + timedelta(days=10)).isoformat().replace("+00:00", "Z"))],
+        events=[_event(commence_time=(NOW + timedelta(days=40)).isoformat().replace("+00:00", "Z"))],
         remaining_credits=None, used_credits=None, last_cost=None, fetched_at=NOW,
     )
     ctx = _ctx(tmp_path, client)
@@ -155,3 +155,33 @@ def test_tick_never_propagates_unexpected_bug(tmp_path):
     ctx = _ctx(tmp_path, client)
 
     tick(ctx, now=NOW)  # the outer try/except in tick() must catch this
+
+
+def test_empty_poll_does_not_advance_the_schedule(tmp_path):
+    """**The fix that makes a 21-day posting window safe.** Probing a game whose
+    props have not posted costs 0 credits (the live endpoint bills only for
+    markets that return data), but the schedule is a fixed ~34-slot budget per
+    event. Counting free empty probes would burn the whole schedule during the
+    weeks before props exist, leaving nothing for the pre-kickoff window that
+    actually matters. The schedule must track CAPTURES, not API calls.
+    """
+    client = MagicMock()
+    commence = (NOW + timedelta(days=15)).isoformat().replace("+00:00", "Z")
+    client.get_events.return_value = OddsApiResponse(
+        events=[_event(event_id="evt_early", commence_time=commence)],
+        remaining_credits=None, used_credits=None, last_cost=None, fetched_at=NOW,
+    )
+    # A real API response carrying NO bookmakers -- props not posted yet.
+    client.get_event_odds.return_value = OddsApiResponse(
+        events=[{"home_team": "Seattle Seahawks", "away_team": "New England Patriots",
+                 "commence_time": commence, "bookmakers": []}],
+        remaining_credits=25000, used_credits=0, last_cost=0, fetched_at=NOW,
+    )
+    ctx = _ctx(tmp_path, client)
+
+    tick(ctx, now=NOW)
+    tick(ctx, now=NOW)
+
+    client.get_event_odds.assert_called()          # it DID probe (free)
+    state = load_state(ctx.state_path)
+    assert state.events.get("evt_early", EventPollState()).poll_count == 0  # but banked nothing
