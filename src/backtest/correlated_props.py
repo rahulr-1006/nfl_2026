@@ -32,14 +32,21 @@ from scipy.stats import chi2_contingency
 from src.model.elo import canonical_team
 from src.signal.sizing import apply_bankroll_caps, expected_value, fractional_kelly
 
-# Pinnacle's own measured player-prop vig, from this project's real 178-game
-# historical pull (batch 1) -- mean overround across 5,005 real Over/Under
-# pairs, not a guess. See src/backtest/correlated_props.py's price functions
-# below for how this becomes the "naive SGP price" this module tests against.
-# (Mainline moneyline/spread/total vig measured earlier this project was
-# ~2.97% -- props consistently carry more, which is why this, not that
-# number, is the default here.)
-MEASURED_PROP_VIG = 0.0575
+# Pinnacle's own measured player-prop vig: mean overround across **all 16,953
+# two-sided Over/Under contracts** in the complete 2023+2024 historical pull.
+# See this module's price functions below for how it becomes the "naive SGP
+# price" tested against. (Mainline vig measured ~2.97% -- props consistently
+# carry more, which is why this, not that number, is the default here.)
+#
+# **Corrected 2026-08-23: was 0.0575, measured from batch 1 only (5,005 pairs,
+# 178 games).** The full two-season sample measures 0.0629. This matters
+# directionally, not just numerically: `bucket_edge = lift/(1+vig)^2 - 1`, so an
+# understated vig **overstates every edge this module reports** -- the
+# self-flattering direction. The team-total findings move from +6.6%/+14.1% to
+# +5.5%/+12.9% (still positive, but ~1.1pt weaker than previously published).
+# If re-measured again, record the sample size it came from so the next reader
+# knows what is being replaced.
+MEASURED_PROP_VIG = 0.0629
 
 
 def measure_leg_correlation(indicator_a: pd.Series, indicator_b: pd.Series) -> dict:

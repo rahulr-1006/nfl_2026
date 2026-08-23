@@ -139,3 +139,17 @@ def test_different_games_get_independent_kickoffs():
     kickoffs = [t.kickoff for t in truths]
     assert kickoffs == sorted(kickoffs)
     assert len(set(kickoffs)) == 3
+
+
+def test_props_only_simulation_still_returns_ground_truth():
+    """Regression: truth records were previously gated on a moneyline path
+    existing, so a props-only scenario silently returned zero truths and
+    couldn't be validated at all.
+    """
+    snaps, truths = simulate_market(
+        n_games=3, n_poll_steps=2, kickoff_start=KICKOFF_START,
+        markets=(Market.PLAYER_PROP,), n_prop_players=2, books=("pinnacle",), random_state=0,
+    )
+    assert len(truths) == 3
+    assert all(len(t.props) == 2 for t in truths)
+    assert snaps  # and it still produced real snapshots
