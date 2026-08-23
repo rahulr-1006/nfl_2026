@@ -31,6 +31,7 @@ from datetime import UTC, datetime, timedelta
 
 import pandas as pd
 
+from src.signal.live_scan import upcoming_only
 from src.store.pit_store import PointInTimeStore
 
 log = logging.getLogger(__name__)
@@ -103,6 +104,61 @@ def check_all(store: PointInTimeStore, now: datetime | None = None, **kwargs) ->
 
 def unhealthy_messages(results: list[dict]) -> list[str]:
     return [r["message"] for r in results if not r["healthy"]]
+
+
+PINNACLE = "pinnacle"
+
+
+def prop_book_coverage(store: PointInTimeStore, now: datetime | None = None) -> dict:
+    """Which books are currently quoting props on UPCOMING games, and is
+    Pinnacle among them?
+
+    **Pinnacle's first appearance is a state change worth noticing, not a
+    detail.** Three things become possible only once it quotes: anchored EV
+    (`props_scan.find_live_prop_ev_spots` returns empty without a two-sided
+    Pinnacle quote to devig), props CLV against the sharp anchor, and
+    `team_total_scan`'s market-probability path.
+
+    Until then those paths return empty, which is correct but **silent** -- and
+    silence from "Pinnacle isn't quoting yet" is indistinguishable from silence
+    from "no spots today". That exact indistinguishability is what hid a
+    58-hour collector outage, so the transition is surfaced explicitly rather
+    than inferred from an absence of alerts.
+
+    Confirmed against the live store 2026-08-23: FanDuel and BetRivers quoting
+    the 9/9 opener 17 days out, Pinnacle absent.
+    """
+    now = _now(now)
+    df = upcoming_only(store.read_as_of(now), now)
+    if df.empty or "prop_stat" not in df.columns:
+        return {"pinnacle_present": False, "books": [], "n_prop_rows": 0, "n_games": 0}
+
+    props = df[df["market"] == "player_prop"]
+    if props.empty:
+        return {"pinnacle_present": False, "books": [], "n_prop_rows": 0, "n_games": 0}
+
+    books = sorted(props["book"].unique())
+    return {
+        "pinnacle_present": PINNACLE in books,
+        "books": books,
+        "n_prop_rows": len(props),
+        "n_games": int(props["event_id"].nunique()),
+    }
+
+
+def pinnacle_arrival_message(coverage: dict) -> str | None:
+    """The one-time announcement, or None if Pinnacle still isn't quoting.
+
+    Caller is responsible for firing this only once -- `monitor_run` uses the
+    existing alert-state dedup so a persistent condition doesn't text every tick.
+    """
+    if not coverage.get("pinnacle_present"):
+        return None
+    return (
+        f"PINNACLE NOW QUOTING PROPS -- anchored EV, props CLV and team-total scanning "
+        f"are live. {coverage['n_prop_rows']} prop rows across {coverage['n_games']} "
+        f"upcoming game(s), books: {', '.join(coverage['books'])}."
+    )
 
 
 def market_write_freshness(store: PointInTimeStore, now: datetime | None = None) -> pd.DataFrame:
