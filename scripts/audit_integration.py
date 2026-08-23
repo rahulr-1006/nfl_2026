@@ -129,6 +129,38 @@ ORDER = [
 ]
 
 
+def check_architecture_md() -> list[str]:
+    """Flag ARCHITECTURE.md rows marked ORPHAN that are not actually orphans.
+
+    Only the ORPHAN claim is checked, deliberately. That column mixes *role*
+    (LIB, ENTRY) with *reachability* (LIVE, ORPHAN), so most rows compare two
+    different axes and disagreeing means nothing. ORPHAN is the one claim that
+    is purely reachability -- and it has been wrong twice, because it was
+    decided by reading imports and missing make targets entirely.
+    """
+    import re
+
+    arch = REPO / "ARCHITECTURE.md"
+    if not arch.exists():
+        return []
+    real = {m: c for c, m in classify()}
+    by_base: dict[str, list[str]] = {}
+    for m in real:
+        by_base.setdefault(m.rsplit(".", 1)[-1] + ".py", []).append(m)
+
+    problems = []
+    for path, status in re.findall(r"\|\s*`([\w/]+\.py)`\s*\|[^|]*\|\s*\*\*(\w+)\*\*", arch.read_text()):
+        if status != "ORPHAN":
+            continue
+        cands = by_base.get(path.rsplit("/", 1)[-1], [])
+        if len(cands) != 1:
+            continue
+        got = real[cands[0]]
+        if not got.startswith(("TESTED ONLY", "UNREFERENCED")):
+            problems.append(f"ARCHITECTURE.md calls {path} ORPHAN, but it is {got}")
+    return problems
+
+
 def main() -> None:
     rows = classify()
     counts = Counter(c for c, _ in rows)
@@ -138,6 +170,14 @@ def main() -> None:
             if c == cat:
                 print(f"    {m}")
     print(f"\nTOTAL: {len(rows)} modules")
+
+    problems = check_architecture_md()
+    if problems:
+        print("\nARCHITECTURE.md DRIFT:")
+        for p in problems:
+            print(f"    {p}")
+    else:
+        print("\nARCHITECTURE.md: no ORPHAN-claim drift.")
 
 
 if __name__ == "__main__":

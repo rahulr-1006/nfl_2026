@@ -84,88 +84,120 @@ starts quoting props".
 
 ## Open items, in the order they should be picked up
 
-### 1. Orphaned modules — decide wire-or-park (verified today)
+### 1. ~~Orphaned modules~~ RESOLVED 2026-08-23
 
-These are built and tested but imported by **nothing except their own tests**:
+All 9 tested-only modules decided; `make audit` reports **0 undecided, 0
+unreferenced**. Wired: `team_total_scan` (`make team-total-scan-once`),
+`season_review` (`make season-review`, which pulls in `evaluation` and
+`drift/monitor`). Parked with reopen conditions in their own docstrings:
+`props_historical`, `mainline_historical`, `individual_pass_rush_elo`,
+`prop_projection`, `closing_line`, `parlay`.
 
-| Module | Non-test importers |
-|---|---|
-| `src/backtest/parlay.py` | none |
-| `src/model/individual_pass_rush_elo.py` | none |
-| `src/collect/mainline_historical.py` | none (one-shot pull script — probably *park*, not wire) |
+**The blocker this uncovered is now fixed too:** nothing recorded a placed bet,
+so CLV could not be computed for any real bet. `src/store/bet_log.py` +
+`make log-bet`. See methodology_backlog.md.
 
-**Verdicts reached 2026-08-23:**
-
-- **`mainline_historical.py` -> PARK.** A completed one-shot backfill script.
-  Nothing should import it; re-running it is a manual, credit-spending act.
-- **`individual_pass_rush_elo.py` -> PARK, deliberately.** The only wire available
-  is "add it as a model feature", which makes it comparison #10 in a family where
-  feature engineering is 0-for-6 and every new comparison must clear
-  Benjamini-Hochberg. Wiring it would burn a slot on the 2025 holdout for a
-  strategy the project's own design rule predicts will fail. It stays a
-  standalone leaderboard/diagnostic. Re-propose only with a *structural* use.
-- **`parlay.py` -> WIRE, but the obvious seam does not typecheck against its own
-  contract, so it is NOT wired yet.** The module's premise is "N *real* leg prices
-  I can bet right now". The natural consumer looked like
-  `signal/team_total_scan.py`, but that strategy's second leg is a *constructed*
-  team total aggregated from player prop lines, not a posted market price — which
-  is exactly why `correlated_props.py` prices it with a *modeled* naive SGP price
-  instead. Feeding that into `parlay.py` would launder a modeled number through a
-  function documented as taking real ones.
-  **The honest wire is two real same-game player-prop legs** (FanDuel/BetRivers
-  are quoting them now) priced via `two_leg_parlay_ev` with a TRAIN-fit bucket
-  lift from `measure_leg_correlation_by_bucket`. That is a real build — a new
-  live scanner — not a one-line import. Sized as the next session's work.
-
-For contrast, these are properly wired: `clv_portfolio` and `evaluation` are both
-imported by `src/backtest/season_review.py`.
-
-`season_review.py` itself is currently imported only by its test — it is the
-in-season entrypoint and is *meant* to be run by hand, but nothing schedules it.
-Decide whether it becomes a weekly service.
-
-### 2. Stale data files — safe to delete once nothing reads them
+### 2. Stale data files — VERIFIED unreferenced, awaiting your call
 
 ```
-data/static/pbp_2015_2024.parquet
-data/static/injuries_2015_2024.parquet
-data/static/schedules_2015_2024.parquet
-data/static/rosters_weekly_2015_2024.parquet
-data/static/player_stats_2015_2024.parquet
+data/static/{pbp,injuries,schedules,rosters_weekly,player_stats}_2015_2024.parquet
 ```
 
-Superseded by the 2025 refresh. Notebooks were repointed already — **grep before
-deleting**, don't assume.
+Grepped `src/`, `tests/`, `notebooks/` on 2026-08-23: **0 references to any of
+the five.** 11MB total. Safe to delete, but not deleted -- data is preserved by
+standing rule, so this is a decision, not a task.
 
 ### 3. ~~`market_write_freshness` -> alert~~ DONE 2026-08-23
 
 `check_props_write_freshness` in `src/notify/health_check.py`, wired into
-`check_all`, so `monitor_run` texts it through the existing path. Design notes:
+`check_all`, so `monitor_run` texts it through the existing path. Own thresholds
+(120h early / 30h sparse / 12h dense) because the props collector polls a coarser
+tiered schedule; freshness measured over `upcoming_only` rows so the 2023-24
+backfill cannot pass as live activity; no upcoming props = healthy, not an alert.
 
-- **Own thresholds, not the mainline ones**, because the props collector polls a
-  coarser tiered schedule (72h early / 12h sparse / 4h dense / 30min arb). Allowed
-  silence is 120h early, 30h sparse, 12h dense.
-- **Freshness is measured over `upcoming_only` prop rows**, which makes it
-  structurally impossible for the 2023-24 backfill to read as live activity.
-- **No upcoming props = healthy, not an alert.** Books post on their own schedule;
-  before they post, silence is correct behaviour, not a dead collector.
+### 4. ~~Full concurrent dry run~~ DONE 2026-08-23
 
-Verified against the live store: `OK: props collector last wrote 5.7h ago (limit
-120h, early tier, 415.3h to next kickoff with props)`. 7 new tests, one of which
-pins the actual gap (props dead 20h, kickoff 3h away, aggregate check still OK).
+All three services observed running simultaneously through overlapping cycles.
+Verified, each by running it rather than by inspection:
 
-### 4. Full concurrent dry run before Week 1 (9/9)
+| Check | Result |
+|---|---|
+| Three services concurrent | `collector` pid 6121, `props` pid 92314, `monitor` (interval) — all status 0 |
+| Store integrity under concurrent writes | **0 duplicate rows in the live era** (capture_time >= 2026-08-01). The services are not racing. |
+| Props service reload | `bootout`/`bootstrap` clean; per-event `poll_count` state survived intact |
+| Health checks | both report OK correctly — collector 0.3h, props 6.9h against a 120h early-tier limit |
+| Manual scanners alongside live services | `team_total_scan` and `steam_scan` both ran clean; steam found 2 real stale-line spots |
+| Credit accounting | free key 341 (−6 per poll, ~9h05m cadence); paid key 25,076 unchanged — empty prop probes really are free |
 
-All three services running simultaneously, watched for a full cycle. Never done.
+**Collector cadence, measured:** it polls every **~9h05m**, not every 5 minutes.
+The apscheduler tick is 5 min but the budget layer no-ops most of them, spending
+6 credits (3 markets x 2 regions) per real poll to spread 500/month. This matches
+the documented 9.1h median gap and is why `MAX_SILENCE_OTHERWISE` is 30h.
 
-### 5. Retire the preseason modules after 9/9
+**A second dry-run finding was my own error, and is worth recording as such:**
+I first reported 2,752 historical contracts with conflicting prices. That was
+wrong — the duplicate key omitted `prop_stat`, so `passing_tds` and
+`rushing_yards` at the same line value looked like one contract with two prices.
+Real count: **1**. It is fixed anyway, via deterministic dedupe in
+`read_as_of` (see methodology_backlog.md), because `idxmax` ties made reads
+non-deterministic regardless of how few rows were involved.
 
-The hand-polled preseason track was validation scaffolding, not a result.
+**The real defect the dry run found, now fixed:** the props tick logged
+`polled=0 skipped=272`, collapsing two completely different situations. Split
+into `empty` (contacted, no props posted) vs `not_due` (never contacted). The
+live service immediately reported `polled=0 empty=8 not_due=264` — **8 games are
+probed every tick** and that was invisible. Before Week 1 this is the whole
+signal: props silently ceasing to post, or the endpoint returning empties, would
+have looked identical to healthy out-of-window operation. (`failed` already
+separated API errors; these two did not.)
 
-### 6. Cosmetic
+### 5. ~~Settle logged bets~~ DONE 2026-08-23
 
-A registry dict label in `notebooks/model_backtest_results.ipynb` reads "(20)"
-for a comparison family that is now 22.
+`settle_bets` in `src/store/bet_log.py`, called by `make season-review`. Reuses
+`settlement.settle`, `prop_settlement.settle_prop` and `engine.payout_for`
+unchanged -- `_payout` was made public rather than copied, because a second copy
+of the payout convention would let live P&L and backtest P&L diverge silently.
+
+Three properties worth knowing:
+
+- **Kickoff order, not decision order.** `clv_portfolio.bankroll_path` reads
+  `bankroll_after` positionally; sorting by decision time produced a non-monotone
+  path once already (a bet can be decided 5 days out on a late game and 1 hour
+  out on an early one). `settle_bets` returns in kickoff order.
+- **Ungraded is not a loss.** An unplayed game, unmatched player name, or missing
+  stat yields `outcome=None` and leaves the bankroll untouched. Grading it a loss
+  would understate a $100 bankroll that has no top-ups.
+- **Ties are pushes.** ~1 NFL tie a season; folding one into a loss is wrong.
+
+`load_settlement_inputs` concatenates every cached schedule/player_stats vintage
+and drops duplicates keeping the newest, which also makes the superseded
+2015-2024 files harmless rather than a correctness risk.
+
+**Verified end-to-end on real cached data**, not just fixtures: two real 2024
+games (KC 27-20 BAL, PHI 34-29 GB), bets settled win/loss correctly, bankroll
+$100 -> $102 -> $100, real CLV of +0.0209 computed from actual Pinnacle
+snapshots, and `season_review` correctly returning INSUFFICIENT_DATA at n=2.
+
+### 6. Retire the preseason modules after 9/9
+
+`collect/preseason.py`, `clv/preseason_report.py`. Validation scaffolding, not a
+result.
+
+### 7. Cosmetic / housekeeping
+
+- `notebooks/model_backtest_results.ipynb`: a registry label reads "(20)" for a
+  comparison family that is now 22 (2 occurrences).
+- Cell 95 has **stale outputs** showing the superseded 0.0575. Source and prose
+  are corrected; outputs were deliberately not hand-edited (that would be
+  fabricating a result). Needs a kernel re-run on `nfl-clv`.
+- **Lint debt: 12 ruff errors**, 9 auto-fixable, in `collect/run.py`,
+  `tests/test_pit_store.py`, `tests/test_props_budget.py`, `tests/test_schema.py`.
+  (Was 17; four `src/` files were cleaned incidentally this session.)
+- `ARCHITECTURE.md`'s status column conflates *role* (LIB, ENTRY) with
+  *reachability* (LIVE, ORPHAN), so 8 rows disagree with `make audit` by
+  construction. `make audit` now checks the ORPHAN claims automatically and
+  reports drift; the deeper fix is to split the column or drop reachability
+  from it and defer to the audit.
 
 ---
 

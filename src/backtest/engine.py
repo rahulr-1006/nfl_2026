@@ -392,7 +392,7 @@ class BacktestEngine:
         )
 
         outcome = self._grade(order, event_id)
-        payout = _payout(outcome, order.stake, float(entry["price_decimal"]))
+        payout = payout_for(outcome, order.stake, float(entry["price_decimal"]))
 
         # `bankroll_before` is the balance at DECISION time -- identical for every
         # bet placed at the same decision point, since none of them had settled
@@ -452,7 +452,10 @@ class BacktestEngine:
         return settle(order.market, order.side, order.line, result) if result is not None else None
 
 
-def _payout(outcome: Outcome | None, stake: float, price_decimal: float) -> float | None:
+def payout_for(outcome: Outcome | None, stake: float, price_decimal: float) -> float | None:
+    """Profit (not total return) for a graded bet. Public because live bets in
+    `src/store/bet_log.py` settle through this exact function -- a second copy
+    of the convention would let live P&L and backtest P&L disagree silently."""
     if outcome is None:
         return None
     if outcome == Outcome.WIN:

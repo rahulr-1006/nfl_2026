@@ -60,7 +60,9 @@ leakage guard), not a call — verified 2026-08-23.
 
 Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 **LIB**: imported by live/entry code. **RESEARCH**: used only by notebooks/tests.
-**ORPHAN**: nothing imports it anywhere.
+**ORPHAN**: nothing reaches it -- no import, **no make target**, no notebook. Checking imports alone is not enough and has produced wrong verdicts here twice (`preseason_report.py` and `demo_pipeline.py` were both filed ORPHAN while having make targets). `make audit` is authoritative; this column is a summary of it.
+
+**PARKED**: unreachable *by decision*, with the reason and a reopen condition in the module's own docstring. Not the same as an orphan -- it is a closed question.
 
 ### store/ — foundation (all LIVE)
 | Module | Imported by | Status | Notes |
@@ -82,7 +84,7 @@ Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 | `props_scheduler.py` / `props_budget.py` | 1 / 1 | **LIB** | 3-tier cadence, 84.4% of credit grant. |
 | `props.py` | 4 | **LIB** | Prop parsing + market definitions. |
 | `props_historical.py` | 1 | **ENTRY** | Executed: 2023+2024 props pulled. |
-| `mainline_historical.py` | 0 | **ORPHAN** | Executed once (570 games) via a scratchpad driver; no test, no caller. **Wire or document as one-shot.** |
+| `mainline_historical.py` | 0 | **PARKED** | Completed one-shot pull (570 games); gap confirmed real but inconsequential (0.000138 Brier). Park verdict 2026-08-23, reason in its docstring. |
 | `preseason.py` | 1 | **ENTRY** | Superseded by the real season — retire after 9/9. |
 
 ### model/ — feature/rating layer (trains ONLY on free nflverse data)
@@ -99,7 +101,7 @@ Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 | `game_level_features.py` | 0 | **RESEARCH** | Rolls the above to game level; tested negative. |
 | `closing_line.py` | 0 | **RESEARCH** | Phase 3. Predicts Pinnacle's closing fair prob from pre-game features. Valid for MAINLINE; **not** for props (target is ~0.5 by construction, measured). |
 | `prop_projection.py` | 0 | **RESEARCH** | Phase 3. Projects a player's stat vs the posted line -- the first model here to consume `data/snapshots`. Tested negative: recent form adds nothing beyond the line. |
-| `individual_pass_rush_elo.py` | 0 | **ORPHAN** | **12 tests, 0 notebooks, 0 callers.** Built, sanity-checked, then never used for anything. |
+| `individual_pass_rush_elo.py` | 0 | **PARKED** | Wiring it = comparison #10 against an 0-for-6 feature-engineering record; would spend a BH slot and the 2025 holdout. Reopen only for a structural use. |
 
 ### backtest/ — strategies & evaluation
 | Module | Imported by | Status | Notes |
@@ -115,7 +117,7 @@ Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
 | `clv_portfolio.py` | 0 | **RESEARCH** | Built 2026-08-23; reporting layer, no live caller yet. |
 | `season_review.py` | 0 | **RESEARCH** | Phase 4. Weekly in-season health check: CLV + drift CUSUM + bettability -> continue/monitor/retire. Consumes `drift/monitor.py` and `clv_portfolio.py`, both previously orphaned. |
-| `parlay.py` | 0 | **ORPHAN** | Built 2026-08-23. Tested, documented, **wired to nothing**. |
+| `parlay.py` | 0 | **PARKED** | Contract requires REAL leg prices; team-total's second leg is a constructed aggregate, so that wire would launder a modelled number. Reopen when a same-game prop parlay scanner exists. |
 
 ### signal/ notify/ clv/ devig/ features/ drift/
 | Module | Imported by | Status | Notes |
@@ -126,12 +128,12 @@ Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
 | `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
-| `clv/preseason_report.py` | 0 | **ORPHAN** | Preseason-only; retire after 9/9. |
+| `clv/preseason_report.py` | 0 | **MANUAL** | `make preseason-report`. Was mis-filed ORPHAN by import-only reasoning. Preseason-only; retire after 9/9. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
 | `features/load_static.py` | 1 | **ENTRY** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
 | `drift/monitor.py` | 1 | **LIB** | CUSUM drift detection. **Wired 2026-08-23** by `season_review.py` -- no longer an orphan. |
-| `demo_pipeline.py` | 0 | **ORPHAN** | Documentation-by-example. Keep as a smoke test or delete. |
+| `demo_pipeline.py` | 0 | **MANUAL** | `make demo`. Was mis-filed ORPHAN by import-only reasoning. Documentation-by-example smoke test. |
 
 ---
 
