@@ -1,13 +1,13 @@
 import random
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
 
 from src.store.pit_store import LeakageError, PointInTimeStore
 from src.store.schema import Market, OddsSnapshot, Side
 
-BASE = datetime(2026, 9, 4, 0, 0, tzinfo=timezone.utc)
-KICKOFF = datetime(2026, 9, 7, 17, 0, tzinfo=timezone.utc)
+BASE = datetime(2026, 9, 4, 0, 0, tzinfo=UTC)
+KICKOFF = datetime(2026, 9, 7, 17, 0, tzinfo=UTC)
 
 
 def _snap(capture_offset_hours: float, price_american: int = -110) -> OddsSnapshot:
@@ -118,7 +118,7 @@ def test_decision_time_must_be_tz_aware(tmp_path):
     store = PointInTimeStore(root=tmp_path)
     store.write([_snap(0)])
     with pytest.raises(ValueError):
-        store.read_as_of(datetime(2026, 9, 4, 5, 0))  # naive
+        store.read_as_of(datetime(2026, 9, 4, 5, 0))  # noqa: DTZ001 -- naive on purpose
 
 
 def test_event_id_filter(tmp_path):
@@ -170,3 +170,75 @@ def test_read_as_of_exposes_new_columns_even_when_no_file_on_disk_has_them(tmp_p
     assert "player_name" in visible.columns
     assert "prop_stat" in visible.columns
     assert visible["player_name"].isna().all()
+
+
+# --- deterministic contract dedupe ------------------------------------------
+#
+# The store is append-only, so a re-run of a historical pull can legitimately
+# re-record rows it already holds. Selectors like `engine.latest_fair_prob` pick
+# via `idxmax` on capture_time, which is AMBIGUOUS across tied rows -- so without
+# dedupe the chosen price can differ between runs of identical code.
+
+
+def _prop(capture_offset_hours: float, prop_stat: str, price_american: int = -110,
+          line: float = 2.5, player: str = "Jared Goff") -> OddsSnapshot:
+    return OddsSnapshot.from_american(
+        capture_time=BASE + timedelta(hours=capture_offset_hours),
+        event_id="2026_01_KC_LAC", season=2026, week=1, home_team="LAC", away_team="KC",
+        event_start_time=KICKOFF, book="barstool", market=Market.PLAYER_PROP,
+        side=Side.OVER, price_american=price_american, line=line,
+        player_name=player, prop_stat=prop_stat,
+    )
+
+
+def test_identical_rewrite_collapses_to_one_row(tmp_path):
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(1)])
+    store.write([_snap(1)])          # same contract, same instant, re-recorded
+    assert len(store.read_as_of(KICKOFF)) == 1
+
+
+def test_raw_record_is_preserved_and_reachable(tmp_path):
+    """Nothing is mutated -- dedupe is a read-time view, not a deletion."""
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(1)])
+    store.write([_snap(1)])
+    assert len(store.read_as_of(KICKOFF, dedupe=False)) == 2
+
+
+def test_conflicting_prices_resolve_to_one_row_deterministically(tmp_path):
+    """Real case: Khalil Herbert receptions 1.5 at betonlineag carried -119 AND
+    -125 at the same instant. Either is equally (un)justified; what matters is
+    that repeated reads agree, and that we do not silently pick the better one.
+    """
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(1, price_american=-119)])
+    store.write([_snap(1, price_american=-125)])
+
+    first = store.read_as_of(KICKOFF)
+    assert len(first) == 1
+    for _ in range(3):
+        assert store.read_as_of(KICKOFF)["price_american"].iloc[0] == first["price_american"].iloc[0]
+
+
+def test_prop_stat_is_part_of_the_contract_key(tmp_path):
+    """**Regression guard for a real analysis error (2026-08-23).** One player
+    can carry `passing_tds` and `rushing_yards` at the SAME line value (2.5),
+    same book, same instant. Omitting prop_stat from the key makes two unrelated
+    contracts look like one contract with two prices -- which produced a false
+    "2,752 conflicting prices" reading when the true count is 1. These must both
+    survive.
+    """
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_prop(1, "passing_tds", price_american=300),
+                 _prop(1, "rushing_yards", price_american=-150)])
+    out = store.read_as_of(KICKOFF)
+    assert len(out) == 2
+    assert set(out["prop_stat"]) == {"passing_tds", "rushing_yards"}
+
+
+def test_same_contract_at_different_times_is_not_collapsed(tmp_path):
+    """Dedupe must never flatten a price HISTORY -- that is the whole store."""
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(1, price_american=-110), _snap(2, price_american=-120)])
+    assert len(store.read_as_of(KICKOFF)) == 2

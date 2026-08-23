@@ -1,5 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
+import pandas as pd
 import pytest
 
 from src.store.bet_log import (
@@ -7,10 +8,12 @@ from src.store.bet_log import (
     active_bets,
     load_bet_log,
     log_bet,
+    settle_bets,
     to_backtest_bets,
 )
 from src.store.pit_store import PointInTimeStore
 from src.store.schema import Market, OddsSnapshot, Side
+from src.store.settlement import Outcome
 
 KICKOFF = datetime(2026, 9, 20, 17, 0, tzinfo=UTC)
 ENTRY = KICKOFF - timedelta(hours=24)
@@ -140,3 +143,103 @@ def test_bridge_preserves_strategy_relevant_identity(tmp_path):
     assert out.prop_stat == "receiving_yards"
     assert out.line == 45.5
     assert out.stake == 2.0
+
+
+# --- settlement -------------------------------------------------------------
+#
+# Settlement reuses settlement.settle / prop_settlement.settle_prop /
+# engine.payout_for unchanged. A second copy of that math would let live P&L
+# and backtest P&L disagree silently, which is the whole reason payout_for was
+# made public rather than duplicated.
+
+
+def _schedule(home_score, away_score, game_id=EVENT):
+    return pd.DataFrame([{"game_id": game_id, "home_score": home_score, "away_score": away_score}])
+
+
+def _settled(bets, schedule, kickoffs=None, player_stats=None, bankroll=100.0):
+    return settle_bets(bets, schedule, kickoffs or {EVENT: KICKOFF}, player_stats, bankroll)
+
+
+def _as_backtest(logged, store):
+    return to_backtest_bets(logged, store, as_of=KICKOFF)
+
+
+def _store(tmp_path):
+    s = PointInTimeStore(root=tmp_path)
+    s.write(_ml("pinnacle", -110, -110, ENTRY))
+    return s
+
+
+def test_moneyline_win_pays_profit_not_total_return(tmp_path):
+    bets = _as_backtest([_bet(price_american=100, stake=2.0)], _store(tmp_path))
+    out = _settled(bets, _schedule(home_score=24, away_score=17))   # home wins
+    assert out[0].outcome == Outcome.WIN
+    assert out[0].payout == pytest.approx(2.0)          # profit, not 4.0
+    assert out[0].bankroll_after == pytest.approx(102.0)
+
+
+def test_loss_debits_the_stake(tmp_path):
+    bets = _as_backtest([_bet(stake=2.0)], _store(tmp_path))
+    out = _settled(bets, _schedule(home_score=10, away_score=31))
+    assert out[0].outcome == Outcome.LOSS
+    assert out[0].payout == pytest.approx(-2.0)
+    assert out[0].bankroll_after == pytest.approx(98.0)
+
+
+def test_tie_is_a_push_not_a_loss(tmp_path):
+    """NFL ties are real -- ~1 a season. Folding one into a loss understates
+    the bankroll.
+    """
+    bets = _as_backtest([_bet(stake=2.0)], _store(tmp_path))
+    out = _settled(bets, _schedule(home_score=20, away_score=20))
+    assert out[0].outcome == Outcome.PUSH
+    assert out[0].payout == pytest.approx(0.0)
+    assert out[0].bankroll_after == pytest.approx(100.0)
+
+
+def test_ungraded_bet_is_not_counted_as_a_loss(tmp_path):
+    """An unplayed game must leave the bankroll untouched. Grading it as a loss
+    would silently understate a $100 bankroll that has no top-ups.
+    """
+    bets = _as_backtest([_bet(stake=2.0)], _store(tmp_path))
+    out = _settled(bets, _schedule(home_score=None, away_score=None))
+    assert out[0].outcome is None
+    assert out[0].payout is None
+    assert out[0].bankroll_after == pytest.approx(100.0)
+
+
+def test_bankroll_is_accumulated_in_KICKOFF_order_not_decision_order(tmp_path):
+    """`clv_portfolio.bankroll_path` reads bankroll_after positionally, and
+    sorting by decision time produced a non-monotone path once already: a bet
+    can be decided 5 days out on a late game and 1 hour out on an early one.
+    """
+    early_ko, late_ko = KICKOFF, KICKOFF + timedelta(days=2)
+    store = PointInTimeStore(root=tmp_path)
+    store.write(_ml("pinnacle", -110, -110, ENTRY)
+                + _ml("pinnacle", -110, -110, ENTRY, event_id="LATE"))
+
+    # decided FIRST but kicks off LAST
+    late = _bet(placed_at=ENTRY - timedelta(days=5), event_id="LATE", price_american=100)
+    early = _bet(placed_at=ENTRY, price_american=100)
+
+    bets = to_backtest_bets([late, early], store, as_of=KICKOFF)
+    sched = pd.concat([_schedule(24, 17), _schedule(24, 17, game_id="LATE")], ignore_index=True)
+    out = settle_bets(bets, sched, {EVENT: early_ko, "LATE": late_ko}, None, 100.0)
+
+    assert [b.event_id for b in out] == [EVENT, "LATE"]           # kickoff order
+    assert [b.bankroll_after for b in out] == pytest.approx([102.0, 104.0])
+
+
+def test_prop_settles_against_player_stats(tmp_path):
+    store = PointInTimeStore(root=tmp_path)
+    store.write(_ml("pinnacle", -110, -110, ENTRY))
+    prop = _bet(market=Market.PLAYER_PROP, side=Side.OVER, strategy="prop_arb",
+                player_name="A.J. Brown", prop_stat="receiving_yards", line=45.5,
+                price_american=100, stake=2.0)
+    stats = pd.DataFrame([{"game_id": EVENT, "player_display_name": "AJ Brown",
+                           "receiving_yards": 78.0}])
+    out = _settled(_as_backtest([prop], store), _schedule(24, 17), player_stats=stats)
+    # name normalisation resolves "A.J. Brown" (book) to "AJ Brown" (nflverse)
+    assert out[0].outcome == Outcome.WIN
+    assert out[0].bankroll_after == pytest.approx(102.0)

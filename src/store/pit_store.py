@@ -75,6 +75,18 @@ class LeakageError(RuntimeError):
     """Raised if a query would return (or returned) data from after decision_time."""
 
 
+# One price observation is identified by WHEN it was seen plus WHICH contract it
+# is. `prop_stat` is load-bearing and easy to omit: a single player can carry
+# `passing_tds` and `rushing_yards` at the same `line` value (2.5) from the same
+# book at the same instant -- leaving it out makes two unrelated contracts look
+# like one contract with two prices. (That mistake produced a false "2,752
+# conflicting prices" reading on 2026-08-23; the real count is 1.)
+CONTRACT_KEY = [
+    "capture_time", "event_id", "book", "market", "side",
+    "player_name", "prop_stat", "line",
+]
+
+
 class PointInTimeStore:
     def __init__(self, root: Path | str = Path("data/snapshots")):
         self.root = Path(root)
@@ -98,8 +110,29 @@ class PointInTimeStore:
         df.to_parquet(path, index=False)
         return path
 
-    def read_as_of(self, decision_time: datetime, event_id: str | None = None) -> pd.DataFrame:
-        """The only read path. Returns rows visible at `decision_time`, and nothing later."""
+    def read_as_of(
+        self, decision_time: datetime, event_id: str | None = None, dedupe: bool = True
+    ) -> pd.DataFrame:
+        """The only read path. Returns rows visible at `decision_time`, and nothing later.
+
+        **`dedupe` collapses repeat observations of the same contract at the same
+        instant, so reads are deterministic.** The store is append-only by design
+        and a re-run of a historical pull can legitimately re-record rows it
+        already holds; measured on the real store, 6,300 such groups are
+        byte-identical (pure re-writes) and exactly **one** carries two different
+        prices (Khalil Herbert receptions 1.5, betonlineag, 2023-09-24: -119 and
+        -125). Selectors like `engine.latest_fair_prob` pick via `idxmax` on
+        `capture_time`, which is *ambiguous* across tied rows -- so without this
+        the chosen price could differ between runs.
+
+        The tie-break is last-in-sorted-file-order: stable across runs, and
+        deliberately **neutral**. Picking the better price would flatter every EV
+        and CLV number computed downstream, which is the one direction a betting
+        system must never round toward.
+
+        Nothing is mutated -- the store still holds every row. Pass
+        `dedupe=False` to audit the raw record.
+        """
         if decision_time.tzinfo is None:
             raise ValueError("decision_time must be tz-aware (use UTC)")
 
@@ -108,6 +141,8 @@ class PointInTimeStore:
             return df
 
         result = self._filter(df, decision_time, event_id)
+        if dedupe and not result.empty:
+            result = result.drop_duplicates(subset=CONTRACT_KEY, keep="last")
 
         if not result.empty and result["capture_time"].max() > decision_time:
             raise LeakageError(

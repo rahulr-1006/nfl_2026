@@ -246,14 +246,33 @@ def run(store_root: str = "data/snapshots", segment_column: str = "strategy") ->
     cost, so it is free to run as often as you like. Meant to be read weekly;
     manual for now, since acting on a RETIRE verdict is a human decision.
     """
-    from src.store.bet_log import active_bets, to_backtest_bets
+    from src.store.bet_log import (
+        active_bets,
+        kickoffs_from_store,
+        load_settlement_inputs,
+        settle_bets,
+        to_backtest_bets,
+    )
 
     logged = active_bets()
     if not logged:
         log.info("season review: bet log is empty -- nothing placed yet")
         return pd.DataFrame()
 
-    bets = to_backtest_bets(logged, PointInTimeStore(root=store_root))
+    store = PointInTimeStore(root=store_root)
+    bets = to_backtest_bets(logged, store)
+
+    # Settle before reviewing, so realized P&L and the running bankroll are real
+    # rather than every bet showing as unresolved. Ungraded bets stay ungraded.
+    schedule, player_stats = load_settlement_inputs()
+    if schedule.empty:
+        log.warning("no cached schedule found -- bets cannot be settled, CLV only")
+    else:
+        bets = settle_bets(bets, schedule, kickoffs_from_store(store), player_stats)
+        graded = sum(1 for b in bets if b.outcome is not None)
+        log.info("settled %d of %d bet(s); bankroll $%.2f",
+                 graded, len(bets), bets[-1].bankroll_after if bets else 0.0)
+
     reviews = review_all(bets, segment_column=segment_column)
     print(format_review_summary(reviews))
     return reviews

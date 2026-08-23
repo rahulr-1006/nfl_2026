@@ -80,7 +80,7 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
 
     events = dict(state.events)
     remaining_credits = state.remaining_credits
-    polled = skipped = unmatched = failed = 0
+    polled = not_due = empty = unmatched = failed = 0
 
     for event in events_resp.events:
         event_id = event.get("id")
@@ -92,7 +92,7 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
         event_state = events.get(event_id, EventPollState())
         decision = decide_props_poll(now, kickoff, event_state, remaining_credits)
         if not decision.should_poll:
-            skipped += 1
+            not_due += 1  # never contacted the API -- no call, no cost
             continue
 
         try:
@@ -128,7 +128,14 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
             # makes a wide POSTING_WINDOW_DAYS safe: we can probe early and
             # often for free, and the real schedule only starts advancing once
             # there is something to capture.
-            skipped += 1
+            #
+            # Counted separately from `not_due` (2026-08-23 dry run): these two
+            # were both reported as "skipped", which made "we contacted N games
+            # and they have no props yet" indistinguishable from "we did not
+            # look". Before Week 1 that difference is the whole signal -- props
+            # silently ceasing to post would have looked exactly like healthy
+            # out-of-window operation.
+            empty += 1
             continue
 
         ctx.store.write(snapshots)
@@ -143,7 +150,10 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
         )
 
     save_state(ctx.state_path, PropsCollectorState(events=events, remaining_credits=remaining_credits))
-    log.info("props tick complete: polled=%d skipped=%d unmatched=%d failed=%d", polled, skipped, unmatched, failed)
+    log.info(
+        "props tick complete: polled=%d empty=%d not_due=%d unmatched=%d failed=%d",
+        polled, empty, not_due, unmatched, failed,
+    )
 
 
 def build_scheduler(ctx: PropsCollectorContext) -> BlockingScheduler:

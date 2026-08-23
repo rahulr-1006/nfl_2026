@@ -481,15 +481,51 @@ a row in 462,331 snapshots) cost **0 credits**. Those two dead markets in
 
 ---
 
+## Pre-kickoff only: enforced in both props paths (2026-08-23)
+
+**No live prop is ever polled after kickoff.** Every strategy here is priced
+entry-vs-close, and in-play prop books re-price on every snap, so an in-play
+quote is expensive (a full per-event call) *and* methodologically useless.
+
+Audit of every caller of the per-event odds endpoint:
+
+| Caller | Guard |
+|---|---|
+| `collect/props_scheduler.py` | `decide_props_poll` -> `event_started` (`props_budget.py:385`). Fires **before** the budget check, so no API call is made. Was **untested**; now covered, including a test that the ordering holds — a well-funded key must not buy in-play polls. |
+| `collect/props.py` (manual `make props-poll`) | **Was unguarded.** Its filter tested only `commence_time <= cutoff`, which a game that kicked off an hour ago still satisfies. Now `select_pollable_events` requires `now < kickoff <= now + days_ahead`. |
+| `collect/props_historical.py` | Historical endpoint — past games are the point. PARKED. |
+
+**Empirically clean:** 0 of 456,480 prop rows (and 0 mainline rows) have
+`capture_time > event_start_time`. The manual-path gap was latent, never fired.
+
+**Second defect found in the same function:** `props.py` built its client from
+`config.api_key`, which is `ODDS_API_KEY` — the **free** tier the mainline
+collector runs on (~500/month, 341 left). One manual props sweep at ~14 credits x
+16 games would have wiped it and silently stopped mainline collection. It now
+requires `ODDS_API_KEY_PAID` and hard-fails without it, matching `props_run.py`.
+This was a direct violation of the standing "do not mix the keys" constraint,
+sitting in a `make` target.
+
 ## Housekeeping backlog (low priority, not methodology)
 
-- **Notebook cell 95 has stale OUTPUTS.** Its source now sweeps
-  `[0.0297, 0.0476, 0.0629, 0.08, 0.10]`, but the rendered output tables still
-  show the superseded `0.0575` row because the cell has not been re-executed.
-  Source and prose are corrected everywhere (2026-08-23); **the outputs were
-  deliberately NOT hand-edited** -- rewriting a displayed result to a number
-  that was never computed is fabrication. Re-run the notebook on the `nfl-clv`
-  kernel to refresh. Low priority: nothing reads those outputs programmatically.
+- **~~2,752 conflicting historical prices~~ CORRECTED: the real count was 1, and
+  it is now fixed.** The original reading was an analysis error of mine, not a
+  data defect: the duplicate key omitted `prop_stat`, and one player can carry
+  `passing_tds` and `rushing_yards` at the *same line value* (2.5), same book,
+  same instant. That made two unrelated contracts look like one contract with two
+  prices. With `prop_stat` in the key: 6,301 duplicate groups, of which **6,300
+  are byte-identical re-writes** and exactly **1** is a genuine price conflict
+  (Khalil Herbert receptions 1.5, betonlineag, 2023-09-24: -119 vs -125).
+
+  **Fixed** in `PointInTimeStore.read_as_of`, which now deduplicates on
+  `CONTRACT_KEY` (capture_time + event + book + market + side + player +
+  **prop_stat** + line). This matters for determinism, not accuracy:
+  `engine.latest_fair_prob` selects via `idxmax` on `capture_time`, which is
+  ambiguous across tied rows, so identical code could return different prices
+  between runs. Tie-break is last-in-sorted-file-order — stable, and deliberately
+  **neutral**: picking the better price would flatter every EV and CLV number,
+  the one direction a betting system must never round toward. Nothing is mutated;
+  `dedupe=False` returns the raw record. Removes 6,589 redundant rows of 619,983.
 
 - **`src/collect/mainline_historical.py` is the one truly unreferenced module**
   (no import, no make target, no notebook). It is a completed one-shot pull.

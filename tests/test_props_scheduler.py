@@ -1,3 +1,4 @@
+import logging
 from datetime import UTC, datetime, timedelta
 from unittest.mock import MagicMock
 
@@ -185,3 +186,66 @@ def test_empty_poll_does_not_advance_the_schedule(tmp_path):
     client.get_event_odds.assert_called()          # it DID probe (free)
     state = load_state(ctx.state_path)
     assert state.events.get("evt_early", EventPollState()).poll_count == 0  # but banked nothing
+
+
+
+def test_empty_probe_and_not_due_are_counted_separately(tmp_path, caplog):
+    """**Dry-run finding, 2026-08-23.** Both paths were reported as one
+    `skipped` number, which made "we contacted N games and they have no props
+    yet" indistinguishable from "we never looked". Against the live services
+    this read `polled=0 skipped=272` while ~10 events were in fact being probed
+    every tick -- so props silently ceasing to post, or the endpoint returning
+    empties, would have looked exactly like healthy out-of-window operation.
+    `failed` already separated API errors; these two did not.
+    """
+    in_window = (NOW + timedelta(days=15)).isoformat().replace("+00:00", "Z")
+    far_out = (NOW + timedelta(days=300)).isoformat().replace("+00:00", "Z")
+
+    client = MagicMock()
+    client.get_events.return_value = OddsApiResponse(
+        events=[_event(event_id="evt_near", commence_time=in_window),
+                _event(event_id="evt_far", commence_time=far_out)],
+        remaining_credits=None, used_credits=None, last_cost=None, fetched_at=NOW,
+    )
+    client.get_event_odds.return_value = OddsApiResponse(
+        events=[{"home_team": "Seattle Seahawks", "away_team": "New England Patriots",
+                 "commence_time": in_window, "bookmakers": []}],   # probed, nothing posted
+        remaining_credits=25000, used_credits=0, last_cost=0, fetched_at=NOW,
+    )
+
+    caplog.set_level(logging.INFO, logger="src.collect.props_scheduler")
+    tick(_ctx(tmp_path, client), now=NOW)
+
+    # Exactly one event was contacted; the far-out one never was.
+    assert client.get_event_odds.call_count == 1
+    assert "polled=0 empty=1 not_due=1" in caplog.text
+
+
+def test_tick_never_polls_a_game_that_has_already_kicked_off(tmp_path):
+    """**Pre-kickoff is the whole methodology.** Every strategy here is priced
+    entry-vs-close, and in-play prop books re-price on every snap -- so an
+    in-play quote is both expensive (a full per-event call) and useless. The
+    guard lives in `decide_props_poll` (`event_started`) and fires BEFORE the
+    budget check, so no API call is made at all. Previously untested, which
+    meant a reordering of those checks would have gone unnoticed.
+    """
+    started = (NOW - timedelta(minutes=30)).isoformat().replace("+00:00", "Z")
+    client = MagicMock()
+    client.get_events.return_value = OddsApiResponse(
+        events=[_event(event_id="evt_live", commence_time=started)],
+        remaining_credits=None, used_credits=None, last_cost=None, fetched_at=NOW,
+    )
+    tick(_ctx(tmp_path, client), now=NOW)
+    client.get_event_odds.assert_not_called()
+
+
+def test_kickoff_guard_precedes_the_budget_check(tmp_path):
+    """Order matters: if the budget check ran first, a well-funded key would
+    happily pay for in-play polls.
+    """
+    from src.collect.props_budget import EventPollState, decide_props_poll
+
+    started = NOW - timedelta(minutes=1)
+    d = decide_props_poll(NOW, started, EventPollState(), remaining_credits=999_999)
+    assert not d.should_poll
+    assert d.reason == "event_started"

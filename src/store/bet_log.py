@@ -39,17 +39,24 @@ be traced back to the alert that triggered it.
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
 from pydantic import BaseModel, Field, field_validator
 
-from src.backtest.engine import BacktestBet, latest_fair_prob
+from src.backtest.engine import BacktestBet, latest_fair_prob, payout_for
 from src.clv.metrics import clv_price, clv_probability
 from src.devig.convert import american_to_decimal
 from src.store.pit_store import PointInTimeStore
+from src.store.prop_settlement import (
+    build_player_stats_index,
+    normalize_player_name,
+    settle_prop,
+)
 from src.store.schema import Market, Side
+from src.store.settlement import Outcome, build_results_index, settle
 
 log = logging.getLogger(__name__)
 
@@ -250,6 +257,121 @@ def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datet
     if rows.empty:
         return None
     return float(rows.loc[rows["capture_time"].idxmax(), "price_decimal"])
+
+
+def kickoffs_from_store(store: PointInTimeStore, as_of: datetime | None = None) -> dict[str, datetime]:
+    """event_id -> kickoff, read from the store's own `event_start_time`.
+
+    Separate from the schedule on purpose: the store already carries the exact
+    kickoff each quote was priced against, so this needs no column-name guessing
+    and stays correct for any event the collector saw.
+    """
+    df = store.read_as_of(as_of or datetime.now(UTC))
+    if df.empty:
+        return {}
+    return df.groupby("event_id")["event_start_time"].max().to_dict()
+
+
+def _grade(bet: BacktestBet, results: dict, stats_index: dict) -> Outcome | None:
+    """One bet's outcome, or None if it cannot be graded yet.
+
+    None is returned rather than guessed for an unplayed game, an unmatched
+    player name, or a missing stat -- an ungraded bet must never be counted as
+    a loss, which would silently understate the bankroll.
+    """
+    if bet.market == Market.PLAYER_PROP:
+        if bet.player_name is None or bet.prop_stat is None or bet.line is None:
+            return None
+        stats = stats_index.get((bet.event_id, normalize_player_name(bet.player_name)))
+        if stats is None or bet.prop_stat not in stats:
+            return None
+        actual = stats[bet.prop_stat]
+        if pd.isna(actual):
+            return None
+        return settle_prop(bet.side, bet.line, actual)
+
+    result = results.get(bet.event_id)
+    return None if result is None else settle(bet.market, bet.side, bet.line, result)
+
+
+def settle_bets(
+    bets: list[BacktestBet],
+    schedule: pd.DataFrame,
+    kickoffs: dict[str, datetime],
+    player_stats: pd.DataFrame | None = None,
+    starting_bankroll: float = 100.0,
+) -> list[BacktestBet]:
+    """Grade logged bets and track the realized bankroll.
+
+    Reuses `settlement.settle` / `prop_settlement.settle_prop` /
+    `engine.payout_for` unchanged -- settlement was written decoupled from the
+    store precisely so "both the eventual backtester and a real bet log can
+    reuse it", and a second implementation would let live and backtest P&L
+    disagree.
+
+    **Returned in kickoff order, not decision order.** `clv_portfolio.bankroll_path`
+    reads `bankroll_after` positionally and documents why: a strategy can decide
+    5 days out on a late game and 1 hour out on an early one, so only settlement
+    order describes the bankroll. Sorting by decision time here would reproduce a
+    bug already fixed once. Ungraded bets sort last and leave the bankroll
+    untouched -- they are unresolved, not losses.
+    """
+    if not bets:
+        return []
+
+    results = build_results_index(schedule) if schedule is not None and not schedule.empty else {}
+    stats_index: dict = {}
+    if player_stats is not None and not player_stats.empty:
+        stats_index = {
+            (gid, normalize_player_name(name)): st
+            for (gid, name), st in build_player_stats_index(player_stats).items()
+        }
+
+    graded = []
+    for b in bets:
+        outcome = _grade(b, results, stats_index)
+        graded.append(replace(b, outcome=outcome, payout=payout_for(outcome, b.stake, b.price_decimal)))
+
+    far_future = datetime.max.replace(tzinfo=UTC)
+    graded.sort(key=lambda b: (b.outcome is None, kickoffs.get(b.event_id, far_future), b.decision_time))
+
+    bankroll = starting_bankroll
+    out = []
+    for b in graded:
+        before = bankroll
+        if b.payout is not None:
+            bankroll += b.payout
+        out.append(replace(b, bankroll_before=before, bankroll_after=bankroll))
+    return out
+
+
+STATIC_DIR = Path("data/static")
+
+
+def load_settlement_inputs(static_dir: Path = STATIC_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:
+    """(schedule, player_stats) for settlement, concatenated across every cached
+    vintage in `static_dir`.
+
+    Concatenates rather than picking a file because the cache holds overlapping
+    vintages (`schedules_2015_2024`, `schedules_2015_2025`, `schedules_2026_2026`)
+    and a bet can land in any of them. Duplicates are dropped keeping the LAST
+    occurrence, so a newer vintage supersedes an older one for the same game --
+    which also makes the superseded 2015-2024 files harmless rather than a
+    correctness risk. Missing files return empty frames: nothing is settled, and
+    that is reported, never guessed.
+    """
+    def _concat(pattern: str, key: list[str]) -> pd.DataFrame:
+        frames = [pd.read_parquet(f) for f in sorted(static_dir.glob(pattern))]
+        if not frames:
+            return pd.DataFrame()
+        out = pd.concat(frames, ignore_index=True)
+        present = [k for k in key if k in out.columns]
+        return out.drop_duplicates(subset=present, keep="last") if present else out
+
+    return (
+        _concat("schedules_*.parquet", ["game_id"]),
+        _concat("player_stats_*.parquet", ["game_id", "player_display_name"]),
+    )
 
 
 def main() -> None:

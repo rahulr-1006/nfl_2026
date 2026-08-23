@@ -51,7 +51,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Iterable, Mapping
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pandas as pd
 from dotenv import load_dotenv
@@ -209,6 +209,30 @@ def poll_all_props(
     return {"matched": matched, "unmatched": unmatched, "malformed": malformed, "failed": failed, "written": len(all_snapshots)}
 
 
+def select_pollable_events(events: Iterable[dict], now: datetime, days_ahead: int) -> list[dict]:
+    """Events worth spending a per-event call on: **strictly before kickoff**,
+    and within `days_ahead`.
+
+    **The lower bound is the point of this function.** The filter here used to
+    test only `commence_time <= cutoff`, which a game that kicked off an hour ago
+    still satisfies -- so an in-play game was eligible for a paid per-event call.
+    That is wasted money twice over: every strategy in this project is priced
+    pre-kickoff (entry price vs. close), and in-play prop books re-price on every
+    snap, so the quote is both expensive and methodologically useless. The
+    scheduler path already refused this (`props_budget.decide_props_poll` ->
+    `event_started`); this manual path did not.
+    """
+    out = []
+    for e in events:
+        commence = e.get("commence_time")
+        if commence is None:
+            continue
+        kickoff = datetime.fromisoformat(commence)
+        if now < kickoff <= now + timedelta(days=days_ahead):
+            out.append(e)
+    return out
+
+
 def main() -> None:
     """Manual entrypoint: `python -m src.collect.props`. See module
     docstring -- not meant to run until real prop coverage exists.
@@ -218,8 +242,9 @@ def main() -> None:
     hitting the full ~272-game season schedule on every invocation would
     be pure waste, not extra coverage.
     """
+    import os
     import sys
-    from datetime import UTC, timedelta
+    from datetime import UTC
 
     import requests
 
@@ -243,14 +268,24 @@ def main() -> None:
     )
     events_resp.raise_for_status()
 
-    cutoff = datetime.now(UTC) + timedelta(days=days_ahead)
-    upcoming = [
-        e for e in events_resp.json() if datetime.fromisoformat(e["commence_time"]) <= cutoff
-    ]
-    log.info("%d event(s) within the next %d day(s) (of %d total)", len(upcoming), days_ahead, len(events_resp.json()))
+    all_events = events_resp.json()
+    upcoming = select_pollable_events(all_events, datetime.now(UTC), days_ahead)
+    log.info("%d event(s) pre-kickoff within the next %d day(s) (of %d total)",
+             len(upcoming), days_ahead, len(all_events))
     events = [(e["id"], e["home_team"], e["away_team"]) for e in upcoming]
 
-    client = OddsApiClient(config.api_key, config.sport_key)
+    # Props run on the PAID key, never the free one -- same rule props_run.py
+    # enforces. `config.api_key` is ODDS_API_KEY (free tier, ~500/month) which
+    # the mainline collector depends on; a single manual props sweep at ~14
+    # credits x 16 games would wipe it out and silently stop mainline collection.
+    props_key = os.environ.get("ODDS_API_KEY_PAID")
+    if not props_key:
+        raise ValueError(
+            "ODDS_API_KEY_PAID is not set (add it to .env) -- props polling uses the paid key, "
+            "not ODDS_API_KEY, which the mainline collector needs"
+        )
+
+    client = OddsApiClient(props_key, config.sport_key)
     store = PointInTimeStore(root=config.store_root)
     poll_all_props(client, events, config.season, schedule_index, name_to_abbr, store)
 

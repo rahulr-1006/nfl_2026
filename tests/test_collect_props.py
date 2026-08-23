@@ -177,3 +177,34 @@ def test_poll_all_props_records_failed_calls_without_raising(tmp_path):
     )
 
     assert counts == {"matched": 0, "unmatched": 0, "malformed": 0, "failed": 1, "written": 0}
+
+
+# --- pre-kickoff selection --------------------------------------------------
+
+
+def test_select_pollable_events_excludes_a_game_already_underway():
+    """The old filter tested only `commence_time <= cutoff`, which a game that
+    kicked off an hour ago still satisfies -- so an in-play game was eligible
+    for a paid per-event call. The scheduler path already refused this; this
+    manual path did not.
+    """
+    from datetime import UTC, datetime, timedelta
+
+    from src.collect.props import select_pollable_events
+
+    now = datetime(2026, 9, 7, 18, 0, tzinfo=UTC)
+    events = [
+        {"id": "live", "commence_time": (now - timedelta(hours=1)).isoformat()},
+        {"id": "soon", "commence_time": (now + timedelta(hours=3)).isoformat()},
+        {"id": "far", "commence_time": (now + timedelta(days=30)).isoformat()},
+    ]
+    assert [e["id"] for e in select_pollable_events(events, now, days_ahead=7)] == ["soon"]
+
+
+def test_select_pollable_events_excludes_a_game_starting_exactly_now():
+    from datetime import UTC, datetime
+
+    from src.collect.props import select_pollable_events
+
+    now = datetime(2026, 9, 7, 18, 0, tzinfo=UTC)
+    assert select_pollable_events([{"id": "x", "commence_time": now.isoformat()}], now, 7) == []
