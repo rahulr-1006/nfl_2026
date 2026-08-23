@@ -55,6 +55,7 @@ def bets_to_frame(bets: Sequence[BacktestBet]) -> pd.DataFrame:
             {
                 "event_id": b.event_id,
                 "decision_time": b.decision_time,
+                "strategy": b.strategy,
                 "market": b.market.value,
                 "side": b.side.value,
                 "line": b.line,

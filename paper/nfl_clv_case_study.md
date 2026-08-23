@@ -68,7 +68,7 @@
       individual seasons; the strongest, most robust finding in the session
       (`src/backtest/correlated_props.py`)
 - [x] Correlated-edge pricing (§4.5) — turns the correlation finding into a
-      quantified EV/Kelly-stake output using the project's own measured 5.75%
+      quantified EV/Kelly-stake output using the project's own measured 6.29%
       prop vig, not a guess; 6 of 7 pairs clear the vig hurdle, and the two
       strongest survive a vig sensitivity sweep up to 10%
       (`correlated_edge`/`naive_parlay_price` in `src/backtest/correlated_props.py`)
@@ -1129,7 +1129,7 @@ using `src/devig/methods.py::devig_multiplicative`'s own vig convention in rever
 and the TRUE joint probability is the one already measured (not assumed), the
 resulting bettor EV and suggested stake follow directly. The vig assumption is
 measured, not guessed: Pinnacle's own real vig on 5,005 Over/Under prop pairs from
-this project's historical pull averages 5.75% -- that's the default.
+this project's complete 2023+2024 historical pull averages 6.29%.
 
 **Result: 6 of 7 pairs show positive edge; the weakest correlation (`team_won x
 leading_receiver_75plus`, lift 1.07) does not clear the vig hurdle** -- a small
@@ -1140,11 +1140,11 @@ artifact of the pricing model rather than a real signal. The two strongest pairs
 `game_over x qb_2plus_tds`: +24.8% edge, $2.00 stake -- capped) reuse the exact same
 fractional-Kelly-then-bankroll-cap sizing every other spot in this project uses.
 
-**Robustness check: does the edge survive if the vig assumption is wrong?** 5.75% is
+**Robustness check: does the edge survive if the vig assumption is wrong?** 6.29% is
 Pinnacle's own measured prop vig, but execution books typically carry more, and a
 real multi-leg SGP engine's effective vig isn't independently measured here. Swept
 across this project's own measured mainline vig (2.97%), the standard -110/-110
-convention (4.76%), the measured prop vig (5.75%), and two higher retail-book
+convention (4.76%), the measured prop vig (6.29%), and two higher retail-book
 scenarios (8%, 10%): **both strongest pairs stay solidly positive-EV even at 10%
 vig**, well above the measured mean -- the edge shrinks monotonically as assumed vig
 rises (mechanically expected) but never crosses zero within a realistic range.
@@ -1359,8 +1359,8 @@ p=2.8e-5) and passing (lift 1.28, p=6.0e-5) team-total-over legs correlate with
 `team_won` in the underdog bucket, survive the assumption-free permutation test, and
 survive an honest 2023-train/2024-test out-of-sample split (rushing: 1.226 train ->
 1.167 realized; passing: 1.311 -> 1.216 realized -- both hold up). Priced edge (same
-`bucket_edge` formula, same measured 5.75% prop vig): rushing underdog **+6.6%**,
-passing underdog **+14.1%**. The favorite bucket (rushing only) repeats the exact
+`bucket_edge` formula, same measured 6.29% prop vig): rushing underdog **+5.5%**,
+passing underdog **+12.9%**. The favorite bucket (rushing only) repeats the exact
 failure mode already found for the fixed-threshold legs: nominally significant
 pooled (p=0.00026) but priced edge is already negative (-2.4%) and shrinks further
 out-of-sample (1.129 -> 1.051) -- not a real, tradeable signal.

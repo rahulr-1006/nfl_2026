@@ -12,6 +12,7 @@ from src.backtest.correlated_props import (
     is_bucket_validated,
     measure_leg_correlation,
     measure_leg_correlation_by_bucket,
+    measure_prop_vig,
     naive_parlay_price,
     price_bucket_bet,
 )
@@ -270,10 +271,29 @@ def test_bucket_edge_is_independent_of_market_probability():
         assert bucket_edge(lift, vig=vig) == pytest.approx(full["edge"])
 
 
-def test_bucket_edge_uses_measured_prop_vig_by_default():
+def test_bucket_edge_requires_an_explicit_vig():
+    """**Inverted 2026-08-23.** This used to assert that vig DEFAULTED to
+    `MEASURED_PROP_VIG`. That default was the bug: it is one pooled Pinnacle
+    mean applied to every book, while real per-book overround runs 6.47%-7.80%,
+    and `bucket_edge` divides by `(1 + vig) ** 2` so the error is squared and
+    self-flattering. Callers must now state the vig they measured.
+    """
     from src.backtest.correlated_props import MEASURED_PROP_VIG
 
-    assert bucket_edge(1.2) == pytest.approx(1.2 / (1 + MEASURED_PROP_VIG) ** 2 - 1)
+    with pytest.raises(TypeError):
+        bucket_edge(1.2)
+
+    assert bucket_edge(1.2, MEASURED_PROP_VIG) == pytest.approx(1.2 / (1 + MEASURED_PROP_VIG) ** 2 - 1)
+
+
+def test_bucket_edge_is_sensitive_to_the_vig_it_is_given():
+    """Squared term: a 1.5pp vig understatement is roughly a 3pp edge error.
+    This is why the pooled default was worth removing rather than documenting.
+    """
+    pooled = bucket_edge(1.2, 0.0629)          # the old pooled constant
+    williamhill = bucket_edge(1.2, 0.0780)     # that book's real measured vig
+    assert pooled > williamhill
+    assert (pooled - williamhill) > 0.02
 
 
 # --- is_bucket_validated / price_bucket_bet (2026-08-21 portfolio-validation fix) ---
@@ -290,7 +310,7 @@ def test_is_bucket_validated_matches_the_validated_set():
 def test_price_bucket_bet_prices_a_validated_bucket_normally():
     # team_market_prob=0.3 -> "underdog" bucket, validated.
     bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
-    result = price_bucket_bet(team_market_prob=0.3, historical_p_b=0.186, bucket_lift=bucket_lift)
+    result = price_bucket_bet(team_market_prob=0.3, historical_p_b=0.186, bucket_lift=bucket_lift, vig=0.0629)
 
     assert result["bucket"] == "underdog"
     assert result["bucket_validated"] is True
@@ -298,7 +318,7 @@ def test_price_bucket_bet_prices_a_validated_bucket_normally():
 
     # matches calling the unwrapped functions directly
     joint = estimate_game_specific_joint_prob(0.3, 0.186, 1.76)
-    expected = correlated_edge(0.3, 0.186, joint)
+    expected = correlated_edge(0.3, 0.186, joint, vig=0.0629)
     assert result["edge"] == pytest.approx(expected["edge"])
     assert result["suggested_stake"] == pytest.approx(expected["suggested_stake"])
 
@@ -307,7 +327,7 @@ def test_price_bucket_bet_refuses_an_unvalidated_bucket_by_default():
     # team_market_prob=0.8 -> "heavy_favorite" bucket, NOT validated.
     bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
     with pytest.raises(UnvalidatedBucketError):
-        price_bucket_bet(team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift)
+        price_bucket_bet(team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift, vig=0.0629)
 
 
 def test_price_bucket_bet_refuses_a_favorite_bucket_by_default():
@@ -315,13 +335,13 @@ def test_price_bucket_bet_refuses_a_favorite_bucket_by_default():
     # having cleared vig in the original pooled (in-sample, leaky) analysis.
     bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
     with pytest.raises(UnvalidatedBucketError):
-        price_bucket_bet(team_market_prob=0.6, historical_p_b=0.186, bucket_lift=bucket_lift)
+        price_bucket_bet(team_market_prob=0.6, historical_p_b=0.186, bucket_lift=bucket_lift, vig=0.0629)
 
 
 def test_price_bucket_bet_allows_unvalidated_when_explicitly_requested():
     bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
     result = price_bucket_bet(
-        team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift, allow_unvalidated=True
+        team_market_prob=0.8, historical_p_b=0.186, bucket_lift=bucket_lift, vig=0.0629, allow_unvalidated=True
     )
     assert result["bucket"] == "heavy_favorite"
     assert result["bucket_validated"] is False
@@ -330,4 +350,60 @@ def test_price_bucket_bet_allows_unvalidated_when_explicitly_requested():
 def test_price_bucket_bet_error_message_names_the_bad_bucket():
     bucket_lift = {"underdog": 1.76, "narrow": 1.6, "favorite": 1.33, "heavy_favorite": 1.12}
     with pytest.raises(UnvalidatedBucketError, match="heavy_favorite"):
-        price_bucket_bet(team_market_prob=0.9, historical_p_b=0.186, bucket_lift=bucket_lift)
+        price_bucket_bet(team_market_prob=0.9, historical_p_b=0.186, bucket_lift=bucket_lift, vig=0.0629)
+
+
+# --- vig measurement provenance ---------------------------------------------
+
+
+def _prop_row(over_am, under_am, book="pinnacle", player="A", line=45.5, eid="E1"):
+    """One two-sided prop contract at a given pair of American prices."""
+    def imp(a):
+        return (-a) / ((-a) + 100) if a < 0 else 100 / (a + 100)
+    return [
+        {"market": "player_prop", "book": book, "event_id": eid, "player_name": player,
+         "prop_stat": "receiving_yards", "line": line, "side": s,
+         "implied_prob_raw": imp(a), "capture_time": pd.Timestamp("2026-01-01", tz="UTC")}
+        for s, a in (("over", over_am), ("under", under_am))
+    ]
+
+
+def test_measure_prop_vig_recovers_a_known_overround():
+    """-110/-110 is 4.76% overround by construction. If this drifts, the
+    constant's provenance is broken.
+    """
+    df = pd.DataFrame(_prop_row(-110, -110))
+    r = measure_prop_vig(df, book="pinnacle")
+    assert r["n_contracts"] == 1
+    assert r["mean_overround"] == pytest.approx(0.047619, abs=1e-5)
+
+
+def test_measure_prop_vig_uses_overround_not_hold():
+    """The constant is `sum(q)-1`, matching devig's own `overround()`. Hold
+    would be `overround/(1+overround)` and reads ~0.5pp lower -- conflating
+    them would silently understate the barrier every prop proposal must clear.
+    """
+    df = pd.DataFrame(_prop_row(-130, -130))
+    r = measure_prop_vig(df, book="pinnacle")
+    assert r["mean_overround"] == pytest.approx(0.130435, abs=1e-5)   # overround
+    assert r["mean_overround"] != pytest.approx(0.115385, abs=1e-5)   # NOT hold
+
+
+def test_measure_prop_vig_reports_mean_and_median_separately():
+    """They differ materially on real data (6.29% vs 6.88% on the same 16,953
+    Pinnacle contracts). Reporting one number hides the skew.
+    """
+    rows = _prop_row(-110, -110, eid="E1") + _prop_row(-130, -130, eid="E2") + _prop_row(-130, -130, eid="E3")
+    r = measure_prop_vig(pd.DataFrame(rows), book="pinnacle")
+    assert r["n_contracts"] == 3
+    assert r["mean_overround"] != pytest.approx(r["median_overround"], abs=1e-4)
+
+
+def test_measure_prop_vig_ignores_one_sided_quotes():
+    """A one-sided quote has no complement to sum against, so it carries no
+    measurable overround -- the same reason anytime-TD is out of scope.
+    """
+    rows = _prop_row(-110, -110, eid="E1")
+    rows.append({**rows[0], "event_id": "E2", "side": "over"})  # over with no under
+    r = measure_prop_vig(pd.DataFrame(rows), book="pinnacle")
+    assert r["n_contracts"] == 1

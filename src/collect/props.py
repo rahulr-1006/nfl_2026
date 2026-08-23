@@ -16,10 +16,30 @@ Structural differences from the mainline collector (src/collect/scheduler.py):
   for the regular season (unlike preseason), so matching reuses
   src/collect/transform.py's match_event/build_schedule_index directly.
 - Only Over/Under-style prop markets (PROP_MARKET_TO_STAT) are parsed.
-  Proposition-style markets (player_anytime_td and similar) were observed
-  live as single-sided -- no complementary "No" price -- so they can't be
-  devigged with the existing two-outcome methods (src/devig/methods.py)
-  and are deliberately out of scope, not just unmapped.
+  Proposition-style markets (player_anytime_td and similar) are out of
+  scope. **Re-tested in-season 2026-08-23 and the verdict holds, now on
+  real evidence rather than one preseason observation:** the original call
+  was made 2026-08-17 when only DraftKings had posted anything at all. A
+  live probe of player_anytime_td (2 credits, NE @ SEA) returned 3 books
+  (draftkings, fanduel, williamhill_us) and 63 outcomes -- **every one
+  "Yes", not a single "No" at any book.**
+
+  There is a second, deeper reason this market cannot be priced here, which
+  the original note missed: **anytime-TD is not a partition.** Several
+  players score in a game, so summed Yes probabilities came to 4.83-5.29
+  per book -- that is the expected NUMBER of TD scorers, not 1.0. So
+  `sum(q) - 1` is not an overround either. With no complementary price AND
+  no partition, **the vig on this market cannot be measured from prices at
+  all** -- any published "TD props run 12-20% vig" figure is model-derived,
+  not observed, and is not comparable to the two-way overround this project
+  measures (6.93% median across 228,146 real contracts).
+
+  Books do disagree here, substantially -- up to 10.0pp of implied
+  probability on the same player (DK +115 / FD +130 / WH -115). But with
+  only one side quoted that disagreement is not arbitrable and not
+  middleable; capturing it requires estimating the true probability, which
+  is the strategy shape this project has measured as failing. See
+  methodology_backlog.md.
 - No launchd service, no budget-aware scheduling: meant to be invoked by
   hand (`python -m src.collect.props`) once props are actually observed
   to exist, the same "manual/sparse invocation" discipline

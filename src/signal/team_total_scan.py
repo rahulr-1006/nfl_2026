@@ -25,6 +25,7 @@ code path is exercised before it matters.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
@@ -33,6 +34,7 @@ import pandas as pd
 from src.backtest.correlated_props import (
     UnvalidatedBucketError,
     bucket_favorite_strength,
+    measure_prop_vig,
     price_bucket_bet,
 )
 from src.model.baseline import market_baseline
@@ -51,6 +53,9 @@ VALIDATED_TEAM_TOTAL_LIFT: Mapping[str, Mapping[str, float]] = {
 # Base rate of a team clearing its own summed prop line, measured on the real
 # 2023-24 contracts (`team_total_props` build). Near 0.5 by construction, which
 # is the expected result of summing balanced two-sided lines.
+log = logging.getLogger(__name__)
+
+PINNACLE_BOOK = "pinnacle"
 DEFAULT_TEAM_TOTAL_BASE_RATE = 0.5
 DEFAULT_EDGE_THRESHOLD = 0.03
 
@@ -108,6 +113,38 @@ def team_market_probabilities(store: PointInTimeStore, as_of: datetime | None = 
     return pd.DataFrame(rows)
 
 
+def measured_vig_by_event(
+    store: PointInTimeStore, prop_stat: str, as_of: datetime | None = None, book: str = PINNACLE_BOOK
+) -> dict[str, float]:
+    """Vig measured per event from the SAME rows this scanner prices against,
+    rather than a pooled constant.
+
+    **Why this is not `MEASURED_PROP_VIG`.** That constant is one pooled mean
+    over all of Pinnacle; real per-book median overround runs 6.47%-7.80%, and
+    `bucket_edge` divides by `(1 + vig) ** 2`, so vig enters squared and a 1.5pp
+    error becomes roughly a 3pp edge error -- in the self-flattering direction.
+    An event whose vig cannot be measured returns no entry, and the caller skips
+    it: the same "refuse rather than invent" discipline as `UnvalidatedBucketError`.
+    """
+    as_of = as_of or datetime.now(UTC)
+    df = upcoming_only(store.read_as_of(as_of), as_of)
+    if df.empty or "prop_stat" not in df.columns:
+        return {}
+
+    scoped = df[(df["market"] == "player_prop") & (df["prop_stat"] == prop_stat)]
+    if scoped.empty:
+        return {}
+
+    out: dict[str, float] = {}
+    for event_id, rows in scoped.groupby("event_id"):
+        measured = measure_prop_vig(rows, book=book)
+        if measured["n_contracts"] and measured["median_overround"] is not None:
+            # Median, not mean: a single lopsided contract should not move the
+            # vig applied to a whole game's pricing.
+            out[str(event_id)] = float(measured["median_overround"])
+    return out
+
+
 def find_team_total_spots(
     store: PointInTimeStore,
     prop_stat: str = "rushing_yards",
@@ -133,6 +170,11 @@ def find_team_total_spots(
     if lines.empty or probs.empty:
         return pd.DataFrame()
 
+    # Vig measured from the actual quotes being priced, per event -- never a
+    # pooled constant. See `measured_vig_by_event` for why that distinction is
+    # not cosmetic (vig enters `bucket_edge` squared).
+    vig_by_event = measured_vig_by_event(store, prop_stat, as_of)
+
     rows = []
     for r in probs.itertuples():
         try:
@@ -141,8 +183,13 @@ def find_team_total_spots(
             continue
         if bucket not in lifts:
             continue  # no TRAIN-fit lift for this bucket -- do not invent one
+        vig = vig_by_event.get(str(r.event_id))
+        if vig is None:
+            continue  # no measurable vig for this game -- refuse rather than assume one
         try:
-            priced = price_bucket_bet(r.team_market_prob, base_rate, dict(lifts), bankroll=bankroll)
+            priced = price_bucket_bet(
+                r.team_market_prob, base_rate, dict(lifts), vig=vig, bankroll=bankroll
+            )
         except UnvalidatedBucketError:
             continue  # the gate doing its job
 
@@ -151,7 +198,7 @@ def find_team_total_spots(
         rows.append({
             "event_id": r.event_id, "side": r.side, "prop_stat": prop_stat, "bucket": bucket,
             "team_market_prob": r.team_market_prob, "lift": priced["bucket_lift"],
-            "edge": priced["edge"], "suggested_stake": priced["suggested_stake"],
+            "edge": priced["edge"], "suggested_stake": priced["suggested_stake"], "vig": vig,
             "n_player_lines": int((lines["event_id"] == r.event_id).sum()),
         })
 
@@ -174,3 +221,37 @@ def team_total_alert_key(row: pd.Series) -> str:
 
 def available_stats(lift_by_bucket: Mapping[str, Mapping[str, float]] = VALIDATED_TEAM_TOTAL_LIFT) -> Sequence[str]:
     return sorted(lift_by_bucket)
+
+
+def run(store_root: str = "data/snapshots", threshold: float = DEFAULT_EDGE_THRESHOLD) -> pd.DataFrame:
+    """Scan every validated stat and print what is priceable right now.
+
+    **Manual only, matching `middle_scan`/`steam_scan` and for the same stated
+    reason:** this strategy has no live track record yet, so it is not trusted
+    to an unattended alert channel. Reads local parquet only -- no Odds API
+    cost, so it is free to run as often as you like.
+    """
+    store = PointInTimeStore(root=store_root)
+    frames = []
+    for stat in available_stats():
+        spots = find_team_total_spots(store, prop_stat=stat, threshold=threshold)
+        if not spots.empty:
+            frames.append(spots)
+
+    if not frames:
+        log.info("team-total scan: no priceable spots (validated buckets only)")
+        return pd.DataFrame()
+
+    out = pd.concat(frames, ignore_index=True).sort_values("edge", ascending=False)
+    for _, row in out.iterrows():
+        log.info(format_team_total_alert(row))
+    return out.reset_index(drop=True)
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    run()
+
+
+if __name__ == "__main__":
+    main()

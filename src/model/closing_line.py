@@ -39,6 +39,12 @@ a real price that differs from your predicted close by more than the vig, and th
 module says nothing about whether such prices exist or persist. Route any candidate
 strategy through `src/backtest/evaluation.py::evaluate_strategy` before calling it an
 edge -- a good R^2 here is a necessary condition, not a sufficient one.
+
+**PARKED 2026-08-23 (audit verdict).** Phase 3 research that reached an honest
+NEGATIVE result: recent form adds nothing beyond the line itself. The question
+it asked was worth asking -- it is the one model here that predicts the market
+rather than being scored against it -- but the answer was no, and nothing
+downstream consumes it. Reopen only with a new feature family, not a re-run.
 """
 
 from __future__ import annotations

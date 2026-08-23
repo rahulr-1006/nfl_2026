@@ -1,3 +1,5 @@
+import inspect
+
 import pytest
 
 from src.devig.methods import (
@@ -97,3 +99,64 @@ def test_compare_methods_table_has_one_row_per_method_and_sums_to_one():
     assert list(table.columns) == ["p_0", "p_1"]
     row_sums = table["p_0"] + table["p_1"]
     assert (row_sums.round(6) == 1.0).all()
+
+
+# --- vig magnitude invariance -----------------------------------------------
+#
+# Prompted by a real question: published figures put player-prop vig near 12%,
+# far above the 6.93% median this project measures on its own markets. The
+# concern was whether the deviggers are calibrated to a vig level and would
+# silently under-remove a fatter one.
+#
+# They are not, and these tests pin that. Every method derives the vig from the
+# quote it is handed -- `overround()` is `sum(q_i) - 1` computed from that
+# quote -- so there is no vig constant to be wrong. MEASURED_PROP_VIG lives in
+# src/backtest/correlated_props.py and is never imported here; it feeds the SGP
+# pricing simulator, which has no real quote to read.
+
+
+def _symmetric_market(overround_target: float) -> tuple[float, float]:
+    """Two-way market with a known overround, priced 50/50 before vig."""
+    q = (1.0 + overround_target) / 2.0
+    return (q, q)
+
+
+@pytest.mark.parametrize("target", [0.0476, 0.0693, 0.12, 0.20, 0.35])
+@pytest.mark.parametrize("name", sorted(DEVIG_METHODS))
+def test_devig_removes_whatever_vig_is_present(name, target):
+    """A 35% market gets 35% removed, same as a 4.76% one. The methods are
+    scale-free in the vig, which is the whole property the concern was about.
+    """
+    raw = _symmetric_market(target)
+    assert overround(raw) == pytest.approx(target, abs=1e-9)
+
+    result = DEVIG_METHODS[name](raw)
+    assert sum(result.probabilities) == pytest.approx(1.0, abs=1e-9)
+    # Symmetric market must devig to a coin flip regardless of how fat the vig is.
+    assert result.probabilities[0] == pytest.approx(0.5, abs=1e-6)
+
+
+@pytest.mark.parametrize("name", sorted(DEVIG_METHODS))
+def test_fatter_vig_yields_strictly_lower_fair_probability_on_a_favorite(name):
+    """The fair probability of a given raw price must FALL as the market's vig
+    rises -- more of that price is juice. If a method ignored vig magnitude
+    this would come out flat.
+    """
+    fav_raw = 0.60
+    thin = DEVIG_METHODS[name]((fav_raw, 0.4476))   # ~4.76% overround
+    fat = DEVIG_METHODS[name]((fav_raw, 0.5200))    # ~12% overround
+    assert fat.probabilities[0] < thin.probabilities[0]
+    for r in (thin, fat):
+        assert sum(r.probabilities) == pytest.approx(1.0, abs=1e-9)
+
+
+def test_no_vig_constant_is_imported_into_the_devig_module():
+    """Guards the separation directly: if someone ever wires a measured-vig
+    constant into devigging, the devigger stops reading the real market and
+    starts asserting one. That is the failure the concern imagined.
+    """
+    import src.devig.methods as m
+
+    src = inspect.getsource(m)
+    assert "MEASURED_PROP_VIG" not in src
+    assert "correlated_props" not in src

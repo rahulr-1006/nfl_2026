@@ -37,6 +37,7 @@ worked first.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -48,6 +49,9 @@ from src.backtest.engine import BacktestBet
 from src.backtest.evaluation import evaluate_strategy
 from src.clv.metrics import beat_rate
 from src.drift.monitor import cusum, first_flag_index, rolling_mean_clv
+from src.store.pit_store import PointInTimeStore
+
+log = logging.getLogger(__name__)
 
 # Below this, a verdict is noise. Not tuned on data -- chosen so a single bad
 # week cannot retire a strategy, since with ~16 games/week a real props strategy
@@ -228,3 +232,37 @@ def format_review_summary(reviews: pd.DataFrame) -> str:
             f"mean_clv={clv} recent={recent} drift={'YES' if r.drift_flagged else 'no'} -- {r.reason}"
         )
     return "\n".join(lines)
+
+
+def run(store_root: str = "data/snapshots", segment_column: str = "strategy") -> pd.DataFrame:
+    """Weekly in-season health check over the LIVE bet log.
+
+    Segments on `strategy` rather than `market` because that is what identifies
+    the scanner: prop arb and experimental prop EV are both `player_prop` with
+    opposite track records, and a pooled verdict would let the validated one
+    mask the null one.
+
+    Reads `data/bet_log.jsonl` + the local snapshot store only -- no Odds API
+    cost, so it is free to run as often as you like. Meant to be read weekly;
+    manual for now, since acting on a RETIRE verdict is a human decision.
+    """
+    from src.store.bet_log import active_bets, to_backtest_bets
+
+    logged = active_bets()
+    if not logged:
+        log.info("season review: bet log is empty -- nothing placed yet")
+        return pd.DataFrame()
+
+    bets = to_backtest_bets(logged, PointInTimeStore(root=store_root))
+    reviews = review_all(bets, segment_column=segment_column)
+    print(format_review_summary(reviews))
+    return reviews
+
+
+def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+    run()
+
+
+if __name__ == "__main__":
+    main()

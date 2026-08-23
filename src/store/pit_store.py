@@ -14,9 +14,9 @@ batch's capture time.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Sequence
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Sequence
 from uuid import uuid4
 
 import pandas as pd
@@ -90,7 +90,7 @@ class PointInTimeStore:
         partition_dir = self.root / f"capture_date={capture_date.isoformat()}"
         partition_dir.mkdir(parents=True, exist_ok=True)
 
-        filename = f"{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S%f')}_{uuid4().hex[:8]}.parquet"
+        filename = f"{datetime.now(UTC).strftime('%Y%m%dT%H%M%S%f')}_{uuid4().hex[:8]}.parquet"
         path = partition_dir / filename
         if path.exists():
             raise FileExistsError(f"refusing to overwrite existing snapshot file {path}")

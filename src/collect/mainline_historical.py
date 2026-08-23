@@ -29,6 +29,12 @@ the 570 2023-2024 test-set games is ~34,200 credits.
 **Unverified against a real response until the first real pull** -- same
 caveat `props_historical.py` carries, for the same reason (no way to call
 the historical endpoint without paid access to test against).
+
+**PARKED 2026-08-23 (audit verdict).** A completed one-shot pull -- the real
+Pinnacle mainline odds were fetched and re-scored, and the gap turned out real
+but numerically inconsequential (0.000138 Brier difference, corr 0.9976). It was
+the *only* module in the repo with no importer, no make target and no notebook
+reference. Nothing should wire it; re-running spends real paid credits.
 """
 
 from __future__ import annotations

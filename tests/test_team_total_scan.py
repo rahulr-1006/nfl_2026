@@ -7,6 +7,7 @@ from src.signal.team_total_scan import (
     VALIDATED_TEAM_TOTAL_LIFT,
     find_team_total_spots,
     format_team_total_alert,
+    measured_vig_by_event,
     team_market_probabilities,
     team_total_alert_key,
     team_total_lines_from_store,
@@ -143,3 +144,52 @@ def test_alert_keys_distinguish_side_and_stat():
     c = team_total_alert_key(pd.Series({**base, "side": "home", "prop_stat": "passing_yards"}))
     assert len({a, b, c}) == 3
     assert a.startswith("tt|")
+
+
+# --- vig must be MEASURED per event, never a pooled constant ----------------
+#
+# `bucket_edge` divides by `(1 + vig) ** 2`, so vig enters squared. A pooled
+# Pinnacle mean (6.29%) applied to a book quoting 7.80% understates the vig by
+# ~1.5pp and overstates the edge by ~3pp -- in the self-flattering direction,
+# which is exactly how the superseded 5.75% constant went unnoticed.
+
+
+def _one_sided_prop(player, line, capture=NOW, event_id="2026_03_KC_LAC", stat="rushing_yards"):
+    """Over only -- no complement, so no measurable overround."""
+    return [
+        OddsSnapshot.from_american(
+            capture_time=capture, event_id=event_id, season=2026, week=3, home_team="LAC",
+            away_team="KC", event_start_time=KICKOFF, book="pinnacle", market=Market.PLAYER_PROP,
+            side=Side.OVER, price_american=-110, line=line, player_name=player, prop_stat=stat,
+        )
+    ]
+
+
+def test_measured_vig_by_event_reads_the_real_quote(tmp_path):
+    """-110/-110 is 4.76% overround by construction -- not the 6.29% constant."""
+    store = PointInTimeStore(root=tmp_path)
+    store.write(_ml(-110, -110) + _prop("RB1", 60.5))
+    vigs = measured_vig_by_event(store, "rushing_yards", as_of=NOW)
+    assert vigs["2026_03_KC_LAC"] == pytest.approx(0.047619, abs=1e-5)
+
+
+def test_priced_spot_carries_the_vig_actually_measured(tmp_path):
+    from src.backtest.correlated_props import MEASURED_PROP_VIG
+
+    store = PointInTimeStore(root=tmp_path)
+    store.write(_ml(-110, -110) + _prop("RB1", 60.5))
+    spots = find_team_total_spots(store, "rushing_yards", as_of=NOW, threshold=0.0)
+    assert not spots.empty
+    assert spots.iloc[0]["vig"] == pytest.approx(0.047619, abs=1e-5)
+    # The whole point: it is NOT silently the pooled constant.
+    assert spots.iloc[0]["vig"] != pytest.approx(MEASURED_PROP_VIG, abs=1e-4)
+
+
+def test_event_with_no_measurable_vig_is_skipped_not_assumed(tmp_path):
+    """One-sided quotes carry no overround. Refuse rather than invent one --
+    the same discipline as UnvalidatedBucketError.
+    """
+    store = PointInTimeStore(root=tmp_path)
+    store.write(_ml(-110, -110) + _one_sided_prop("RB1", 60.5))
+    assert measured_vig_by_event(store, "rushing_yards", as_of=NOW) == {}
+    assert find_team_total_spots(store, "rushing_yards", as_of=NOW, threshold=0.0).empty

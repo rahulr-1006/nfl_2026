@@ -45,6 +45,15 @@ rate, expected since this is per-SNAP (includes run-support snaps) for one
 individual rather than per-dropback for a whole defense.
 `DEFAULT_INDIVIDUAL_BASE_PRESSURE_OFFSET` is `-400 * log10(1/p - 1)` at that
 measured `p`, the identical formula `pass_rush_elo.py`'s own offset uses.
+
+**PARKED 2026-08-23 (audit verdict).** The only available wire is "add it as a
+model feature", which makes it comparison #10 in a family where feature
+engineering is **0 for 6** (garbage time, weather, rest/travel, game-level Elo
+rollups, GBM-once-Elo-is-present, referee tendencies) and every new comparison
+must clear Benjamini-Hochberg against ~69 p-values. Wiring it would spend a
+correction slot -- and burn the untouched 2025 holdout -- on an outcome this
+project's own design rule predicts. It stays a standalone leaderboard/diagnostic.
+Reopen only for a *structural* use that needs no probability estimate.
 """
 
 from __future__ import annotations
