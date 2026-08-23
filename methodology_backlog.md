@@ -44,6 +44,30 @@ none of which require out-predicting Pinnacle.
 **Before proposing a prop strategy, state which shape it is.** If it is
 probability estimation, state where the >4.7% is coming from.
 
+### Vig is measured, never assumed (2026-08-23)
+
+`MEASURED_PROP_VIG = 0.0629` is now **reproducible**: `measure_prop_vig` in
+`src/backtest/correlated_props.py` re-derives it from raw snapshots and returns
+n=16,953, mean=0.0629 against Pinnacle — matching the documented sample exactly.
+Previously the number could be quoted but not audited, and it had already been
+wrong once (0.0575).
+
+**It is deliberately NOT a default on any pricing function.** Vig varies by book —
+per-book median overround runs 6.47% (betonlineag) to 7.80% (williamhill_us) —
+and `bucket_edge` divides by `(1 + vig) ** 2`, so **vig enters squared**. Pricing a
+williamhill_us bet at the pooled 6.29% understates vig ~1.5pp, which is roughly a
+3pp edge error in the self-flattering direction. `bucket_edge`,
+`naive_parlay_price`, `correlated_edge` and `price_bucket_bet` now all require an
+explicit vig; `team_total_scan.measured_vig_by_event` measures it per event from
+the same quotes being priced, and **skips any event whose vig cannot be measured**
+rather than assuming one.
+
+Live devigging never used the constant and never did: all four methods in
+`src/devig/methods.py` derive vig from the two-sided quote handed to them
+(`overround()` is `sum(q_i) - 1` on that quote), per contract per capture. The
+live EV path devigs Pinnacle only and compares against the execution book's **raw**
+price — the book's vig is paid, not modelled away.
+
 ### What to expect once Pinnacle starts quoting props (measured 2026-08-23)
 
 Live props posted on 2026-08-23 for the 9/9 opener — 17 days out, far earlier
@@ -390,6 +414,180 @@ posted price exists for "sum of individual player lines," so this confirms the
 correlation mechanism is real, not a confirmed live exploit. Full write-up: paper
 §4.5 (new subsection), `notebooks/model_backtest_results.ipynb` (new section, 6
 cells).
+
+---
+
+## 10. High-vig markets — **checked, hypothesis reframed, anytime-TD confirmed unpriceable**
+
+**The hypothesis (worth stating fairly, because it is a good one):** published
+figures put player-prop vig near 12%, well above the 6.29% here. A book quoting
+wide is a book that is less sure of itself, so wide markets should hold more
+mispricing and therefore more edge.
+
+**First finding: the 12% is not comparable to our number.** Measured across all
+**228,146** real two-sided contracts in the store: median overround **6.93%**,
+p99 **8.17%**, and **zero contracts at or above 10%**. One-sided dropout is
+0.05%, so nothing wide is being filtered out. Live props run 6.54–7.38%. The
+published 12–20% figures describe *multi-way* markets, a different construct
+with a different denominator — see the anytime-TD result below.
+
+**Second finding, and the reusable one: vig does not predict structural
+opportunity here — line standardization does.** Correlation between per-book vig
+and cross-book arb rate across our 5 stats is **−0.954**; the *lowest*-vig
+markets carry the most opportunity.
+
+| prop_stat | per-book vig | best-of-books | shopping gain | arb rate | distinct lines |
+|---|---|---|---|---|---|
+| receptions | 6.71% | 4.45% | 2.26pp | 3.00% | 11 |
+| passing_tds | 6.72% | 3.18% | 3.54pp | 4.40% | 4 |
+| receiving_yards | 6.93% | 6.51% | 0.42pp | 0.41% | 121 |
+| rushing_yards | 6.93% | 6.28% | 0.64pp | 0.60% | 135 |
+| passing_yards | 6.98% | 6.54% | 0.43pp | 0.24% | 161 |
+
+The mechanism is **not** books disagreeing more. It is that few distinct lines
+force every book onto the *same* contract, so prices are directly comparable.
+Yards markets spray across 121–161 lines, matched pairs are rare, and there is
+little to arb even when prices differ. `ARB_MARKETS` was already set to exactly
+the two standardized markets — this explains *why* that worked.
+
+**Honest limit:** our vig range is 6.71%–6.98%, a 0.27pp window, and n=5 stats.
+That correlation cannot be extrapolated to a 12% market. The properties also come
+apart at anytime-TD, which is high-vig *and* perfectly standardized. So the
+question was settled by measurement, not inference.
+
+**Third finding — anytime-TD is structurally unpriceable, on real evidence.**
+A 2-credit live probe (2026-08-23, NE @ SEA) returned 3 books and 63 outcomes,
+**all "Yes", zero "No" at any book**. This upholds an earlier call made
+2026-08-17, but that one rested on a single preseason observation when only
+DraftKings had posted anything; it is now evidenced.
+
+The deeper reason the earlier note missed: **anytime-TD is not a partition.**
+Multiple players score, so summed Yes probabilities came to **4.83–5.29 per
+book** — the expected *number* of TD scorers, not 1.0. So `sum(q) − 1` is not an
+overround either. **With no complementary price and no partition, this market's
+vig cannot be measured from prices at all.** Any "TD props run 12–20%" figure is
+model-derived, not observed.
+
+Books do disagree substantially — up to **10.0pp** of implied probability on the
+same player (DK +115 / FD +130 / WH −115). But one-sided quotes cannot be arbed
+or middled, so capturing that requires estimating the true probability: the
+strategy shape with a 0-for-7 record here, against a vig you cannot even measure.
+**Verdict: park.** Reopen only if a book starts posting "No" prices.
+
+**Free byproduct — the API bills on markets RETURNED, not requested.** A probe
+requesting only `player_rush_tds,player_reception_tds` (which have never returned
+a row in 462,331 snapshots) cost **0 credits**. Those two dead markets in
+`PROP_MARKET_TO_STAT` are not wasting any budget; leaving them in place is free.
+
+---
+
+## Housekeeping backlog (low priority, not methodology)
+
+- **Notebook cell 95 has stale OUTPUTS.** Its source now sweeps
+  `[0.0297, 0.0476, 0.0629, 0.08, 0.10]`, but the rendered output tables still
+  show the superseded `0.0575` row because the cell has not been re-executed.
+  Source and prose are corrected everywhere (2026-08-23); **the outputs were
+  deliberately NOT hand-edited** -- rewriting a displayed result to a number
+  that was never computed is fabrication. Re-run the notebook on the `nfl-clv`
+  kernel to refresh. Low priority: nothing reads those outputs programmatically.
+
+- **`src/collect/mainline_historical.py` is the one truly unreferenced module**
+  (no import, no make target, no notebook). It is a completed one-shot pull.
+  Park or delete; do not "wire" it.
+
+- **Pre-existing lint debt: 17 ruff errors across 7 files** (`src/clv/metrics.py`,
+  `src/collect/run.py`, `src/devig/methods.py`, `src/store/pit_store.py`,
+  `tests/test_pit_store.py`, `tests/test_props_budget.py`, `tests/test_schema.py`).
+  All UP035/UP017/I001, all auto-fixable with `ruff check --fix`. Note the
+  handoff recorded "lint clean" -- that was true under an older ruff.
+
+### Orphan verdicts (2026-08-23) — 9 tested-only modules resolved
+
+| Module | Verdict |
+|---|---|
+| `signal/team_total_scan.py` | **WIRED** — `make team-total-scan-once`, manual like `middle_scan`/`steam_scan` (validated edge, no live track record) |
+| `collect/props_historical.py` | PARKED — completed one-shot pull, 285/285 games |
+| `collect/mainline_historical.py` | PARKED — completed one-shot pull, was the only fully unreferenced module |
+| `model/individual_pass_rush_elo.py` | PARKED — wiring = comparison #10 against an 0-for-6 record; would burn a BH slot and the 2025 holdout |
+| `model/prop_projection.py` | PARKED — measured worse than base rate |
+| `model/closing_line.py` | PARKED — honest negative (recent form adds nothing beyond the line) |
+| `backtest/evaluation.py` | **BLOCKED** — see below |
+| `backtest/parlay.py` | **BLOCKED** — see below |
+| `backtest/season_review.py` | **BLOCKED** — see below |
+| `drift/monitor.py` | **BLOCKED** — see below |
+
+Park verdicts live in each module's own docstring (`PARKED`), and `make audit`
+reads them, so a decided module stops resurfacing as an open question.
+
+### The real blocker: there is no live bet log
+
+**Nothing in this repo records a bet that was actually placed.** `BacktestBet` is
+constructed in exactly one place -- `BacktestEngine.run()` -- which is a backtest.
+`data/alert_state.json` records which alerts were *sent*, not what was staked, at
+what price, or at which book. Bets are placed manually across 5 books and nothing
+comes back.
+
+That single gap is why the last four modules cannot be wired: `season_review`
+reviews live bets, `clv_portfolio`/`evaluation` score them, `drift/monitor`
+watches their CLV decay, and `parlay` prices real legs against a tracked bankroll.
+All four are downstream of an input that does not exist. Wiring `season_review`
+today would print "No live bets to review yet." forever.
+
+It also means **CLV -- the project's headline thesis -- cannot currently be
+computed for any real bet**, because CLV needs an entry price and no entry price
+is ever stored. Note `paper/nfl_clv_case_study.md:322` already refers to "the bet
+log" as though one exists. ARCHITECTURE.md's "wired 2026-08-23" notes on
+`drift/monitor` and `clv_portfolio` describe them being wired **to each other**
+via `season_review`, not into the pipeline.
+
+**BUILT 2026-08-23: `src/store/bet_log.py`.** Append-only JSONL at
+`data/bet_log.jsonl`, entered via `make log-bet ARGS="..."`, read by
+`make season-review`.
+
+Two rules make the record trustworthy:
+
+1. **Only what a human can know at bet time is typed.** Entry fair probability,
+   closing price, CLV and settlement are all derived later from the
+   point-in-time store by `to_backtest_bets`, which reuses
+   `engine.latest_fair_prob` so a live bet and a backtested bet are scored by
+   *identical* code. Nothing derived can be mistyped, and everything can be
+   recomputed if the methodology changes.
+2. **Append-only.** A log editable after the close is one editable *because* of
+   the close — the exact bias CLV exists to detect. Corrections are appended as
+   new rows with `corrects`, and `active_bets()` resolves them while
+   `load_bet_log()` keeps the original visible.
+
+`strategy` is a required closed-set field, not inferred from `market`, because
+prop arb and experimental prop EV are both `player_prop` with opposite track
+records — pooling them lets the null one hide behind the validated one.
+`BacktestBet` and `clv_portfolio.bets_to_frame` carry it through, so
+`season_review` segments on the scanner that actually produced the bet.
+
+A bet whose anchor never quoted two-sided gets `None` CLV, never a guess.
+
+### Integration drift is now checkable, not rediscoverable
+
+`make audit` (`scripts/audit_integration.py`) classifies every `src/` module by
+what actually reaches it. **Run it before claiming anything is or isn't wired.**
+Baseline 2026-08-23, 61 modules:
+
+| Category | n | Meaning |
+|---|---|---|
+| LIVE (launchd service) | 24 | reachable from the 3 running services |
+| MANUAL (make target) | 15 | hand-invoked, often deliberately |
+| RESEARCH (notebook) | 12 | offline model/analysis code |
+| TESTED ONLY (wired to nothing) | 9 | built and validated, connected to nothing |
+| UNREFERENCED | 1 | `collect/mainline_historical.py` |
+
+**Manual is not the same as neglected.** `middle_scan` and `steam_scan` are
+make-target-only *on purpose* -- documented in the Makefile as having no live
+track record yet and therefore not trusted to an unattended alert channel.
+
+The 9 tested-only modules are the real standing question: `evaluation`,
+`parlay`, `season_review`, `props_historical`, `drift.monitor`, `closing_line`,
+`individual_pass_rush_elo`, `prop_projection`, `team_total_scan`. Note
+`season_review` imports `evaluation` and `clv_portfolio`, so "properly wired"
+claims about those describe wiring *to each other*, not to the pipeline.
 
 ---
 

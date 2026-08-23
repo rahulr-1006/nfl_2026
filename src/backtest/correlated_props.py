@@ -48,6 +48,63 @@ from src.signal.sizing import apply_bankroll_caps, expected_value, fractional_ke
 # knows what is being replaced.
 MEASURED_PROP_VIG = 0.0629
 
+# **Deliberately NOT a default on any pricing function below (2026-08-23).** It is
+# a single pooled mean over Pinnacle only, and vig varies materially by book:
+# measured across 228,146 real two-sided contracts, per-book median overround runs
+# 6.47% (betonlineag) to 7.80% (williamhill_us) against this 6.29%. That spread
+# matters more than it looks because `bucket_edge` divides by `(1 + vig) ** 2` --
+# **vig enters SQUARED**, since these are two-leg bets. Pricing a williamhill_us
+# parlay at 6.29% understates its vig by ~1.5pp, which through the squared term is
+# roughly a 3pp edge error, against reported edges of +5.5%/+12.9%. And it errs in
+# the self-flattering direction -- exactly how the superseded 0.0575 went unnoticed.
+#
+# So callers must pass a vig MEASURED from the book and line actually being priced
+# (`measure_prop_vig` below). This constant remains for reference and for research
+# code that genuinely wants the pooled Pinnacle number, stated explicitly.
+
+
+def measure_prop_vig(props: pd.DataFrame, book: str | None = "pinnacle") -> dict:
+    """Re-derive `MEASURED_PROP_VIG` from raw prop snapshots. **This exists
+    because the constant above had no measurement code anywhere in the repo**
+    -- it could be quoted but not reproduced or audited, and it has already
+    been wrong once (0.0575, measured from batch 1 only, overstating every
+    edge this module reports because `bucket_edge` divides by `(1+vig)^2`).
+
+    Pass `book=None` to pool all books. Returns mean AND median: the constant
+    is a *mean* overround, and the two differ materially here (a 2026-08-23
+    re-measurement over the same 16,953 Pinnacle contracts read mean 6.29% vs
+    median 6.88%, consistent with left skew from contracts priced at a flat
+    -110/-110). Reporting only one hides that.
+
+    Vig convention is `sum(q_i) - 1` (overround), matching
+    `src/devig/methods.py::overround` and the `(1 + vig)` inversion used by
+    `naive_parlay_price` below -- NOT "hold", which would be
+    `overround / (1 + overround)` and reads ~0.5pp lower.
+    """
+    df = props[props["market"] == "player_prop"]
+    if book is not None:
+        df = df[df["book"] == book]
+
+    key = ["event_id", "book", "player_name", "prop_stat", "line"]
+    latest = df.sort_values("capture_time").groupby(key + ["side"], as_index=False).last()
+    wide = latest.pivot_table(index=key, columns="side", values="implied_prob_raw", aggfunc="last")
+
+    # Two-sided only: a one-sided quote has no complement to sum against, so it
+    # carries no measurable overround at all (see src/collect/props.py on why
+    # anytime-TD is out of scope entirely for exactly this reason).
+    if "over" not in wide.columns or "under" not in wide.columns:
+        return {"n_contracts": 0, "mean_overround": None, "median_overround": None, "book": book}
+    wide = wide.dropna(subset=["over", "under"])
+    ovr = wide["over"] + wide["under"] - 1.0
+
+    return {
+        "n_contracts": len(ovr),
+        "mean_overround": float(ovr.mean()) if len(ovr) else None,
+        "median_overround": float(ovr.median()) if len(ovr) else None,
+        "p99_overround": float(ovr.quantile(0.99)) if len(ovr) else None,
+        "book": book,
+    }
+
 
 def measure_leg_correlation(indicator_a: pd.Series, indicator_b: pd.Series) -> dict:
     """`indicator_a`/`indicator_b`: aligned boolean/0-1 Series, one row per
@@ -167,7 +224,7 @@ def estimate_game_specific_joint_prob(team_market_prob: float, historical_p_b: f
     return min(raw, team_market_prob, historical_p_b)
 
 
-def bucket_edge(lift: float, vig: float = MEASURED_PROP_VIG) -> float:
+def bucket_edge(lift: float, vig: float) -> float:
     """Closed-form edge for one `FAVORITE_BUCKETS` bucket, under this
     module's multiplicative pricing model -- a real algebraic property, not
     an approximation. `naive_parlay_price` scales as `1/p_a`; the unclipped
@@ -186,7 +243,7 @@ def bucket_edge(lift: float, vig: float = MEASURED_PROP_VIG) -> float:
     return lift / (1 + vig) ** 2 - 1
 
 
-def naive_parlay_price(p_a: float, p_b: float, vig: float = MEASURED_PROP_VIG) -> float:
+def naive_parlay_price(p_a: float, p_b: float, vig: float) -> float:
     """Decimal price a same-game parlay would carry if a book priced it by
     multiplying each leg's own *vigged* single-leg price together -- the
     naive-independence SGP construction this whole module tests against.
@@ -206,7 +263,7 @@ def naive_parlay_price(p_a: float, p_b: float, vig: float = MEASURED_PROP_VIG) -
 
 
 def correlated_edge(
-    p_a: float, p_b: float, p_a_and_b: float, vig: float = MEASURED_PROP_VIG, bankroll: float = 100.0
+    p_a: float, p_b: float, p_a_and_b: float, vig: float, bankroll: float = 100.0
 ) -> dict:
     """The bettor-relevant number this module exists to produce: if a book
     prices a same-game parlay of legs A and B naively (`naive_parlay_price`),
@@ -264,7 +321,7 @@ def price_bucket_bet(
     team_market_prob: float,
     historical_p_b: float,
     bucket_lift: dict[str, float],
-    vig: float = MEASURED_PROP_VIG,
+    vig: float,
     bankroll: float = 100.0,
     allow_unvalidated: bool = False,
 ) -> dict:

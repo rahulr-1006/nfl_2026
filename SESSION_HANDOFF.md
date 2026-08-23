@@ -38,8 +38,8 @@ open-items list:
 
 | Thing | Value | How checked |
 |---|---|---|
-| Test suite | **773 passed** | `pytest -q` |
-| Lint | clean | `ruff check src/` |
+| Test suite | **780 passed** (773 + 7 props-freshness) | `pytest -q` |
+| Lint | **5 pre-existing errors** in `clv/metrics.py`, `collect/run.py`, `devig/methods.py`, `store/pit_store.py` (UP035/UP017/I001 — newer ruff than when "clean" was recorded; untouched by recent work, all auto-fixable) | `ruff check src/` |
 | Snapshot store | 615,643 rows, 462,249 of them props | `read_as_of(now)` |
 | Last capture | 2026-08-23 10:44 UTC | same |
 | Paid-key credits left | **25,087** | `data/props_collect_state.json` |
@@ -94,6 +94,29 @@ These are built and tested but imported by **nothing except their own tests**:
 | `src/model/individual_pass_rush_elo.py` | none |
 | `src/collect/mainline_historical.py` | none (one-shot pull script — probably *park*, not wire) |
 
+**Verdicts reached 2026-08-23:**
+
+- **`mainline_historical.py` -> PARK.** A completed one-shot backfill script.
+  Nothing should import it; re-running it is a manual, credit-spending act.
+- **`individual_pass_rush_elo.py` -> PARK, deliberately.** The only wire available
+  is "add it as a model feature", which makes it comparison #10 in a family where
+  feature engineering is 0-for-6 and every new comparison must clear
+  Benjamini-Hochberg. Wiring it would burn a slot on the 2025 holdout for a
+  strategy the project's own design rule predicts will fail. It stays a
+  standalone leaderboard/diagnostic. Re-propose only with a *structural* use.
+- **`parlay.py` -> WIRE, but the obvious seam does not typecheck against its own
+  contract, so it is NOT wired yet.** The module's premise is "N *real* leg prices
+  I can bet right now". The natural consumer looked like
+  `signal/team_total_scan.py`, but that strategy's second leg is a *constructed*
+  team total aggregated from player prop lines, not a posted market price — which
+  is exactly why `correlated_props.py` prices it with a *modeled* naive SGP price
+  instead. Feeding that into `parlay.py` would launder a modeled number through a
+  function documented as taking real ones.
+  **The honest wire is two real same-game player-prop legs** (FanDuel/BetRivers
+  are quoting them now) priced via `two_leg_parlay_ev` with a TRAIN-fit bucket
+  lift from `measure_leg_correlation_by_bucket`. That is a real build — a new
+  live scanner — not a one-line import. Sized as the next session's work.
+
 For contrast, these are properly wired: `clv_portfolio` and `evaluation` are both
 imported by `src/backtest/season_review.py`.
 
@@ -114,13 +137,22 @@ data/static/player_stats_2015_2024.parquet
 Superseded by the 2025 refresh. Notebooks were repointed already — **grep before
 deleting**, don't assume.
 
-### 3. `market_write_freshness` should be promoted from diagnostic to alert
+### 3. ~~`market_write_freshness` -> alert~~ DONE 2026-08-23
 
-There is a TODO in `src/notify/health_check.py` saying exactly this. Now that
-live props are posting, a stale `player_prop` write means the props collector
-died, and the aggregate health check **structurally cannot see it** (the mainline
-collector keeps the aggregate timestamp fresh). This is the same class of gap
-that hid a 58-hour outage.
+`check_props_write_freshness` in `src/notify/health_check.py`, wired into
+`check_all`, so `monitor_run` texts it through the existing path. Design notes:
+
+- **Own thresholds, not the mainline ones**, because the props collector polls a
+  coarser tiered schedule (72h early / 12h sparse / 4h dense / 30min arb). Allowed
+  silence is 120h early, 30h sparse, 12h dense.
+- **Freshness is measured over `upcoming_only` prop rows**, which makes it
+  structurally impossible for the 2023-24 backfill to read as live activity.
+- **No upcoming props = healthy, not an alert.** Books post on their own schedule;
+  before they post, silence is correct behaviour, not a dead collector.
+
+Verified against the live store: `OK: props collector last wrote 5.7h ago (limit
+120h, early tier, 415.3h to next kickoff with props)`. 7 new tests, one of which
+pins the actual gap (props dead 20h, kickoff 3h away, aggregate check still OK).
 
 ### 4. Full concurrent dry run before Week 1 (9/9)
 

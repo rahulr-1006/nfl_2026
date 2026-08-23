@@ -15,7 +15,12 @@ from dotenv import load_dotenv
 
 from src.collect.client import OddsApiClient
 from src.collect.config import Config, load_config
-from src.collect.scheduler import CollectorContext, CollectorHalted, build_scheduler, tick
+from src.collect.scheduler import (
+    CollectorContext,
+    CollectorHalted,
+    build_scheduler,
+    tick,
+)
 from src.collect.teams import load_team_name_map
 from src.collect.transform import build_schedule_index
 from src.features.load_static import load_schedules

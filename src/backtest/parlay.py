@@ -33,6 +33,20 @@ that fills it in automatically, because 2-leg is exactly where this
 project has real measured lift to fill it in WITH. A 5-leg parlay priced
 here under `assume_independent=True` is honestly labeled as such; it is
 not a correlation-aware number.
+
+**PARKED 2026-08-23 (audit verdict).** Not because it is wrong -- because the
+obvious wire does not satisfy this module's own contract. It requires N *real*
+leg prices. The natural consumer looked like `signal/team_total_scan.py`, but
+that strategy's second leg is a **constructed** team total aggregated from
+player prop lines, not a posted market price -- which is exactly why
+`correlated_props.py` prices it with a *modelled* naive SGP price instead.
+Feeding that in would launder a modelled number through a function documented
+as taking real ones.
+
+The honest wire is two real same-game player-prop legs (FanDuel/BetRivers quote
+them now) through `two_leg_parlay_ev` with a TRAIN-fit bucket lift from
+`measure_leg_correlation_by_bucket`. **Reopen when that scanner is built** --
+it is a new live scanner, not an import.
 """
 
 from __future__ import annotations

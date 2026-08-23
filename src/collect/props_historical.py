@@ -28,6 +28,11 @@ unchanged -- the historical endpoint's response schema is documented as
 "almost the same as the live per-event endpoint," just wrapped in an
 envelope with a real snapshot timestamp this module unwraps before
 handing off.
+
+**PARKED 2026-08-23 (audit verdict).** A completed one-shot backfill: the full
+2024 props pull finished at 285/285 games. Nothing should import this, and
+re-running it spends real paid credits. Kept because it is the only record of
+how that pull was done. Reopen only to run a genuinely new historical batch.
 """
 
 from __future__ import annotations

@@ -128,6 +128,12 @@ class BacktestBet:
     prop_stat: str | None = None
     bankroll_before: float | None = None
     bankroll_after: float | None = None
+    # Which scanner produced the bet. None for backtested bets (the strategy is
+    # whatever was passed to `run`); set for LIVE bets from `store/bet_log.py`,
+    # where `season_review` segments on it. Market type cannot substitute:
+    # prop arb and experimental prop EV are both `player_prop` with opposite
+    # track records, and pooling them lets one mask the other.
+    strategy: str | None = None
 
 
 def _market_rows(

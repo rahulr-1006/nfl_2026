@@ -19,6 +19,12 @@ install: venv
 test:
 	$(PY) -m pytest -q
 
+# Which src/ modules are actually reachable, and from what (launchd service,
+# make target, notebook, tests, or nothing). Run this before believing any
+# claim about what is or isn't wired -- see scripts/audit_integration.py.
+audit:
+	$(PY) scripts/audit_integration.py
+
 lint:
 	$(PY) -m ruff check src tests
 
@@ -114,6 +120,26 @@ middle-scan-once:
 # takes time to accumulate, zero live track record yet.
 steam-scan-once:
 	$(PY) -m src.backtest.steam_scan
+
+# Team-total O/U vs moneyline (src/signal/): the one correlated-props edge that
+# survived an honest out-of-sample split. Manual only, same reasoning as
+# middle-scan-once and steam-scan-once -- validated in backtest, zero live
+# track record. Local parquet only, no Odds API cost.
+team-total-scan-once:
+	$(PY) -m src.signal.team_total_scan
+
+# Record a bet you actually placed. WITHOUT THIS, CLV CANNOT BE COMPUTED FOR
+# ANY REAL BET -- CLV needs an entry price and nothing else stores one.
+# Append-only; corrections are new rows, never edits. Example:
+#   make log-bet ARGS="--event-id 2026_01_KC_LAC --market moneyline --side home \
+#       --book draftkings --price -110 --stake 2 --strategy moneyline_ev"
+log-bet:
+	$(PY) -m src.store.bet_log $(ARGS)
+
+# Weekly in-season health check over the live bet log: CLV + drift CUSUM +
+# bettability -> continue/monitor/retire, segmented per strategy.
+season-review:
+	$(PY) -m src.backtest.season_review
 
 MONITOR_AGENT := $(HOME)/Library/LaunchAgents/com.nflclv.monitor.plist
 

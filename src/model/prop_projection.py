@@ -38,6 +38,13 @@ the vig to be bettable. Route any candidate through
 `src/backtest/evaluation.py::evaluate_strategy`, which applies the
 threshold sweep, proportion-bet, bootstrap CI and random-side null. Accuracy here
 is a necessary condition, never a sufficient one.
+
+**PARKED 2026-08-23 (audit verdict).** Measured worse than the base rate. It is
+a probability-estimation strategy, which must overcome 6.29% prop vig, and it
+supplies none of it -- the same shape as every other failure here. Retained as
+the record of a checked-and-rejected formulation (its docstring documents two
+further hypotheses killed by pre-build data checks, which is worth keeping).
+Do not re-propose without new evidence.
 """
 
 from __future__ import annotations
