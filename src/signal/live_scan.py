@@ -23,7 +23,7 @@ already exists for, just wired to live data instead of a backtest.
 from __future__ import annotations
 
 import json
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -48,6 +48,27 @@ DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked
 # unguarded -- book_time/pinnacle_time were captured and returned but never
 # actually checked against each other.
 DEFAULT_MAX_CAPTURE_GAP = pd.Timedelta(minutes=30)
+
+
+def upcoming_only(df: pd.DataFrame, as_of: datetime) -> pd.DataFrame:
+    """Drop snapshots for games that have already kicked off -- only a
+    future game is actually bettable.
+
+    **Not a hypothetical guard: this was a real, live bug.** The
+    point-in-time store holds historical backfill alongside live collection
+    (the 2026-08-22/23 pulls put 570 games of 2023-2024 mainline odds and a
+    full 2023-2024 season of props into the same store the live collector
+    writes to). Every scanner reads `read_as_of(now)`, which correctly
+    returns everything captured before now -- including those finished
+    games. A dry run of the monitor found **874 of 879 flagged spots were on
+    games played months ago**, which would have flooded the alert channel
+    with unbettable noise on day one. Filtering on `event_start_time` is the
+    fix; `capture_time` cannot express this, since a historical snapshot's
+    capture_time is legitimately in the past too.
+    """
+    if df.empty or "event_start_time" not in df.columns:
+        return df
+    return df[df["event_start_time"] > as_of]
 
 
 def _latest_two_sided_pinnacle(moneyline: pd.DataFrame) -> pd.DataFrame:
@@ -90,7 +111,7 @@ def find_positive_ev_spots(
     a fresh execution-book one (see `DEFAULT_MAX_CAPTURE_GAP`'s comment).
     """
     as_of = as_of or datetime.now(UTC)
-    df = store.read_as_of(as_of)
+    df = upcoming_only(store.read_as_of(as_of), as_of)
     if df.empty:
         return pd.DataFrame()
 
@@ -181,27 +202,43 @@ def _alert_key(row: pd.Series) -> str:
 
 
 def new_or_improved_spots(
-    spots: pd.DataFrame, state: dict[str, AlertRecord], min_edge_increase: float = 0.01
+    spots: pd.DataFrame,
+    state: dict[str, AlertRecord],
+    min_edge_increase: float = 0.01,
+    key_fn: Callable[[pd.Series], str] = _alert_key,
+    edge_column: str = "edge",
 ) -> pd.DataFrame:
     """Keep only spots that are brand new, or whose edge has grown by at
-    least `min_edge_increase` since the last alert for that (event, side,
-    book) -- so a stable +EV spot doesn't re-text every scan cycle, but a
-    meaningfully improving one still does.
+    least `min_edge_increase` since the last alert for that key -- so a
+    stable +EV spot doesn't re-text every scan cycle, but a meaningfully
+    improving one still does.
+
+    `key_fn`/`edge_column` are parameterized (2026-08-23) so the props
+    scanner can share this state machine instead of duplicating it: prop
+    contracts need `player/stat/line` in the key (the moneyline default
+    collides across every prop in a game), and arbitrage rows carry
+    `arb_margin` rather than `edge`.
     """
     if spots.empty:
         return spots
 
     def _is_new_or_improved(row: pd.Series) -> bool:
-        prior = state.get(_alert_key(row))
-        return prior is None or row["edge"] >= prior.edge + min_edge_increase
+        prior = state.get(key_fn(row))
+        return prior is None or row[edge_column] >= prior.edge + min_edge_increase
 
     mask = spots.apply(_is_new_or_improved, axis=1)
     return spots[mask]
 
 
-def record_alerts(spots: pd.DataFrame, state: dict[str, AlertRecord], now: datetime | None = None) -> dict[str, AlertRecord]:
+def record_alerts(
+    spots: pd.DataFrame,
+    state: dict[str, AlertRecord],
+    now: datetime | None = None,
+    key_fn: Callable[[pd.Series], str] = _alert_key,
+    edge_column: str = "edge",
+) -> dict[str, AlertRecord]:
     now = now or datetime.now(UTC)
     updated = dict(state)
-    for row in spots.itertuples():
-        updated[f"{row.event_id}|{row.side}|{row.book}"] = AlertRecord(edge=row.edge, alerted_at=now)
+    for _, row in spots.iterrows():
+        updated[key_fn(row)] = AlertRecord(edge=float(row[edge_column]), alerted_at=now)
     return updated

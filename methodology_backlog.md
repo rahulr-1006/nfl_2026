@@ -6,6 +6,46 @@ active — things queued to build, not deferred. Update status as work moves.
 
 ---
 
+## Standing reference: the numbers any prop proposal must clear
+
+Measured 2026-08-23 across the **complete** 2023+2024 historical pull (462K prop
+snapshots, 16,953 two-sided contracts). Check a proposal against these before
+building it — they are cheap to consult and have already explained every prop
+failure to date.
+
+| Quantity | Measured |
+|---|---|
+| Pinnacle prop vig (mean overround) | **6.29%** |
+| Cross-book price dispersion, best−worst (median) | 0.101 decimal |
+| Line-shopping gain, best−median book (median) | 0.045 decimal ≈ **1.26 pts** |
+| Best-of-5-books EV vs Pinnacle fair (median) | **−4.74%** |
+| Fraction of contract-sides with positive EV at best price | **14.0%** |
+
+**Line shopping is real and NOT patched** — dispersion persists across 44,391
+contract-sides with ≥3 books quoting. But it recovers only ~1.3 of the ~3.1
+points of per-side vig, leaving a **~4.7% structural deficit** at the best
+available price.
+
+### The design rule this implies
+
+Every strategy tried here falls into one of two shapes, and the shape predicts
+the outcome:
+
+| Shape | Requires | Track record |
+|---|---|---|
+| **Probability estimation** | beating Pinnacle's own probability | props EV (null, 6,812 bets), prop projection (worse than base rate), moneyline model (**0 for 7**) |
+| **Structural exploitation** | no probability estimate at all | props arb (65 real spots), correlated/team-total props (validated buckets), middling & steam (live-validated) |
+
+Probability-estimation strategies must overcome 6.29% vig; nothing this project
+has built supplies more than ~0 of it. Structural strategies exploit two books
+disagreeing, a book pricing correlated legs as independent, or a line moving —
+none of which require out-predicting Pinnacle.
+
+**Before proposing a prop strategy, state which shape it is.** If it is
+probability estimation, state where the >4.7% is coming from.
+
+---
+
 ## 1. Rest/travel differential — **tested, negative result**
 
 Days-of-rest re-encoding (differential, short-week/bye-week binary flags) plus
@@ -290,9 +330,9 @@ found, using an independently-constructed leg definition.**
 
 | Stat | Bucket | n | Lift | p-value | Priced edge | 2023→2024 OOS |
 |---|---|---|---|---|---|---|
-| rushing | underdog | 473 | 1.192 | 2.8e-5 | **+6.6%** | 1.226→1.167 (holds) |
-| rushing | favorite | 303 | 1.091 | 2.6e-4 | -2.4% | 1.129→1.051 (shrinks, same leak as before) |
-| passing | underdog | 410 | 1.276 | 6.0e-5 | **+14.1%** | 1.311→1.216 (holds) |
+| rushing | underdog | 473 | 1.192 | 2.8e-5 | **+5.5%** | 1.226→1.167 (holds) |
+| rushing | favorite | 303 | 1.091 | 2.6e-4 | -3.4% | 1.129→1.051 (shrinks, same leak as before) |
+| passing | underdog | 410 | 1.276 | 6.0e-5 | **+12.9%** | 1.311→1.216 (holds) |
 
 Permutation test (assumption-free, 10K shuffles): rushing pooled p=0.0001, passing
 pooled p=0.029 — both confirm the chi-square result independent of its asymptotic

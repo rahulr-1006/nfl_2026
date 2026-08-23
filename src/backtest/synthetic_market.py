@@ -48,6 +48,17 @@ simplification: no cross-market correlation is modeled (a real spread move and
 a real total move on the same game usually aren't independent), same "state
 the simplification plainly" discipline as every other v1 pricing model in this
 project.
+
+**Player props (2026-08-23):** `n_prop_players` synthetic players per game,
+each with their own independent price path and their own Over/Under line, so
+a game carries many simultaneous prop contracts -- the exact structure that
+makes contract-level price selection necessary in
+`src/backtest/engine.py::_market_rows`. This is what lets the props CLV path
+be validated against known ground truth BEFORE the season, which matters
+because props CLV can never be backtested historically: every historical prop
+pull in this project is a single near-kickoff snapshot, with no earlier entry
+price to measure a close against. Synthetic validation is not a nice-to-have
+here, it is the only pre-season check that exists.
 """
 
 from __future__ import annotations
@@ -125,6 +136,21 @@ def simulate_true_probability_path(
 
 
 @dataclass(frozen=True)
+class SimulatedPropTruth:
+    """Ground truth for one simulated player-prop contract. `over_hit` is
+    the realized outcome, drawn against the closing latent probability --
+    the analogue of `SimulatedGameTruth.home_win` for a prop.
+    """
+
+    player_name: str
+    prop_stat: str
+    line: float
+    p_open_over_true: float
+    p_close_over_true: float
+    over_hit: bool
+
+
+@dataclass(frozen=True)
 class SimulatedGameTruth:
     """Ground truth for one simulated game -- what `simulate_market` actually
     generated, kept separate from the `OddsSnapshot`s so validation code can
@@ -136,10 +162,15 @@ class SimulatedGameTruth:
     home_team: str
     away_team: str
     kickoff: datetime
-    p_true_home: float
-    p_open_home_true: float  # the latent fair probability at open, before per-book noise/vig
-    p_close_home_true: float  # the latent fair probability at close, before per-book noise/vig
-    home_win: bool
+    # All four game-level fields are None when MONEYLINE wasn't simulated --
+    # there is no meaningful home-win probability in a props-only or
+    # spread/total-only run, and inventing one silently corrupts any consumer
+    # that calibrates against it. Check before use.
+    p_true_home: float | None
+    p_open_home_true: float | None  # the latent fair probability at open, before per-book noise/vig
+    p_close_home_true: float | None  # the latent fair probability at close, before per-book noise/vig
+    home_win: bool | None
+    props: tuple[SimulatedPropTruth, ...] = ()
 
 
 def _to_snapshot(
@@ -156,6 +187,8 @@ def _to_snapshot(
     side: Side,
     prob: float,
     line: float | None = None,
+    player_name: str | None = None,
+    prop_stat: str | None = None,
 ) -> OddsSnapshot:
     return OddsSnapshot.from_american(
         capture_time=capture_time,
@@ -170,6 +203,8 @@ def _to_snapshot(
         side=side,
         price_american=implied_prob_to_american(prob),
         line=line,
+        player_name=player_name,
+        prop_stat=prop_stat,
     )
 
 
@@ -177,7 +212,11 @@ _MARKET_SIDES: dict[Market, tuple[Side, Side]] = {
     Market.MONEYLINE: (Side.HOME, Side.AWAY),
     Market.SPREAD: (Side.HOME, Side.AWAY),
     Market.TOTAL: (Side.OVER, Side.UNDER),
+    Market.PLAYER_PROP: (Side.OVER, Side.UNDER),
 }
+
+DEFAULT_PROP_STAT = "receiving_yards"
+DEFAULT_PROP_LINE = 45.5
 
 
 def simulate_market(
@@ -188,6 +227,7 @@ def simulate_market(
     poll_window: timedelta = timedelta(hours=48),
     books: tuple[str, ...] = ("pinnacle", "draftkings", "fanduel", "betmgm"),
     markets: tuple[Market, ...] = (Market.MONEYLINE,),
+    n_prop_players: int = 8,
     drift_strength: float = 0.5,
     noise_scale: float = 0.03,
     initial_shrinkage: float = DEFAULT_INITIAL_SHRINKAGE,
@@ -222,54 +262,81 @@ def simulate_market(
             kickoff - poll_window + (poll_window * step / n_poll_steps) for step in range(n_poll_steps + 1)
         ]
 
-        market_paths: dict[Market, np.ndarray] = {}
-        for market in markets:
+        def _new_path() -> np.ndarray:
             p_true = float(rng.uniform(0.15, 0.85))
-            path = simulate_true_probability_path(
+            return simulate_true_probability_path(
                 p_true, n_poll_steps, drift_strength, noise_scale,
                 initial_shrinkage=initial_shrinkage, jump_rate=jump_rate, jump_scale=jump_scale, random_state=rng,
             )
-            market_paths[market] = path
 
-        home_win = bool(rng.random() < market_paths[markets[0]][-1])
+        # One entry per real CONTRACT, not per market: a game carries a
+        # separate prop contract for every listed player, which is exactly
+        # the structure engine.py's contract-level price selection exists to
+        # handle. Mainline markets contribute one contract each.
+        contracts: list[tuple[Market, str | None, str | None, float | None, np.ndarray]] = []
+        for market in markets:
+            if market == Market.PLAYER_PROP:
+                for p in range(n_prop_players):
+                    contracts.append(
+                        (market, f"Player {i:04d}-{p:02d}", DEFAULT_PROP_STAT, DEFAULT_PROP_LINE, _new_path())
+                    )
+            else:
+                line = None if market == Market.MONEYLINE else 0.0
+                contracts.append((market, None, None, line, _new_path()))
 
-        moneyline_path = market_paths.get(Market.MONEYLINE)
-        if moneyline_path is not None:
-            truths.append(
-                SimulatedGameTruth(
-                    event_id=event_id, home_team=home_team, away_team=away_team, kickoff=kickoff,
-                    p_true_home=float(moneyline_path[-1]), p_open_home_true=float(moneyline_path[0]),
-                    p_close_home_true=float(moneyline_path[-1]), home_win=home_win,
-                )
+        moneyline_path = next((path for m, _, _, _, path in contracts if m == Market.MONEYLINE), None)
+        prop_truths = tuple(
+            SimulatedPropTruth(
+                player_name=player_name, prop_stat=prop_stat, line=line,
+                p_open_over_true=float(path[0]), p_close_over_true=float(path[-1]),
+                over_hit=bool(rng.random() < path[-1]),
             )
+            for market, player_name, prop_stat, line, path in contracts
+            if market == Market.PLAYER_PROP
+        )
 
-        for market, path in market_paths.items():
+        # Ground truth is emitted for EVERY game, including props-only
+        # simulations (this was previously gated on a moneyline path existing,
+        # so simulating props alone silently returned zero truth records and
+        # made the scenario unvalidatable).
+        #
+        # **With no moneyline market simulated, the game-level fields are None,
+        # not a fabricated coin flip.** An earlier version of this fix filled
+        # them with 0.5 / `rng.random() < 0.5`, which is worse than useless: a
+        # consumer calibrating against `p_true_home` or `home_win` from a
+        # spread/total/props-only run would get plausible-looking numbers that
+        # mean nothing. None fails loudly at the point of misuse instead.
+        has_moneyline = moneyline_path is not None
+        truths.append(
+            SimulatedGameTruth(
+                event_id=event_id, home_team=home_team, away_team=away_team, kickoff=kickoff,
+                p_true_home=float(moneyline_path[-1]) if has_moneyline else None,
+                p_open_home_true=float(moneyline_path[0]) if has_moneyline else None,
+                p_close_home_true=float(moneyline_path[-1]) if has_moneyline else None,
+                home_win=bool(rng.random() < moneyline_path[-1]) if has_moneyline else None,
+                props=prop_truths,
+            )
+        )
+
+        for market, player_name, prop_stat, line, path in contracts:
             side_a, side_b = _MARKET_SIDES[market]
-            line = 0.0 if market != Market.MONEYLINE else None
-            for step, (capture_time, p_true_side_a) in enumerate(zip(poll_times, path, strict=True)):
+            for capture_time, p_true_side_a in zip(poll_times, path, strict=True):
                 for book in books:
                     book_noise = rng.normal(0.0, book_noise_scale)
                     p_book_side_a = float(_sigmoid(_logit(p_true_side_a) + book_noise))
                     p_book_side_a = min(max(p_book_side_a, 1e-4), 1 - 1e-4)
 
-                    q_a = p_book_side_a * (1 + vig)
-                    q_b = (1 - p_book_side_a) * (1 + vig)
-                    q_a = min(q_a, 1 - 1e-4)
-                    q_b = min(q_b, 1 - 1e-4)
+                    q_a = min(p_book_side_a * (1 + vig), 1 - 1e-4)
+                    q_b = min((1 - p_book_side_a) * (1 + vig), 1 - 1e-4)
 
-                    snapshots.append(
-                        _to_snapshot(
-                            capture_time=capture_time, event_id=event_id, season=season, week=1,
-                            home_team=home_team, away_team=away_team, kickoff=kickoff, book=book,
-                            market=market, side=side_a, prob=q_a, line=line,
+                    for side, prob in ((side_a, q_a), (side_b, q_b)):
+                        snapshots.append(
+                            _to_snapshot(
+                                capture_time=capture_time, event_id=event_id, season=season, week=1,
+                                home_team=home_team, away_team=away_team, kickoff=kickoff, book=book,
+                                market=market, side=side, prob=prob, line=line,
+                                player_name=player_name, prop_stat=prop_stat,
+                            )
                         )
-                    )
-                    snapshots.append(
-                        _to_snapshot(
-                            capture_time=capture_time, event_id=event_id, season=season, week=1,
-                            home_team=home_team, away_team=away_team, kickoff=kickoff, book=book,
-                            market=market, side=side_b, prob=q_b, line=line,
-                        )
-                    )
 
     return snapshots, truths

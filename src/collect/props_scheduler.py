@@ -103,7 +103,11 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
             continue
 
         try:
-            response = ctx.client.get_event_odds(event_id, ctx.regions, ctx.markets)
+            # This poll's OWN markets, not ctx.markets -- the arb tier deliberately
+            # requests a narrow, cheap subset (see props_budget.ARB_MARKETS). Using
+            # ctx.markets here would silently pay full price for every arb poll and
+            # blow the season budget the tiering exists to protect.
+            response = ctx.client.get_event_odds(event_id, ctx.regions, decision.markets or ctx.markets)
         except (RateLimitExceeded, OddsApiError) as exc:
             log.warning("props tick: failed to poll %s (%s): %s", event_id, match.event_id, exc)
             failed += 1
@@ -118,8 +122,9 @@ def _tick(ctx: PropsCollectorContext, now: datetime) -> None:
             remaining_credits = response.remaining_credits
         polled += 1
         log.info(
-            "props tick: polled %s (%s), wrote %d snapshots, poll #%d/%d, credits_remaining=%s",
-            match.event_id, event_id, len(snapshots), events[event_id].poll_count, POLLS_PER_EVENT, response.remaining_credits,
+            "props tick: polled %s (%s) tier=%s cost=%s, wrote %d snapshots, poll #%d/%d, credits_remaining=%s",
+            match.event_id, event_id, decision.tier, decision.cost, len(snapshots),
+            events[event_id].poll_count, POLLS_PER_EVENT, response.remaining_credits,
         )
 
     save_state(ctx.state_path, PropsCollectorState(events=events, remaining_credits=remaining_credits))
