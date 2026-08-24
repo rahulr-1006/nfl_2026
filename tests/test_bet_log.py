@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 
 import pandas as pd
@@ -243,3 +244,91 @@ def test_prop_settles_against_player_stats(tmp_path):
     # name normalisation resolves "A.J. Brown" (book) to "AJ Brown" (nflverse)
     assert out[0].outcome == Outcome.WIN
     assert out[0].bankroll_after == pytest.approx(102.0)
+
+
+# --- code-review regressions (2026-08-23) -----------------------------------
+
+
+def test_corrects_matches_a_value_copied_out_of_the_file(tmp_path):
+    """**The correction workflow must work with the value the file actually
+    contains.** Pydantic serialises `placed_at` as `...Z`; `.isoformat()`
+    produces `...+00:00`. Comparing those as strings never matches, so the
+    superseded row survives and `settle_bets` counts its stake AND P&L twice --
+    a real error on a fixed $100 bankroll with no top-ups.
+
+    The earlier test passed only because it built `corrects` in Python instead
+    of reading it back from disk: it validated the implementation, not the
+    workflow. This one round-trips through the file, which is the only way a
+    human can obtain that value.
+    """
+    import json
+
+    p = tmp_path / "bets.jsonl"
+    log_bet(_bet(stake=2.0), path=p)
+    on_disk = json.loads(p.read_text().splitlines()[0])["placed_at"]
+
+    log_bet(_bet(placed_at=ENTRY + timedelta(minutes=5), stake=5.0, corrects=on_disk), path=p)
+
+    assert len(load_bet_log(p)) == 2          # raw record keeps both
+    live = active_bets(p)
+    assert len(live) == 1 and live[0].stake == 5.0
+
+
+def test_no_clv_for_a_game_that_has_not_kicked_off(tmp_path):
+    """"Close" is defined as the last quote at or before kickoff -- a filter every
+    row trivially satisfies while kickoff is still in the future, which turns the
+    *current* quote into a fake close. `season_review` feeds these into the CUSUM
+    drift detector, so a strategy could be retired on CLV from lines still moving.
+    """
+    future_kickoff = ENTRY + timedelta(days=10)
+    store = PointInTimeStore(root=tmp_path)
+    store.write([
+        OddsSnapshot.from_american(
+            capture_time=cap, event_id=EVENT, season=2026, week=3, home_team="LAC",
+            away_team="KC", event_start_time=future_kickoff, book="pinnacle",
+            market=Market.MONEYLINE, side=side, price_american=price,
+        )
+        for cap, h, a in ((ENTRY, -110, -110), (ENTRY + timedelta(hours=2), -200, 170))
+        for side, price in ((Side.HOME, h), (Side.AWAY, a))
+    ])
+    b = to_backtest_bets([_bet()], store, as_of=ENTRY + timedelta(hours=3))[0]
+    assert b.entry_prob_fair is not None      # entry is knowable
+    assert b.close_prob_fair is None          # the close is NOT
+    assert b.clv_probability is None
+    assert b.close_price_decimal is None
+
+
+def test_impossible_market_side_combination_is_rejected_at_entry():
+    """`--market player_prop --side home` used to be accepted by the CLI and
+    only blow up later inside settlement, where the person who could have fixed
+    it is no longer looking.
+    """
+    with pytest.raises(ValueError, match="requires side in"):
+        _bet(market=Market.PLAYER_PROP, side=Side.HOME, strategy="prop_arb",
+             player_name="A", prop_stat="receptions", line=2.5)
+    with pytest.raises(ValueError, match="requires side in"):
+        _bet(market=Market.MONEYLINE, side=Side.OVER)
+
+
+def test_prop_without_contract_identity_is_rejected():
+    """player/stat/line identify the CONTRACT. A prop missing them can never be
+    graded and would sit in the log forever reporting outcome=None.
+    """
+    with pytest.raises(ValueError, match="identify the contract"):
+        _bet(market=Market.PLAYER_PROP, side=Side.OVER, strategy="prop_arb")
+
+
+def test_one_ungradeable_bet_does_not_abort_the_whole_settlement(tmp_path):
+    """A single bad row must not hide every other bet's real P&L. `outcome=None`
+    is already a supported state, so an ungradeable bet degrades to unsettled.
+    """
+    store = _store(tmp_path)
+    good = _as_backtest([_bet(price_american=100, stake=2.0)], store)[0]
+    # force an ungradeable row past the entry validator, as a corrupted file could
+    broken = replace(good, side=Side.OVER, market=Market.PLAYER_PROP,
+                     player_name="X", prop_stat="receptions", line=None)
+    out = _settled([good, broken], _schedule(home_score=24, away_score=17))
+    outcomes = {b.event_id + str(b.market.value): b.outcome for b in out}
+    assert any(o is not None for o in outcomes.values())    # the good bet still graded
+    assert any(o is None for o in outcomes.values())        # the bad one degraded
+    assert out[-1].bankroll_after == pytest.approx(102.0)   # only the good bet moved it

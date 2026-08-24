@@ -45,6 +45,7 @@ from src.signal.live_scan import (
     format_alert_message,
     load_alert_state,
     new_or_improved_spots,
+    prune_alert_state,
     record_alerts,
     save_alert_state,
 )
@@ -57,7 +58,7 @@ from src.signal.props_scan import (
     format_prop_ev_alert_message,
     prop_alert_key,
 )
-from src.store.pit_store import PointInTimeStore
+from src.store.pit_store import PointInTimeStore, kickoffs_from_store
 
 log = logging.getLogger(__name__)
 
@@ -172,7 +173,13 @@ def run(
         log.warning("ALERT_PHONE_NUMBER not set in .env -- scanning but not sending any alerts")
 
     store = PointInTimeStore(root=store_root)
-    state = load_alert_state()
+    # Prune before use: this state is never otherwise cleaned and grew to 874
+    # entries, 866 of them for games played in 2023-24. Stale keys are dead
+    # weight rather than a correctness bug (a played game's spot cannot recur),
+    # but an alert history nobody can trust is not much of an audit trail.
+    loaded = load_alert_state()
+    state = prune_alert_state(loaded, kickoffs=kickoffs_from_store(store))
+    pruned = len(loaded) - len(state)
     all_sent: list[pd.Series] = []
 
     # Liveness first, and OUTSIDE the spot-alert dedup: if the collector has
@@ -250,9 +257,14 @@ def run(
     )
     all_sent.extend(sent)
 
-    if all_sent:
+    # Persist if anything changed -- alerts sent OR entries pruned. Saving only
+    # on `all_sent` would leave the prune in memory and re-do it every cycle
+    # forever, so the file would never actually shrink.
+    if all_sent or pruned:
         save_alert_state(state)
-    else:
+    if pruned:
+        log.info("pruned %d stale alert-state entr(ies)", pruned)
+    if not all_sent:
         log.info("scan ok: no new alerts this cycle")
 
     return len(all_sent)

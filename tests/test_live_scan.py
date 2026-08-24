@@ -211,3 +211,73 @@ def test_record_alerts_adds_new_keys_and_preserves_existing():
 
     assert "X|home|fanduel" in updated
     assert updated["A|home|fanduel"].edge == pytest.approx(0.03)
+
+
+# --- alert state pruning ----------------------------------------------------
+
+
+def _rec(days_ago, now):
+    from datetime import timedelta
+    return AlertRecord(edge=0.05, alerted_at=now - timedelta(days=days_ago))
+
+
+def test_prune_drops_entries_whose_game_has_started():
+    """**Pruning must key on KICKOFF, not alert age.** Measured 2026-08-23: the
+    state held 874 entries, 866 for already-played 2023-24 games -- residue from
+    the pre-`upcoming_only` bug. That bug fired TODAY, so those entries carry
+    recent `alerted_at` values and an age filter keeps every one of them. What
+    makes an entry dead is that its event has started.
+    """
+    from datetime import timedelta
+
+    from src.signal.live_scan import prune_alert_state
+
+    now = datetime(2026, 9, 20, tzinfo=UTC)
+    state = {
+        "2026_01_KC_LAC|home|fanduel": _rec(0, now),
+        "ev|2023_11_LAC_GB|Aaron Jones|receptions|3.5|under|betmgm": _rec(0, now),  # alerted today
+    }
+    kickoffs = {
+        "2026_01_KC_LAC": now + timedelta(days=3),      # upcoming -> keep
+        "2023_11_LAC_GB": now - timedelta(days=1000),   # long played -> drop
+    }
+    kept = prune_alert_state(state, now=now, kickoffs=kickoffs)
+    assert list(kept) == ["2026_01_KC_LAC|home|fanduel"]
+
+
+def test_event_id_parses_from_all_three_key_shapes():
+    from src.signal.live_scan import event_id_from_alert_key
+
+    assert event_id_from_alert_key("2026_01_KC_LAC|home|fanduel") == "2026_01_KC_LAC"
+    assert event_id_from_alert_key("ev|2023_11_LAC_GB|A|receptions|3.5|under|betmgm") == "2023_11_LAC_GB"
+    assert event_id_from_alert_key("arb|2024_06_WAS_BAL|B|passing_tds|1.5|betrivers|betmgm") == "2024_06_WAS_BAL"
+    assert event_id_from_alert_key("__pinnacle_props_arrival__") is None
+
+
+def test_prune_never_ages_out_a_one_shot_sentinel():
+    """`__pinnacle_props_arrival__` is a latch, not a dedup entry. Dropping it
+    would re-fire an announcement that must happen exactly once, ever.
+    """
+    from src.signal.live_scan import prune_alert_state
+
+    now = datetime(2026, 9, 20, tzinfo=UTC)
+    state = {"__pinnacle_props_arrival__": AlertRecord(edge=1.0, alerted_at=now)}
+    assert list(prune_alert_state(state, now=now, kickoffs={})) == ["__pinnacle_props_arrival__"]
+
+
+def test_unresolvable_event_falls_back_to_age_so_it_cannot_accumulate():
+    from src.signal.live_scan import prune_alert_state
+
+    now = datetime(2026, 9, 20, tzinfo=UTC)
+    state = {"weird_key_shape": _rec(400, now), "recent_weird_key": _rec(1, now)}
+    assert list(prune_alert_state(state, now=now, kickoffs={})) == ["recent_weird_key"]
+
+
+def test_prune_window_exceeds_the_props_posting_window():
+    """The fallback window must exceed how far ahead of kickoff an alert can
+    fire (21 days), or a still-live alert would be deleted and re-sent.
+    """
+    from src.collect.props_budget import POSTING_WINDOW_DAYS
+    from src.signal.live_scan import DEFAULT_ALERT_STATE_MAX_AGE
+
+    assert DEFAULT_ALERT_STATE_MAX_AGE.days > POSTING_WINDOW_DAYS

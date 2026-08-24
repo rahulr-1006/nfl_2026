@@ -130,7 +130,7 @@ def test_alert_message_is_actionable_without_opening_a_laptop():
     row = pd.Series({
         "event_id": "2026_03_KC_LAC", "side": "away", "prop_stat": "rushing_yards",
         "bucket": "underdog", "team_market_prob": 0.14, "lift": 1.226,
-        "edge": 0.055, "suggested_stake": 1.5, "n_player_lines": 4,
+        "edge": 0.055, "suggested_stake": 1.5, "n_event_player_lines": 4,
     })
     msg = format_team_total_alert(row)
     assert "TEAM-TOTAL" in msg and "underdog" in msg and "5.5%" in msg

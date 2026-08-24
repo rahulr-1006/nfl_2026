@@ -23,9 +23,9 @@ already exists for, just wired to live data instead of a backtest.
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -195,6 +195,69 @@ def save_alert_state(state: dict[str, AlertRecord], path: Path = _ALERT_STATE_PA
     path.parent.mkdir(parents=True, exist_ok=True)
     raw = {k: {"edge": v.edge, "alerted_at": v.alerted_at.isoformat()} for k, v in state.items()}
     path.write_text(json.dumps(raw))
+
+
+# Alert dedup keys are only useful until their game is played -- a spot on a
+# finished game can never recur. Nothing pruned this state, so it grew without
+# bound: measured 2026-08-23 it held 874 entries, 866 of them for already-played
+# 2023-24 games, residue from the pre-`upcoming_only` alert bug.
+#
+# **Pruning is by KICKOFF, not by alert age.** Age was the obvious first choice
+# and is wrong here: that bug fired *today* on games from 2023, so the stale
+# entries carry recent `alerted_at` values and an age filter keeps every one of
+# them. What makes an entry dead is that its event has started, which is exactly
+# what the store's `event_start_time` records.
+#
+# `max_age` remains as a fallback for keys whose event cannot be resolved (an
+# unknown key shape, or an event missing from the store), so an unparseable key
+# still cannot accumulate forever. 30 days is safely longer than the 21-day props
+# posting window, which bounds how far ahead of kickoff any alert can fire.
+DEFAULT_ALERT_STATE_MAX_AGE = timedelta(days=30)
+
+# Keys namespaced with "__" are one-shot latches (e.g. monitor_run's
+# PINNACLE_ARRIVAL_KEY), not per-spot dedup entries. Dropping one would re-fire
+# an announcement that is supposed to happen exactly once, ever.
+_SENTINEL_PREFIX = "__"
+
+
+def event_id_from_alert_key(key: str) -> str | None:
+    """The event a dedup key refers to, across all three key shapes in use:
+    `event|side|book` (moneyline), and `ev|event|...` / `arb|event|...` (props).
+    Returns None for sentinels and anything unrecognised.
+    """
+    if key.startswith(_SENTINEL_PREFIX):
+        return None
+    parts = key.split("|")
+    if parts[0] in ("ev", "arb"):
+        return parts[1] if len(parts) > 1 else None
+    return parts[0] or None
+
+
+def prune_alert_state(
+    state: dict[str, AlertRecord],
+    now: datetime | None = None,
+    kickoffs: Mapping[str, datetime] | None = None,
+    max_age: timedelta = DEFAULT_ALERT_STATE_MAX_AGE,
+) -> dict[str, AlertRecord]:
+    """Drop dedup entries whose event has already started. Sentinels are always
+    kept; entries whose event cannot be resolved fall back to `max_age`.
+    """
+    now = now or datetime.now(UTC)
+    kickoffs = kickoffs or {}
+
+    kept = {}
+    for k, v in state.items():
+        if k.startswith(_SENTINEL_PREFIX):
+            kept[k] = v
+            continue
+        event_id = event_id_from_alert_key(k)
+        kickoff = kickoffs.get(event_id) if event_id else None
+        if kickoff is not None:
+            if kickoff > now:
+                kept[k] = v
+        elif (now - v.alerted_at) <= max_age:
+            kept[k] = v
+    return kept
 
 
 def _alert_key(row: pd.Series) -> str:

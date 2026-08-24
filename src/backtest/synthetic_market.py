@@ -55,9 +55,10 @@ a game carries many simultaneous prop contracts -- the exact structure that
 makes contract-level price selection necessary in
 `src/backtest/engine.py::_market_rows`. This is what lets the props CLV path
 be validated against known ground truth BEFORE the season, which matters
-because props CLV can never be backtested historically: every historical prop
-pull in this project is a single near-kickoff snapshot, with no earlier entry
-price to measure a close against. Synthetic validation is not a nice-to-have
+because props CLV is still not backtested historically: every historical PROP
+pull is a single near-kickoff snapshot, and buying a prop series costs ~700
+credits/game. **That is cost, not impossibility** -- mainline 2024 now has a
+real 6-point series across 105 games, so the barrier was always the price. Synthetic validation is not a nice-to-have
 here, it is the only pre-season check that exists.
 """
 

@@ -199,7 +199,11 @@ def find_team_total_spots(
             "event_id": r.event_id, "side": r.side, "prop_stat": prop_stat, "bucket": bucket,
             "team_market_prob": r.team_market_prob, "lift": priced["bucket_lift"],
             "edge": priced["edge"], "suggested_stake": priced["suggested_stake"], "vig": vig,
-            "n_player_lines": int((lines["event_id"] == r.event_id).sum()),
+            # Both teams' lines, not this side's. `team_total_lines_from_store`
+            # carries no team column, so the count cannot be narrowed without a
+            # player->team mapping that does not exist here. Named for what it
+            # actually is rather than presented as evidence for one side.
+            "n_event_player_lines": int((lines["event_id"] == r.event_id).sum()),
         })
 
     if not rows:
@@ -211,7 +215,7 @@ def format_team_total_alert(row: pd.Series) -> str:
     return (
         f"TEAM-TOTAL {row['edge'] * 100:.1f}% ({row['bucket']}): {row['event_id']} {row['side']} "
         f"{row['prop_stat']} | mkt_prob={row['team_market_prob']:.3f} lift={row['lift']:.3f} "
-        f"| stake ${row['suggested_stake']:.2f} [{row['n_player_lines']} player lines]"
+        f"| stake ${row['suggested_stake']:.2f} [{row['n_event_player_lines']} player lines in event, both teams]"
     )
 
 

@@ -207,3 +207,47 @@ def test_no_decay_reported_before_a_baseline_can_be_established():
     """
     r = review_strategy(_frame([-0.05] * 20), min_bets=10, baseline_bets=30)
     assert not r.drift_flagged
+
+
+def test_pending_bets_do_not_crash_the_review():
+    """**Found by a paper run, 2026-08-23.** A pending bet has fair_prob=None (no
+    Pinnacle anchor yet) and won=None (game not played). Once `bets_to_frame`
+    started emitting those columns, `review_strategy`'s presence-check passed and
+    `expected_value` raised TypeError on the None. `make season-review` would have
+    crashed the first week a real pending bet sat in the log.
+    """
+    import pandas as pd
+
+    from src.backtest.season_review import review_strategy
+
+    frame = pd.DataFrame([{
+        "strategy": "prop_arb", "event_id": "2026_01_SF_LA",
+        "decision_time": pd.Timestamp("2026-08-23", tz="UTC"),
+        "clv_probability": None, "fair_prob": None, "won": None,
+        "price_decimal": 1.909, "stake": 2.0,
+    }])
+    r = review_strategy(frame, strategy="prop_arb")
+    assert r.n_bets == 1
+    assert r.roi is None and r.bettable is False
+    assert r.recommendation == "insufficient_data"
+
+
+def test_unmeasurable_segment_renders_na_not_nan():
+    """`review_strategy` returns None for an unmeasurable strategy, but
+    `review_all` builds a DataFrame and pandas coerces that None to NaN once any
+    other segment has real floats. NaN passes `is not None`, so the weekly digest
+    printed "+nan". Found by a paper run 2026-08-23.
+    """
+    import pandas as pd
+
+    from src.backtest.season_review import format_review_summary
+
+    reviews = pd.DataFrame([
+        {"strategy": "prop_arb", "n_bets": 1, "mean_clv": float("nan"), "clv_beat_rate": None,
+         "recent_mean_clv": float("nan"), "drift_flagged": False, "first_flag_index": None,
+         "roi": None, "bettable": False, "recommendation": "insufficient_data",
+         "reason": "1 bets < 50 needed for a verdict"},
+    ])
+    out = format_review_summary(reviews)
+    assert "nan" not in out.lower()
+    assert "n/a" in out

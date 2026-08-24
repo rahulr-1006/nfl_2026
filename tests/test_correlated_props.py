@@ -407,3 +407,45 @@ def test_measure_prop_vig_ignores_one_sided_quotes():
     rows.append({**rows[0], "event_id": "E2", "side": "over"})  # over with no under
     r = measure_prop_vig(pd.DataFrame(rows), book="pinnacle")
     assert r["n_contracts"] == 1
+
+
+def test_measure_prop_vig_pairs_both_sides_from_the_SAME_moment():
+    """**Code-review finding, 2026-08-23.** Taking `.last()` per side
+    independently pairs the newest over with a stale under, summing two
+    different moments into a fake overround. Measured on a synthetic
+    one-sided move it reported 22% where the truth was 4%.
+
+    That matters more here than almost anywhere: this number feeds
+    `team_total_scan.measured_vig_by_event` -> `bucket_edge`, which divides by
+    `(1 + vig) ** 2`, so the error is squared. `live_scan._latest_two_sided_pinnacle`
+    already pairs on a single capture_time for exactly this reason.
+    """
+    t0 = pd.Timestamp("2026-01-01", tz="UTC")
+    t1 = t0 + pd.Timedelta(hours=1)
+
+    def row(side, imp, cap):
+        return {"market": "player_prop", "book": "pinnacle", "event_id": "E1",
+                "player_name": "A", "prop_stat": "receptions", "line": 2.5,
+                "side": side, "implied_prob_raw": imp, "capture_time": cap}
+
+    # book moved only the OVER at t1; the under is stale from t0
+    df = pd.DataFrame([row("over", 0.52, t0), row("under", 0.52, t0), row("over", 0.70, t1)])
+    r = measure_prop_vig(df, book="pinnacle")
+    assert r["n_contracts"] == 1
+    assert r["mean_overround"] == pytest.approx(0.04, abs=1e-9)   # the t0 pair, not 0.22
+
+
+def test_measure_prop_vig_uses_the_latest_fully_two_sided_moment():
+    """When both sides move together, the NEWEST complete pair wins."""
+    t0 = pd.Timestamp("2026-01-01", tz="UTC")
+    t1 = t0 + pd.Timedelta(hours=1)
+
+    def row(side, imp, cap):
+        return {"market": "player_prop", "book": "pinnacle", "event_id": "E1",
+                "player_name": "A", "prop_stat": "receptions", "line": 2.5,
+                "side": side, "implied_prob_raw": imp, "capture_time": cap}
+
+    df = pd.DataFrame([row("over", 0.52, t0), row("under", 0.52, t0),
+                       row("over", 0.55, t1), row("under", 0.55, t1)])
+    r = measure_prop_vig(df, book="pinnacle")
+    assert r["mean_overround"] == pytest.approx(0.10, abs=1e-9)

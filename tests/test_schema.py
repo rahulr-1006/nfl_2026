@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 from pydantic import ValidationError
@@ -7,19 +7,19 @@ from src.store.schema import Market, OddsSnapshot, Side, american_to_decimal
 
 
 def _snap(**overrides):
-    defaults = dict(
-        capture_time=datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc),
-        event_id="2026_01_KC_LAC",
-        season=2026,
-        week=1,
-        home_team="LAC",
-        away_team="KC",
-        event_start_time=datetime(2026, 9, 5, 0, 20, tzinfo=timezone.utc),
-        book="pinnacle",
-        market=Market.SPREAD,
-        side=Side.HOME,
-        price_american=-110,
-    )
+    defaults = {
+        "capture_time": datetime(2026, 9, 4, 12, 0, tzinfo=UTC),
+        "event_id": "2026_01_KC_LAC",
+        "season": 2026,
+        "week": 1,
+        "home_team": "LAC",
+        "away_team": "KC",
+        "event_start_time": datetime(2026, 9, 5, 0, 20, tzinfo=UTC),
+        "book": "pinnacle",
+        "market": Market.SPREAD,
+        "side": Side.HOME,
+        "price_american": -110,
+    }
     defaults.update(overrides)
     return OddsSnapshot.from_american(**defaults, line=-2.5)
 
@@ -44,13 +44,13 @@ def test_frozen_snapshot_cannot_be_mutated():
 def test_naive_capture_time_rejected():
     with pytest.raises(ValidationError):
         OddsSnapshot.from_american(
-            capture_time=datetime(2026, 9, 4, 12, 0),  # no tz
+            capture_time=datetime(2026, 9, 4, 12, 0),  # noqa: DTZ001 -- naive on purpose
             event_id="2026_01_KC_LAC",
             season=2026,
             week=1,
             home_team="LAC",
             away_team="KC",
-            event_start_time=datetime(2026, 9, 5, 0, 20, tzinfo=timezone.utc),
+            event_start_time=datetime(2026, 9, 5, 0, 20, tzinfo=UTC),
             book="pinnacle",
             market=Market.SPREAD,
             side=Side.HOME,
@@ -67,13 +67,13 @@ def test_moneyline_rejects_line():
 def test_non_moneyline_requires_line():
     with pytest.raises(ValidationError):
         OddsSnapshot.from_american(
-            capture_time=datetime(2026, 9, 4, 12, 0, tzinfo=timezone.utc),
+            capture_time=datetime(2026, 9, 4, 12, 0, tzinfo=UTC),
             event_id="2026_01_KC_LAC",
             season=2026,
             week=1,
             home_team="LAC",
             away_team="KC",
-            event_start_time=datetime(2026, 9, 5, 0, 20, tzinfo=timezone.utc),
+            event_start_time=datetime(2026, 9, 5, 0, 20, tzinfo=UTC),
             book="pinnacle",
             market=Market.SPREAD,
             side=Side.HOME,

@@ -165,12 +165,24 @@ def review_strategy(
 
     flagged, first_flag, _baseline = _detect_decay(clv, baseline_bets, cusum_drift, cusum_threshold)
 
+    # Bettability needs GRADED bets with a usable fair probability. Column
+    # presence is not enough: a pending bet carries fair_prob=None (no Pinnacle
+    # anchor yet) and won=None (game not played), and `expected_value` raises
+    # TypeError comparing None. Found by a paper run 2026-08-23 -- before the
+    # columns existed this branch was skipped entirely, so adding them turned a
+    # silent no-op into a crash that would have hit `make season-review` the
+    # first week a real pending bet was in the log.
     roi, bettable = None, False
-    if {"fair_prob", "price_decimal", "won"}.issubset(frame.columns) and n:
-        report = evaluate_strategy(frame, min_bets=min(min_bets, n), random_state=random_state)
-        best = report["best_threshold"]
-        roi = float(best["roi"]) if best else None
-        bettable = report["verdict"] == "bettable edge"
+    required = {"fair_prob", "price_decimal", "won"}
+    if required.issubset(frame.columns):
+        scorable = frame.dropna(subset=list(required))
+        if len(scorable):
+            report = evaluate_strategy(
+                scorable, min_bets=min(min_bets, len(scorable)), random_state=random_state
+            )
+            best = report["best_threshold"]
+            roi = float(best["roi"]) if best else None
+            bettable = report["verdict"] == "bettable edge"
 
     if n < min_bets:
         rec, reason = INSUFFICIENT, f"{n} bets < {min_bets} needed for a verdict"
@@ -225,8 +237,13 @@ def format_review_summary(reviews: pd.DataFrame) -> str:
 
     lines = []
     for r in ordered.itertuples():
-        clv = f"{r.mean_clv:+.4f}" if r.mean_clv is not None else "n/a"
-        recent = f"{r.recent_mean_clv:+.4f}" if r.recent_mean_clv is not None else "n/a"
+        # `pd.isna`, not `is not None`: `review_strategy` returns None for an
+        # unmeasurable strategy, but `review_all` builds a DataFrame and pandas
+        # coerces that None to NaN whenever another strategy in the same report
+        # has real floats. NaN passes `is not None`, so a pending-only segment
+        # printed "+nan" in the weekly digest. Found by a paper run 2026-08-23.
+        clv = "n/a" if pd.isna(r.mean_clv) else f"{r.mean_clv:+.4f}"
+        recent = "n/a" if pd.isna(r.recent_mean_clv) else f"{r.recent_mean_clv:+.4f}"
         lines.append(
             f"[{r.recommendation.upper():<17}] {r.strategy:<14} n={r.n_bets:<5} "
             f"mean_clv={clv} recent={recent} drift={'YES' if r.drift_flagged else 'no'} -- {r.reason}"

@@ -169,3 +169,21 @@ class PointInTimeStore:
         # it has actually been written, or downstream code indexing that
         # column breaks until the first new-shaped snapshot lands.
         return pd.concat(frames, ignore_index=True).reindex(columns=_COLUMNS)
+
+
+def kickoffs_from_store(store: PointInTimeStore, as_of: datetime | None = None) -> dict[str, datetime]:
+    """event_id -> kickoff, from the store's own `event_start_time`.
+
+    Lives here rather than in a consumer because it has no caller-specific
+    logic -- it reads a column this module owns. It previously sat in
+    `store/bet_log.py`, which forced the live alerting service to import the
+    backtest engine and settlement machinery just to learn when games start.
+
+    Preferred over joining a schedule file: the store already records the exact
+    kickoff each quote was priced against, so this needs no column-name guessing
+    and stays correct for any event the collector actually saw.
+    """
+    df = store.read_as_of(as_of or datetime.now(UTC))
+    if df.empty:
+        return {}
+    return df.groupby("event_id")["event_start_time"].max().to_dict()

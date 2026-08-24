@@ -23,8 +23,13 @@ The plan for this phase was "features at the open, target the close." **That is 
 buildable here.** Checked 2026-08-23: the historical store holds **exactly one
 snapshot per game** (570 games, all 0.24-0.66h before kickoff) -- those are closes,
 and there are no opens. The live 2026 store has 19 snapshots/game but all 423-746
-hours out, i.e. opens with no closes yet. Same structural constraint that makes
-historical CLV impossible.
+hours out, i.e. opens with no closes yet.
+
+**Partly lifted 2026-08-23:** 105 games of 2024 now carry a real 6-point series
+(T-120h..close) bought via `collect/mainline_historical.py` -- the "no opens"
+constraint was cost, not impossibility. This module is still PARKED on its own
+merits (its result was an honest negative), but a future re-run has real early
+prices available for those 105 games.
 
 So the target is the close and the features are **pre-game, not pre-open**: rolling
 EPA, Elo, QB Elo, rest -- all computed from strictly prior games by

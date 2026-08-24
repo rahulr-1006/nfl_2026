@@ -481,6 +481,188 @@ a row in 462,331 snapshots) cost **0 credits**. Those two dead markets in
 
 ---
 
+## Middling and steam vs real 2024 movement — mostly NEGATIVE (2026-08-23)
+
+First evaluation of both structural strategies against real line movement rather
+than synthetic data. Run through `find_middle_opportunities` /
+`find_steam_opportunities` (execution books only, EV-priced) in a **single** call.
+
+| season | series? | middles | median EV | positive-EV |
+|---|---|---|---|---|
+| 2023 | no (single snapshot) | 372 | **−0.1252** | **1%** |
+| 2024 | **yes, 105 games** | 399 | **−0.1228** | **10%** |
+| 2026 | yes, live | 16 | −0.0858 | 12% |
+
+**The overwhelming majority of detectable middles are negative EV.** Even with a
+real time series, only ~10% of 2024 windows price positive. Direct outcome test
+on the 105 purchased games: hit rate **6.7%** (7/105), mean P&L **+3.4%** per
+$1/$1 pair, **95% CI (−4.2%, +12.2%)** — not significant.
+
+**What the series did buy:** 2024's positive-EV share is **10% vs 2023's 1%**, so
+line movement genuinely surfaces ~10x more real middles than single-instant
+cross-book disagreement. Real, but small, and not enough to validate the strategy.
+
+**Steam: 6 detections across 105 games — and the sampling is wrong for it.**
+Steam needs ≥3 books moving within a **1-hour** window; our purchased snapshots
+are **~24 hours apart**, so books only ever appear to move "simultaneously"
+because we observe them at the same 5 timestamps. Steam is a minutes-scale
+phenomenon and is **not measurable at this density** at any sample size. Only the
+live 30-minute arb tier can evaluate it.
+
+### Two analysis errors made and corrected on the way here
+
+1. **Scanning in a loop double-counted massively.** `find_middle_opportunities`
+   scans the WHOLE store per call; calling it once per game and concatenating
+   reported **54,268 middles across 451 games** when only 105 games have a series
+   and no spreads were even purchased. The tells were 451 > 105 and the presence
+   of `spread` rows. One call gives 787.
+2. **A raw `best_middle_for_game` sweep said "105/105 games, median 2.5pt".**
+   That used every book including ones with no account, and ignored EV entirely.
+   The realistic figure is the EV-priced execution-book table above.
+
+## Real historical line movement bought (2026-08-23) — an old claim was wrong
+
+**Ten places in this repo said historical CLV was "structurally impossible ... at
+any sample size". That was a COST statement misfiled as an impossibility.**
+`get_historical_event_odds` accepts an **arbitrary `date`** and returns the
+nearest 5-minute snapshot, so a time series was always purchasable. Only the
+close had ever been bought, because each historical call bills 10x. Nobody
+priced the alternative.
+
+**What was bought:** 104 games (+1 probe) of 2024, five offsets — T-120h, 72h,
+48h, 24h, 6h — on `h2h,totals` over `us,eu`, paired against the ~15-minute close
+those games already owned. **43,236 snapshots, 0 missing / 0 failed / 0
+malformed, 20,904 credits — exactly the estimate.** Result: 105 games with a
+clean 6-point Pinnacle series across ~23 books, on both moneyline and totals.
+
+Funded from grant remainder that expires at the 9/1 reset with no rollover, so
+it cost the season nothing. Balance after: 3,959.
+
+### What it shows
+
+**Lines move, substantially.** Median |Δ fair probability| from T-120h to close is
+**2.29 points**; 72% of games move >1pt and 39% move >3pt. Movement shrinks
+monotonically toward kickoff (2.74% → 1.18% mean), which is the convergence the
+whole CLV thesis assumes. The raw material for rolling-CLV strategies is real.
+
+**The premise is directionally supported but UNDERPOWERED — not proven.** The
+close forecasts the result better than the earlier line at all five horizons
+(Brier improvement +0.001 to +0.0028), **but every 95% CI includes zero.** Best is
+T-48h: +0.00275, CI (−0.00143, +0.00726). Five-for-five positive signs look
+suggestive, but the windows are nested on the same 105 games, so that is not an
+independent test and must not be reported as one. More power needs more games,
+which needs credits we no longer have.
+
+**This measures the MARKET, not a strategy.** It shows the line drifts. Capturing
+that drift still requires predicting *which way* — which is the probability-
+estimation problem this project has failed at 7 times.
+
+### Two analysis bugs caught before believing the output
+
+1. Including both sides made `beat_rate` exactly 0.5000 at every offset — devig
+   forces `p_home + p_away = 1`, so the sides are exact mirrors. A metric that
+   cannot come out otherwise is not evidence. Now home-side only, measured
+   directionally against the actual result.
+2. The T-6h entry window `(0, 12)` swallowed the close itself at 0.66h, making
+   entry == close and CLV identically 0. Entry windows now exclude `CLOSE_MAX`.
+
+### Still not possible
+
+**Props.** At 7 markets a prop series is ~700 credits/game, so the remaining
+budget buys ~5 games. Props rolling CLV stays a live-forward measurement.
+
+## Code review, 2026-08-23 — 13 findings, all fixed
+
+A `/code-review` pass over this session's work found **9 findings, 3 HIGH**, with
+**zero overlap** against the 4 an inline self-review had found. Every HIGH was a
+bug introduced that same session. All were verified by execution before fixing.
+Worth recording honestly: two of them were in code written *specifically to
+improve correctness*.
+
+**HIGH — could cost money or corrupt a verdict**
+
+1. **`corrects` never matched, so the bankroll double-counted.** Pydantic writes
+   `placed_at` as `...Z`; `active_bets` compared against `.isoformat()`
+   (`...+00:00`). A value copied out of `bet_log.jsonl` — the only place a human
+   can get it — never matched, so the superseded row survived and `settle_bets`
+   counted its stake and P&L twice. The original test passed only because it
+   built `corrects` in Python instead of reading it back from the file: it
+   validated the implementation, not the workflow. Now compared as parsed
+   instants, with a round-trip test.
+2. **CLV was computed for games that had not kicked off.** "Last quote at or
+   before kickoff" is satisfied by every row while kickoff is in the future, so
+   the current quote became a fake close — a bet 3 days out reported
+   `clv_probability = +0.143`. `season_review` feeds these to the CUSUM detector,
+   so a strategy could be retired on lines still moving. Now gated on
+   `kickoff <= as_of`.
+3. **Making `vig` required broke three notebook call sites** (cells 93/100/105)
+   — fixed in `src/` and `tests/` but not the notebook, *while editing that same
+   notebook*. Cell 95's already-queued re-run would have died at cell 93.
+
+**MEDIUM**
+
+4. **`measure_prop_vig` paired over/under from different moments** — `.last()`
+   per side independently pairs a fresh over with a stale under. Measured: **22%
+   overround reported where the truth was 4%.** It feeds `bucket_edge`, where vig
+   is **squared**. Now pairs on a single `capture_time`, the rule
+   `live_scan._latest_two_sided_pinnacle` already documents. (The constant still
+   reproduces exactly — n=16,953, mean 0.062891 — because the historical pull has
+   one capture_time per game; the fix matters for the live store.)
+5. `LoggedBet` accepted impossible market/side combinations, and props with no
+   player/stat/line that could never settle. Now rejected at entry.
+6. `settle_bets` had no per-bet error isolation — one bad row hid every other
+   bet's P&L. Now degrades to `outcome=None`, matching `monitor_run._safe`.
+7. `season_review` never computed roi/bettable: `review_strategy` gates on
+   `{fair_prob, price_decimal, won}` and `bets_to_frame` emitted none of them, so
+   `roi` was always None while `make season-review` advertised bettability.
+   Verified fixed: roi=0.321 at n=120.
+8. `make log-bet` had no `--placed-at` (so the entry anchor was the *logging*
+   time, biasing CLV) and no `--corrects` (making the correction workflow
+   unreachable). Both added.
+9. Props freshness had no sub-6h tier: a 12h allowance spanned the whole 48h
+   window while the collector polls every 30 min inside 6h, so a props death
+   under 12h before kickoff was never flagged at all. Added an arb tier (3h).
+10. `sync_architecture`'s row regex (`\w+`) could not match the multi-value
+    status the script itself emits (`**LIVE / MANUAL**`), so such a row would be
+    skipped and never re-synced — the exact drift it exists to prevent.
+
+**LOW:** `n_player_lines` counted both teams while the alert presented it as
+evidence for one side (renamed `n_event_player_lines`); an ARCHITECTURE Notes
+cell contradicted its generated Reach; `kickoffs_from_store` was moved from
+`bet_log` to `pit_store` so the live alerting service no longer imports the
+backtest engine.
+
+## Alert state is now pruned (2026-08-23)
+
+`data/alert_state.json` was **never cleaned by anything** and had grown to 874
+entries / 124KB — **866 of them for already-played 2023-24 games**, residue from
+the pre-`upcoming_only` alert bug. Verified the bug itself is genuinely fixed:
+`find_live_prop_ev_spots` and `find_live_prop_arb_spots` both return 0 against
+the live store, and the 874 sends were logged at 04:26 today, before the fixed
+code was picked up on service restart.
+
+**Pruning keys on KICKOFF, not alert age — and this distinction is the whole
+point.** Age was the obvious first cut and it silently did nothing: that bug
+fired *today* on games from 2023, so every stale entry carries a recent
+`alerted_at` and an age filter keeps all 866. A live run proved it (874 -> 874,
+nothing removed) before the approach was corrected. What makes an entry dead is
+that its event has started.
+
+- `event_id_from_alert_key` handles all three key shapes in use:
+  `event|side|book`, `ev|event|...`, `arb|event|...`.
+- Sentinels (`__`-prefixed, e.g. `__pinnacle_props_arrival__`) are **never**
+  dropped — they are one-shot latches, and ageing one out would re-fire an
+  announcement that must happen exactly once.
+- Unresolvable keys fall back to a 30-day age cap, so an unknown key shape still
+  cannot accumulate forever. 30 days deliberately exceeds the 21-day props
+  posting window, which bounds how far ahead of kickoff an alert can fire.
+- `monitor_run` persists on **prune OR send**. Saving only on send would leave
+  the prune in memory and redo it every cycle forever, so the file would never
+  actually shrink.
+
+Result on the live file: 874 -> 8 entries, 124,686 -> 907 bytes, every survivor a
+real upcoming Week 1 alert.
+
 ## Pre-kickoff only: enforced in both props paths (2026-08-23)
 
 **No live prop is ever polled after kickoff.** Every strategy here is priced

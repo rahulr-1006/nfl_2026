@@ -28,8 +28,10 @@ to work, none of which were before:
 
 **Honest scope limit on props CLV, stated up front:** this project's
 *historical* props pull is a single near-kickoff snapshot per game, so there
-is no earlier entry price to measure a close against -- props CLV is
-structurally impossible to backtest on 2023-2024 data, at any sample size.
+is no earlier entry price to measure a close against -- props CLV remains
+un-backtestable on 2023-2024 data, for COST rather than impossibility (a prop
+series is ~700 credits/game at 7 markets). Mainline is no longer in that
+position: 105 games of 2024 now carry a real 6-point series.
 It is validated pre-season against synthetic data with known ground truth
 (`src/backtest/synthetic_market.py`, `notebooks/clv_tracker_validation.ipynb`)
 and measured for real only once the live props scheduler accrues 2026 data.
