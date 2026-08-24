@@ -39,17 +39,18 @@ be traced back to the alert that triggered it.
 from __future__ import annotations
 
 import logging
+import pathlib
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from src.backtest.engine import BacktestBet, latest_fair_prob, payout_for
 from src.clv.metrics import clv_price, clv_probability
 from src.devig.convert import american_to_decimal
-from src.store.pit_store import PointInTimeStore
+from src.store.pit_store import PointInTimeStore, kickoffs_from_store
 from src.store.prop_settlement import (
     build_player_stats_index,
     normalize_player_name,
@@ -57,6 +58,11 @@ from src.store.prop_settlement import (
 )
 from src.store.schema import Market, Side
 from src.store.settlement import Outcome, build_results_index, settle
+
+# Re-exported: `kickoffs_from_store` lives in pit_store (it reads the store's
+# own event_start_time and has no bet-specific logic), but settlement callers
+# import it from here alongside settle_bets.
+__all__ = ["kickoffs_from_store"]
 
 log = logging.getLogger(__name__)
 
@@ -104,6 +110,35 @@ class LoggedBet(BaseModel):
             raise ValueError(f"unknown strategy {v!r}; expected one of {sorted(STRATEGIES)}")
         return v
 
+    @model_validator(mode="after")
+    def _market_and_side_agree(self) -> LoggedBet:
+        """Reject combinations that cannot be settled, at the point a human
+        types them.
+
+        Without this, `--market player_prop --side home` is accepted by the CLI
+        and only fails much later inside settlement, where the person who could
+        have corrected it is no longer looking. Props additionally need
+        player/stat/line: those identify the CONTRACT, and a prop bet missing
+        them can never be graded -- it would sit in the log forever reporting
+        `outcome=None` with nothing saying why.
+        """
+        over_under = {Side.OVER, Side.UNDER}
+        home_away = {Side.HOME, Side.AWAY}
+        expected = over_under if self.market in (Market.PLAYER_PROP, Market.TOTAL) else home_away
+        if self.side not in expected:
+            raise ValueError(
+                f"market {self.market.value!r} requires side in "
+                f"{sorted(s.value for s in expected)}, got {self.side.value!r}"
+            )
+        if self.market == Market.PLAYER_PROP:
+            missing = [f for f in ("player_name", "prop_stat", "line") if getattr(self, f) is None]
+            if missing:
+                raise ValueError(
+                    f"player_prop bets need {missing} to identify the contract -- "
+                    f"without them the bet can never be settled"
+                )
+        return self
+
     @field_validator("placed_at")
     @classmethod
     def _tz_aware(cls, v: datetime) -> datetime:
@@ -149,8 +184,23 @@ def active_bets(path: Path = BET_LOG_PATH) -> list[LoggedBet]:
     live view; the raw log stays available via `load_bet_log` for auditing.
     """
     bets = load_bet_log(path)
-    superseded = {b.corrects for b in bets if b.corrects}
-    return [b for b in bets if b.placed_at.isoformat() not in superseded]
+
+    # Compare as parsed instants, never as strings. Pydantic serialises
+    # `placed_at` as `...Z` while `.isoformat()` renders `...+00:00`, so string
+    # equality never matched a value copied out of the file -- which is the only
+    # place a human can obtain it. The superseded row then survived and
+    # (`fromisoformat` parses both spellings, so only the comparison was wrong.)
+    # `settle_bets` counted its stake and P&L twice.
+    superseded: set[datetime] = set()
+    for b in bets:
+        if not b.corrects:
+            continue
+        try:
+            superseded.add(datetime.fromisoformat(b.corrects))
+        except ValueError:
+            log.warning("bet at %s has an unparseable `corrects` value %r -- ignoring it, so "
+                        "the row it meant to supersede stays live", b.placed_at, b.corrects)
+    return [b for b in bets if b.placed_at not in superseded]
 
 
 def to_backtest_bets(
@@ -179,7 +229,8 @@ def to_backtest_bets(
     if not bets:
         return []
 
-    snapshots = store.read_as_of(as_of or datetime.now(UTC))
+    now_bound = as_of or datetime.now(UTC)
+    snapshots = store.read_as_of(now_bound)
     if snapshots.empty:
         log.warning("snapshot store is empty -- no CLV can be computed")
 
@@ -187,11 +238,17 @@ def to_backtest_bets(
     for b in bets:
         kickoff = _kickoff_for(snapshots, b.event_id)
         entry_fair = _fair_at(snapshots, b, anchor_book, b.placed_at, devig_method)
-        # "Close" = the last quote before kickoff. Without a known kickoff there
-        # is no defensible close, so CLV stays None rather than silently using
-        # the newest quote (which may be mid-game or another week entirely).
-        close_fair = _fair_at(snapshots, b, anchor_book, kickoff, devig_method) if kickoff else None
-        close_dec = _close_price_decimal(snapshots, b, kickoff) if kickoff else None
+
+        # "Close" = the last quote at or before kickoff -- a filter that EVERY row
+        # trivially satisfies while kickoff is still in the future, which would
+        # turn the current quote into a fake close and report CLV on a line that
+        # is still moving. `season_review` feeds these into the CUSUM drift
+        # detector and continue/monitor/retire verdicts, so a premature number
+        # there can retire a strategy on nothing. A bet is only closed once its
+        # game has actually started.
+        closed = kickoff is not None and kickoff <= now_bound
+        close_fair = _fair_at(snapshots, b, anchor_book, kickoff, devig_method) if closed else None
+        close_dec = _close_price_decimal(snapshots, b, kickoff) if closed else None
 
         out.append(BacktestBet(
             event_id=b.event_id,
@@ -259,17 +316,6 @@ def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datet
     return float(rows.loc[rows["capture_time"].idxmax(), "price_decimal"])
 
 
-def kickoffs_from_store(store: PointInTimeStore, as_of: datetime | None = None) -> dict[str, datetime]:
-    """event_id -> kickoff, read from the store's own `event_start_time`.
-
-    Separate from the schedule on purpose: the store already carries the exact
-    kickoff each quote was priced against, so this needs no column-name guessing
-    and stays correct for any event the collector saw.
-    """
-    df = store.read_as_of(as_of or datetime.now(UTC))
-    if df.empty:
-        return {}
-    return df.groupby("event_id")["event_start_time"].max().to_dict()
 
 
 def _grade(bet: BacktestBet, results: dict, stats_index: dict) -> Outcome | None:
@@ -329,7 +375,17 @@ def settle_bets(
 
     graded = []
     for b in bets:
-        outcome = _grade(b, results, stats_index)
+        # One ungradeable bet must not abort settlement for every other bet --
+        # that would hide all real P&L behind a single bad row. Same discipline
+        # as `monitor_run._safe` and `props_scheduler.tick`. `outcome=None` is
+        # already a supported state (unplayed games produce it), so this needs
+        # no new semantics.
+        try:
+            outcome = _grade(b, results, stats_index)
+        except Exception:
+            log.exception("could not grade %s %s %s @ %s -- leaving it unsettled",
+                          b.event_id, b.market.value, b.side.value, b.book)
+            outcome = None
         graded.append(replace(b, outcome=outcome, payout=payout_for(outcome, b.stake, b.price_decimal)))
 
     far_future = datetime.max.replace(tzinfo=UTC)
@@ -391,11 +447,29 @@ def main() -> None:
     ap.add_argument("--prop-stat")
     ap.add_argument("--alert-key", help="key from data/alert_state.json, for traceability")
     ap.add_argument("--note")
+    # `placed_at` is the moment the BET was struck, not the moment it was typed.
+    # Bets are placed manually across five books and logged afterwards, and
+    # `_fair_at` uses this as the entry anchor -- defaulting it to now() measures
+    # entry fair probability against a later market than the one actually bet
+    # into, quietly biasing every CLV number.
+    ap.add_argument("--placed-at", help="ISO-8601 UTC time the bet was actually placed "
+                                        "(default: now). Use this when logging after the fact.")
+    # Without this the documented append-only correction workflow is unreachable
+    # except by hand-editing the JSONL.
+    ap.add_argument("--corrects", help="`placed_at` of an earlier row this supersedes "
+                                       "(copy it from data/bet_log.jsonl)")
     ap.add_argument("--list", action="store_true", help="print the current log and exit")
+    # A separate log lets the whole loop be exercised end-to-end without writing
+    # a bet that was never actually placed into the real record -- the real log
+    # is append-only and feeds bankroll accounting, so polluting it is not
+    # something a later edit can cleanly undo.
+    ap.add_argument("--path", default=str(BET_LOG_PATH),
+                    help=f"bet log to write/read (default {BET_LOG_PATH})")
     a = ap.parse_args()
 
+    path = pathlib.Path(a.path)
     if a.list:
-        for b in active_bets():
+        for b in active_bets(path):
             print(f"{b.placed_at.isoformat()}  {b.strategy:<13} {b.event_id} {b.side.value} "
                   f"{b.book} {b.price_american:+d} ${b.stake:.2f}")
         return
@@ -408,11 +482,19 @@ def main() -> None:
     if missing:
         ap.error("missing required argument(s): " + ", ".join("--" + m.replace("_", "-") for m in missing))
 
+    if a.placed_at:
+        placed_at = datetime.fromisoformat(a.placed_at)
+        if placed_at.tzinfo is None:
+            ap.error("--placed-at must be timezone-aware (e.g. 2026-09-07T18:30:00Z)")
+    else:
+        placed_at = datetime.now(UTC)
+
     log_bet(LoggedBet(
-        placed_at=datetime.now(UTC), event_id=a.event_id, market=Market(a.market), side=Side(a.side),
+        placed_at=placed_at, event_id=a.event_id, market=Market(a.market), side=Side(a.side),
         book=a.book, price_american=a.price, stake=a.stake, strategy=a.strategy, line=a.line,
         player_name=a.player, prop_stat=a.prop_stat, alert_key=a.alert_key, note=a.note,
-    ))
+        corrects=a.corrects,
+    ), path=path)
 
 
 if __name__ == "__main__":

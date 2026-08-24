@@ -1502,7 +1502,9 @@ and checked numerically in `tests/test_middling.py::test_middle_ev_never_loses_b
 
 **Why this had to be built live-first, unlike every other strategy here.** nflverse's
 2015-2024 schedule data is closing-line-only -- there is no historical record of a
-line moving over time, so middling cannot be backtested against the past the way
+line moving over time (**partly resolved 2026-08-23: 105 games of 2024 now
+carry a real 6-point h2h+totals series, so totals middling IS now backtestable**),
+so middling could not previously be backtested against the past the way
 correlated props or the margin/total regression were. `PointInTimeStore` is the only
 source of real intraday line movement available for this purpose, and it only starts
 on 2026-08-14. This strategy's real track record has to be built forward from this

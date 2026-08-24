@@ -25,13 +25,22 @@ what the engine already measured.
      bets per game the running exposure is a real constraint that per-bet
      sizing caps cannot see (see `BacktestEngine`'s own docstring).
 
-**The honest limitation that shapes how any of this gets read:** CLV needs
-an entry price and a close. Every historical odds pull in this project is a
-single near-kickoff snapshot -- so no historical CLV backtest is possible
-for ANY market, props or mainline, at any sample size. Numbers produced here
-come from either synthetic data with known ground truth (pre-season pipeline
-validation) or real live 2026 collection. They are never a historical
-backtest, and a future reader should not be able to mistake them for one.
+**The limitation that shapes how any of this gets read:** CLV needs an entry
+price and a close.
+
+**Corrected 2026-08-23.** This docstring used to say no historical CLV backtest
+was possible "for ANY market ... at any sample size". That was wrong -- it was a
+COST statement misfiled as an impossibility. `get_historical_event_odds` accepts
+an arbitrary `date`, so a time series was always purchasable; only the close had
+ever been bought, because each historical call bills 10x. 105 games of 2024 now
+carry a real 6-point Pinnacle series (T-120h..close, ~23 books), pulled by
+`collect/mainline_historical.py`.
+
+So: **mainline 2024 CLV can now be backtested.** Props cannot, still for cost --
+a prop series is ~700 credits/game at 7 markets. Numbers here come from that
+2024 mainline series, from synthetic data with known ground truth (pre-season
+pipeline validation), or from live 2026 collection. Which one is always stated;
+a future reader should never have to guess.
 """
 
 from __future__ import annotations
@@ -42,6 +51,7 @@ import pandas as pd
 
 from src.backtest.engine import BacktestBet
 from src.clv.metrics import beat_rate, bootstrap_ci
+from src.store.settlement import Outcome
 
 MIN_BETS_FOR_INTERVAL = 2  # bootstrap_ci's own floor -- below this, report the point estimate with no interval
 
@@ -65,6 +75,16 @@ def bets_to_frame(bets: Sequence[BacktestBet]) -> pd.DataFrame:
                 "stake": b.stake,
                 "price_decimal": b.price_decimal,
                 "entry_prob_fair": b.entry_prob_fair,
+                # `fair_prob` and `won` exist so `season_review.review_strategy`
+                # can actually compute ROI/bettability -- it gates on
+                # {"fair_prob", "price_decimal", "won"} and this frame emitted
+                # neither, so `roi` was always None and `bettable` always False
+                # while `make season-review` advertised "CLV + drift + bettability".
+                # Aliases, not new data: fair_prob IS the entry fair probability,
+                # and `won` is None (not False) for an unsettled or pushed bet so
+                # an ungraded bet is never counted as a loss.
+                "fair_prob": b.entry_prob_fair,
+                "won": None if b.outcome is None else (b.outcome == Outcome.WIN),
                 "close_prob_fair": b.close_prob_fair,
                 "clv_price": b.clv_price,
                 "clv_probability": b.clv_probability,

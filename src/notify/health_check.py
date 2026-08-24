@@ -59,8 +59,16 @@ PROP_MARKET = "player_prop"
 # won or lost. The early allowance is deliberately well clear of 72h: with only one or
 # two games in the window, aggregate prop writes really are that sparse, and a check
 # that pages on a single slipped probe gets muted, which is worse than no check.
+PROPS_ARB_WINDOW_HOURS = 6.0
 PROPS_DENSE_WINDOW_HOURS = 48.0
 PROPS_SPARSE_WINDOW_HOURS = 120.0
+# Inside the final 6h the collector polls every 30 MINUTES (props_budget's arb
+# tier), so a 12h allowance there is not "tightest where CLV is won or lost" --
+# it is blind. A props death starting under 12h before kickoff never crossed the
+# threshold before the game began, and once it did `upcoming_only` had already
+# dropped the event, so it was never flagged at all. 3h is a generous multiple of
+# a 30-minute cadence and still fires with hours of the window left.
+MAX_PROP_SILENCE_ARB = timedelta(hours=3)
 MAX_PROP_SILENCE_DENSE = timedelta(hours=12)
 MAX_PROP_SILENCE_SPARSE = timedelta(hours=30)
 MAX_PROP_SILENCE_EARLY = timedelta(hours=120)
@@ -189,8 +197,10 @@ def pinnacle_arrival_message(coverage: dict) -> str | None:
 def check_props_write_freshness(
     store: PointInTimeStore,
     now: datetime | None = None,
+    arb_window_hours: float = PROPS_ARB_WINDOW_HOURS,
     dense_window_hours: float = PROPS_DENSE_WINDOW_HOURS,
     sparse_window_hours: float = PROPS_SPARSE_WINDOW_HOURS,
+    max_silence_arb: timedelta = MAX_PROP_SILENCE_ARB,
     max_silence_dense: timedelta = MAX_PROP_SILENCE_DENSE,
     max_silence_sparse: timedelta = MAX_PROP_SILENCE_SPARSE,
     max_silence_early: timedelta = MAX_PROP_SILENCE_EARLY,
@@ -240,7 +250,9 @@ def check_props_write_freshness(
     silence = now - last_write
     hours_to_next = (props["event_start_time"].min() - now).total_seconds() / 3600
 
-    if hours_to_next <= dense_window_hours:
+    if hours_to_next <= arb_window_hours:
+        threshold, tier = max_silence_arb, "arb"
+    elif hours_to_next <= dense_window_hours:
         threshold, tier = max_silence_dense, "dense"
     elif hours_to_next <= sparse_window_hours:
         threshold, tier = max_silence_sparse, "sparse"

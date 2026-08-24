@@ -238,9 +238,12 @@ def test_historical_backfill_cannot_pass_as_live_collector_activity(tmp_path):
 
 def test_dead_props_service_alerts_while_aggregate_check_says_ok(tmp_path):
     """The whole point. Mainline keeps writing; props stopped 20h ago with a
-    kickoff 3h away. The aggregate check sees only the fresh mainline write.
+    kickoff 24h away. The aggregate check sees only the fresh mainline write.
+
+    24h, not 3h: inside 6h the arb tier applies (30-min polling), and this test
+    is about the dense tier's behaviour.
     """
-    kickoff = NOW + timedelta(hours=3)
+    kickoff = NOW + timedelta(hours=24)
     store = _store(tmp_path, [
         _prop_snap(NOW - timedelta(hours=20), kickoff),
         _snap(NOW - timedelta(minutes=20), kickoff),
@@ -252,7 +255,7 @@ def test_dead_props_service_alerts_while_aggregate_check_says_ok(tmp_path):
 
 
 def test_fresh_props_write_near_kickoff_is_healthy(tmp_path):
-    kickoff = NOW + timedelta(hours=3)
+    kickoff = NOW + timedelta(hours=24)
     r = check_props_write_freshness(_store(tmp_path, [_prop_snap(NOW - timedelta(hours=2), kickoff)]), now=NOW)
     assert r["healthy"] and r["tier"] == "dense"
 
@@ -262,7 +265,7 @@ def test_thresholds_loosen_with_distance_from_kickoff(tmp_path):
     where the collector only probes every 72h. One constant cannot do both.
     """
     silence = timedelta(hours=20)
-    dense = _store(tmp_path / "d", [_prop_snap(NOW - silence, NOW + timedelta(hours=3))])
+    dense = _store(tmp_path / "d", [_prop_snap(NOW - silence, NOW + timedelta(hours=24))])
     early = _store(tmp_path / "e", [_prop_snap(NOW - silence, NOW + timedelta(days=10))])
     assert not check_props_write_freshness(dense, now=NOW)["healthy"]
     assert check_props_write_freshness(early, now=NOW)["healthy"]
@@ -288,3 +291,31 @@ def test_check_all_runs_both_checks_and_surfaces_the_props_alert(tmp_path):
     assert len(results) == 2
     msgs = unhealthy_messages(results)
     assert len(msgs) == 1 and "props collector" in msgs[0]
+
+
+def test_arb_tier_catches_a_props_death_that_the_dense_threshold_would_miss(tmp_path):
+    """**Code-review finding, 2026-08-23.** Inside the final 6h the collector
+    polls every 30 MINUTES, but the 12h dense allowance spanned the whole 48h
+    window. A props death starting under 12h before kickoff never crossed the
+    threshold before the game began -- and once it did, `upcoming_only` had
+    already dropped the event, so it was never flagged at all. Silent exactly
+    where CLV is won or lost.
+    """
+    kickoff = NOW + timedelta(hours=4)          # arb tier
+    store = _store(tmp_path, [_prop_snap(NOW - timedelta(hours=5), kickoff)])
+    r = check_props_write_freshness(store, now=NOW)
+    assert r["tier"] == "arb"
+    assert not r["healthy"]                     # 5h silence at 30-min cadence is dead
+
+
+def test_arb_tier_tolerates_a_normal_gap(tmp_path):
+    kickoff = NOW + timedelta(hours=4)
+    store = _store(tmp_path, [_prop_snap(NOW - timedelta(hours=1), kickoff)])
+    r = check_props_write_freshness(store, now=NOW)
+    assert r["tier"] == "arb" and r["healthy"]
+
+
+def test_arb_threshold_is_tighter_than_dense():
+    from src.notify.health_check import MAX_PROP_SILENCE_ARB, MAX_PROP_SILENCE_DENSE
+
+    assert MAX_PROP_SILENCE_ARB < MAX_PROP_SILENCE_DENSE

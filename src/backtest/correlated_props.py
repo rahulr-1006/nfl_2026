@@ -86,15 +86,30 @@ def measure_prop_vig(props: pd.DataFrame, book: str | None = "pinnacle") -> dict
         df = df[df["book"] == book]
 
     key = ["event_id", "book", "player_name", "prop_stat", "line"]
-    latest = df.sort_values("capture_time").groupby(key + ["side"], as_index=False).last()
-    wide = latest.pivot_table(index=key, columns="side", values="implied_prob_raw", aggfunc="last")
+
+    # Pair both sides from the SAME capture_time, then take the latest moment at
+    # which the contract was fully two-sided. Taking `.last()` per side
+    # independently pairs a fresh over with a stale under whenever a book moves
+    # one side, summing two different moments into a fake overround (measured:
+    # 22% reported where the truth was 4%). That error is squared downstream --
+    # `bucket_edge` divides by `(1 + vig) ** 2`.
+    # Same rule, same reason as `live_scan._latest_two_sided_pinnacle`.
+    per_moment = df.pivot_table(
+        index=key + ["capture_time"], columns="side", values="implied_prob_raw", aggfunc="last"
+    )
+    if "over" not in per_moment.columns or "under" not in per_moment.columns:
+        return {"n_contracts": 0, "mean_overround": None, "median_overround": None, "book": book}
+    per_moment = per_moment.dropna(subset=["over", "under"]).reset_index()
+    wide = (
+        per_moment.sort_values("capture_time")
+        .groupby(key, as_index=False)
+        .last()
+        .set_index(key)
+    )
 
     # Two-sided only: a one-sided quote has no complement to sum against, so it
     # carries no measurable overround at all (see src/collect/props.py on why
     # anytime-TD is out of scope entirely for exactly this reason).
-    if "over" not in wide.columns or "under" not in wide.columns:
-        return {"n_contracts": 0, "mean_overround": None, "median_overround": None, "book": book}
-    wide = wide.dropna(subset=["over", "under"])
     ovr = wide["over"] + wide["under"] - 1.0
 
     return {

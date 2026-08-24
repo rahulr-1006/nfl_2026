@@ -188,14 +188,21 @@ def test_realistic_season_cost_fits_the_grant_and_worst_case_is_labelled_unreach
     272 upcoming games had props posted. `realistic_season_credit_cost` is the
     planning number.
     """
-    from src.collect.props_budget import realistic_season_credit_cost, season_credit_cost
+    from src.collect.props_budget import (
+        realistic_season_credit_cost,
+        season_credit_cost,
+    )
 
     assert realistic_season_credit_cost(285) < 80_000  # comfortable margin
     assert season_credit_cost(285) > realistic_season_credit_cost(285)  # ceiling is above it
 
 
 def test_early_probes_dominate_the_gap_between_worst_and_realistic_cost():
-    from src.collect.props_budget import POLL_TARGETS, realistic_season_credit_cost, season_credit_cost
+    from src.collect.props_budget import (
+        POLL_TARGETS,
+        realistic_season_credit_cost,
+        season_credit_cost,
+    )
 
     assert any(t.tier == "early" for t in POLL_TARGETS)
     # With every early probe capturing, realistic converges toward worst case.

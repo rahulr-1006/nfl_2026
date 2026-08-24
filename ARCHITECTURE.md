@@ -60,79 +60,94 @@ leakage guard), not a call — verified 2026-08-23.
 
 Legend — **LIVE**: runs in a deployed service. **ENTRY**: manual entrypoint.
 **LIB**: imported by live/entry code. **RESEARCH**: used only by notebooks/tests.
-**ORPHAN**: nothing reaches it -- no import, **no make target**, no notebook. Checking imports alone is not enough and has produced wrong verdicts here twice (`preseason_report.py` and `demo_pipeline.py` were both filed ORPHAN while having make targets). `make audit` is authoritative; this column is a summary of it.
+**The `Reach` column is GENERATED — do not hand-edit it.** `make sync-arch`
+rewrites it from `make audit`. It used to be a hand-maintained `Status` column
+that mixed two different axes — *role* (LIB, ENTRY, RESEARCH) and *reachability*
+(LIVE, ORPHAN) — so rows compared on the wrong axis disagreed with reality by
+construction, and eight did. Role is deliberately not duplicated here; the Notes
+column carries it in prose, where it cannot silently contradict a fact.
 
-**PARKED**: unreachable *by decision*, with the reason and a reopen condition in the module's own docstring. Not the same as an orphan -- it is a closed question.
+Values, all from the audit: **LIVE** (reachable from a launchd service),
+**MANUAL** (reachable from a make target — often deliberate, e.g. `middle_scan`
+and `steam_scan` have no live track record yet and are not trusted to an
+unattended alert channel), **RESEARCH** (reached from a notebook), **PARKED**
+(unreachable by decision, with the reason and a reopen condition in the module's
+own docstring), **UNDECIDED** (built and tested, wired to nothing, no verdict
+yet), **UNREF** (nothing reaches it at all).
+
+Reachability is never decided by reading imports alone — that misses make
+targets, and it produced two wrong ORPHAN verdicts here (`preseason_report.py`
+and `demo_pipeline.py`).
 
 ### store/ — foundation (all LIVE)
-| Module | Imported by | Status | Notes |
+| Module | Imported by | Reach | Notes |
 |---|---|---|---|
 | `pit_store.py` | 18 | **LIVE** | Most-depended-on module in the repo. The leakage guard. |
 | `schema.py` | 12 | **LIVE** | `OddsSnapshot`/`Market`/`Side`. |
-| `settlement.py` | 2 | **LIVE** | Game-score grading. |
-| `prop_settlement.py` | 2 | **LIVE** | Player-stat grading + name reconciliation. |
+| `settlement.py` | 2 | **MANUAL** | Game-score grading. |
+| `prop_settlement.py` | 2 | **MANUAL** | Player-stat grading + name reconciliation. |
 
 ### collect/ — data acquisition
-| Module | Imported by | Status | Notes |
+| Module | Imported by | Reach | Notes |
 |---|---|---|---|
 | `client.py` | 8 | **LIVE** | Odds API wrapper. |
 | `transform.py` | 8 | **LIVE** | JSON → snapshots, event matching. |
 | `teams.py` / `config.py` | 4 / 3 | **LIVE** | |
 | `run.py` | — | **LIVE** | Collector entrypoint (running). |
 | `scheduler.py` / `budget.py` | 1 / 1 | **LIVE** | Mainline cadence. |
-| `props_run.py` | — | **ENTRY** | **Not loaded as a service — the 9/2 blocker.** |
-| `props_scheduler.py` / `props_budget.py` | 1 / 1 | **LIB** | 3-tier cadence, 84.4% of credit grant. |
-| `props.py` | 4 | **LIB** | Prop parsing + market definitions. |
-| `props_historical.py` | 1 | **ENTRY** | Executed: 2023+2024 props pulled. |
+| `props_run.py` | — | **LIVE** | Loaded as `com.nflclv.props` (2026-08-23); the 9/2 blocker cleared early when props posted 17 days out. |
+| `props_scheduler.py` / `props_budget.py` | 1 / 1 | **LIVE** | 3-tier cadence, 84.4% of credit grant. |
+| `props.py` | 4 | **LIVE** | Prop parsing + market definitions. |
+| `props_historical.py` | 1 | **PARKED** | Executed: 2023+2024 props pulled. |
 | `mainline_historical.py` | 0 | **PARKED** | Completed one-shot pull (570 games); gap confirmed real but inconsequential (0.000138 Brier). Park verdict 2026-08-23, reason in its docstring. |
-| `preseason.py` | 1 | **ENTRY** | Superseded by the real season — retire after 9/9. |
+| `preseason.py` | 1 | **MANUAL** | Superseded by the real season — retire after 9/9. |
 
 ### model/ — feature/rating layer (trains ONLY on free nflverse data)
-| Module | Imported by | Status | Notes |
+| Module | Imported by | Reach | Notes |
 |---|---|---|---|
-| `elo.py` | 8 | **LIB** | Base team Elo — the one comparison that survives BH correction. |
-| `features.py` / `train.py` | 1 / 2 | **LIB** | Feature builder, splits, fitting. |
-| `baseline.py` | 4 | **LIB** | Devigged market baseline. |
-| `qb_elo.py` | 1 | **LIB** | In `COMBINED_QB_FEATURE_COLUMNS`. |
-| `stadiums.py` | 1 | **LIB** | Rest/travel (feature tested negative). |
-| `calibration.py` / `evaluate.py` | 1 / 1 | **LIB** | |
+| `elo.py` | 8 | **MANUAL** | Base team Elo — the one comparison that survives BH correction. |
+| `features.py` / `train.py` | 1 / 2 | **MANUAL** | Feature builder, splits, fitting. |
+| `baseline.py` | 4 | **LIVE** | Devigged market baseline. |
+| `qb_elo.py` | 1 | **MANUAL** | In `COMBINED_QB_FEATURE_COLUMNS`. |
+| `stadiums.py` | 1 | **MANUAL** | Rest/travel (feature tested negative). |
+| `calibration.py` / `evaluate.py` | 1 / 1 | **MANUAL** | |
 | `receiver_elo.py` | 0 | **RESEARCH** | Notebook + tests only. Never fed a live decision. |
 | `pass_rush_elo.py` | 0 | **RESEARCH** | Same. |
 | `game_level_features.py` | 0 | **RESEARCH** | Rolls the above to game level; tested negative. |
-| `closing_line.py` | 0 | **RESEARCH** | Phase 3. Predicts Pinnacle's closing fair prob from pre-game features. Valid for MAINLINE; **not** for props (target is ~0.5 by construction, measured). |
-| `prop_projection.py` | 0 | **RESEARCH** | Phase 3. Projects a player's stat vs the posted line -- the first model here to consume `data/snapshots`. Tested negative: recent form adds nothing beyond the line. |
+| `closing_line.py` | 0 | **PARKED** | Phase 3. Predicts Pinnacle's closing fair prob from pre-game features. Valid for MAINLINE; **not** for props (target is ~0.5 by construction, measured). |
+| `prop_projection.py` | 0 | **PARKED** | Phase 3. Projects a player's stat vs the posted line -- the first model here to consume `data/snapshots`. Tested negative: recent form adds nothing beyond the line. |
 | `individual_pass_rush_elo.py` | 0 | **PARKED** | Wiring it = comparison #10 against an 0-for-6 feature-engineering record; would spend a BH slot and the 2025 holdout. Reopen only for a structural use. |
 
 ### backtest/ — strategies & evaluation
-| Module | Imported by | Status | Notes |
+| Module | Imported by | Reach | Notes |
 |---|---|---|---|
-| `engine.py` | 1 | **LIB** | Point-in-time backtester. Look-ahead bug fixed 2026-08-23. |
-| `middling.py` / `steam.py` | 2 / 1 | **LIB** | |
-| `middle_scan.py` / `steam_scan.py` | — | **ENTRY** | Manual `make` targets. No service, no track record. |
-| `props_ev_backtest.py` | 1 | **LIB** | Now also powers live props scanning. |
-| `correlated_props.py` | 0 | **RESEARCH** | 11 public fns, 2 notebooks. `price_bucket_bet` is the gated entrypoint **no live scanner calls**. |
+| `engine.py` | 1 | **MANUAL** | Point-in-time backtester. Look-ahead bug fixed 2026-08-23. |
+| `middling.py` / `steam.py` | 2 / 1 | **MANUAL** | |
+| `middle_scan.py` / `steam_scan.py` | — | **MANUAL** | Manual `make` targets. No service, no track record. |
+| `props_ev_backtest.py` | 1 | **LIVE** | Now also powers live props scanning. |
+| `correlated_props.py` | 0 | **MANUAL** | 11 public fns, 2 notebooks. `price_bucket_bet` is the gated entrypoint **no live scanner calls**. |
 | `team_total_props.py` | 0 | **RESEARCH** | Validated edge (underdog +6.6%/+14.1%), **not wired to anything**. |
 | `validation.py` | 0 | **RESEARCH** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
-| `evaluation.py` | 0 | **RESEARCH** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
+| `evaluation.py` | 0 | **MANUAL** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
-| `clv_portfolio.py` | 0 | **RESEARCH** | Built 2026-08-23; reporting layer, no live caller yet. |
-| `season_review.py` | 0 | **RESEARCH** | Phase 4. Weekly in-season health check: CLV + drift CUSUM + bettability -> continue/monitor/retire. Consumes `drift/monitor.py` and `clv_portfolio.py`, both previously orphaned. |
+| `clv_portfolio.py` | 0 | **MANUAL** | Built 2026-08-23; reporting layer, no live caller yet. |
+| `season_review.py` | 0 | **MANUAL** | Phase 4. Weekly in-season health check: CLV + drift CUSUM + bettability -> continue/monitor/retire. Consumes `drift/monitor.py` and `clv_portfolio.py`, both previously orphaned. |
 | `parlay.py` | 0 | **PARKED** | Contract requires REAL leg prices; team-total's second leg is a constructed aggregate, so that wire would launder a modelled number. Reopen when a same-game prop parlay scanner exists. |
 
 ### signal/ notify/ clv/ devig/ features/ drift/
-| Module | Imported by | Status | Notes |
+| Module | Imported by | Reach | Notes |
 |---|---|---|---|
 | `signal/live_scan.py` | 5 | **LIVE** | Moneyline scanner + shared alert state. |
 | `signal/props_scan.py` | 1 | **LIVE** | Props arb + EV (wired 2026-08-23). |
 | `signal/sizing.py` | 5 | **LIVE** | Kelly + bankroll caps. |
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
-| `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
+| `clv/metrics.py` | 3 | **MANUAL** | The project's headline metric. |
 | `clv/preseason_report.py` | 0 | **MANUAL** | `make preseason-report`. Was mis-filed ORPHAN by import-only reasoning. Preseason-only; retire after 9/9. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
-| `features/load_static.py` | 1 | **ENTRY** | nflverse pulls. |
+| `features/load_static.py` | 1 | **LIVE** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
-| `drift/monitor.py` | 1 | **LIB** | CUSUM drift detection. **Wired 2026-08-23** by `season_review.py` -- no longer an orphan. |
+| `drift/monitor.py` | 1 | **MANUAL** | CUSUM drift detection. **Wired 2026-08-23** by `season_review.py` -- no longer an orphan. |
 | `demo_pipeline.py` | 0 | **MANUAL** | `make demo`. Was mis-filed ORPHAN by import-only reasoning. Documentation-by-example smoke test. |
 
 ---

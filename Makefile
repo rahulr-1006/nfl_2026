@@ -25,6 +25,19 @@ test:
 audit:
 	$(PY) scripts/audit_integration.py
 
+# Regenerate ARCHITECTURE.md's Reach column from the audit. Run after any
+# wiring change; idempotent, so it is safe to run any time.
+sync-arch:
+	$(PY) scripts/sync_architecture.py
+
+# Buy a historical mainline TIME SERIES -- real line movement, real credits.
+# ALWAYS --dry-run first. Manual and deliberate; never scheduled.
+#   make mainline-timeseries ARGS="--dry-run"
+#   make mainline-timeseries ARGS="--probe"
+#   make mainline-timeseries ARGS="--games 105"
+mainline-timeseries:
+	$(PY) -m src.collect.mainline_historical $(ARGS)
+
 lint:
 	$(PY) -m ruff check src tests
 

@@ -97,15 +97,19 @@ unreferenced**. Wired: `team_total_scan` (`make team-total-scan-once`),
 so CLV could not be computed for any real bet. `src/store/bet_log.py` +
 `make log-bet`. See methodology_backlog.md.
 
-### 2. Stale data files — VERIFIED unreferenced, awaiting your call
+### 2. ~~Stale data files~~ DELETED 2026-08-23
 
-```
-data/static/{pbp,injuries,schedules,rosters_weekly,player_stats}_2015_2024.parquet
-```
+The five `*_2015_2024.parquet` files are gone (11MB). **Verified as strict
+supersets before deleting**, not assumed: `schedules` 2,743 -> 3,028 game_ids
+with 0 missing, `player_stats` 180,442 -> 199,862 keys with 0 missing, and
+`pbp`/`injuries`/`rosters_weekly` all higher row counts with no season dropped.
+They were also regenerable via `src/features/load_static.py` if ever needed.
 
-Grepped `src/`, `tests/`, `notebooks/` on 2026-08-23: **0 references to any of
-the five.** 11MB total. Safe to delete, but not deleted -- data is preserved by
-standing rule, so this is a decision, not a task.
+Note they had stopped being unreferenced: `bet_log.load_settlement_inputs`
+globs `schedules_*.parquet` / `player_stats_*.parquet`. Post-delete it still
+returns 3,300 schedule rows (unchanged — the old file was a subset and the
+concat dedups keeping newest), and the full suite plus both entrypoints run
+clean.
 
 ### 3. ~~`market_write_freshness` -> alert~~ DONE 2026-08-23
 
@@ -183,51 +187,65 @@ snapshots, and `season_review` correctly returning INSUFFICIENT_DATA at n=2.
 `collect/preseason.py`, `clv/preseason_report.py`. Validation scaffolding, not a
 result.
 
-### 7. Cosmetic / housekeeping
+### 9. Paper run of the full loop — DONE 2026-08-23, found 2 real bugs
 
-- `notebooks/model_backtest_results.ipynb`: a registry label reads "(20)" for a
-  comparison family that is now 22 (2 occurrences).
-- Cell 95 has **stale outputs** showing the superseded 0.0575. Source and prose
-  are corrected; outputs were deliberately not hand-edited (that would be
-  fabricating a result). Needs a kernel re-run on `nfl-clv`.
-- **Lint debt: 12 ruff errors**, 9 auto-fixable, in `collect/run.py`,
-  `tests/test_pit_store.py`, `tests/test_props_budget.py`, `tests/test_schema.py`.
-  (Was 17; four `src/` files were cleaned incidentally this session.)
-- `ARCHITECTURE.md`'s status column conflates *role* (LIB, ENTRY) with
-  *reachability* (LIVE, ORPHAN), so 8 rows disagree with `make audit` by
-  construction. `make audit` now checks the ORPHAN claims automatically and
-  reports drift; the deeper fix is to split the column or drop reachability
-  from it and defer to the audit.
+Logged a genuinely quoted prop (McCaffrey rushing_yards 59.5 over, DraftKings
+-110, 2026_01_SF_LA) through the real `make log-bet` CLI, then ran it through
+enrichment -> settlement -> weekly review. Added `--path` so the loop can be
+exercised without writing a never-placed bet into the real append-only record.
 
----
+**Two bugs it caught, both of which would have hit Week 1:**
 
-## Things that are settled — do not re-propose without new evidence
+1. **`make season-review` would have CRASHED on any pending bet.** The
+   bettability fix earlier that day made `bets_to_frame` emit `fair_prob`/`won`,
+   which made `review_strategy`'s presence-check pass -- but a pending bet has
+   both as `None`, and `expected_value` raises `TypeError` comparing None. Before
+   that change the branch was skipped entirely, so adding the columns turned a
+   silent no-op into a crash. Now filters to rows with usable values.
+2. **The weekly digest printed `+nan`.** `review_strategy` correctly returns
+   `None` for an unmeasurable segment, but `review_all` builds a DataFrame and
+   pandas coerces that to `NaN` once another segment has real floats. `NaN`
+   passes `is not None`. Now uses `pd.isna`.
 
-- **Garbage-time filtering** — tested, makes the model *worse*.
-- **No historical CLV backtest is possible for any market.** Every historical
-  pull is a single near-kickoff snapshot. CLV must be collected forward, live.
-  This is why the polling density work mattered.
-- **Prop closing probabilities are ~0.5 by construction** (46.8% within ±0.02).
-  A formulation that tries to predict them is predicting noise.
-- **QB Elo's "real improvement" does not survive multiple-comparison
-  correction.** Only base Elo does. The comparison family is ~69 p-values and
-  growing; every new comparison must go through Benjamini-Hochberg.
-- **Feature engineering has failed 6 consecutive times** (garbage time, weather,
-  rest/travel, game-level Elo rollups, GBM-once-Elo-is-present, referee
-  tendencies). The pattern is the design rule below, not bad luck.
+**Verified behaviour on a pending prop:** `fair_prob=None` (Pinnacle isn't
+quoting props), `close=None` (game 18 days out), `clv=None`, `outcome=None`,
+bankroll untouched at $100 -- every one of those is the correct answer, not a
+failure. Settled 2024 moneylines in the same batch graded win/loss and moved the
+bankroll $100 -> $102 -> $100.
 
-**The design rule that predicts outcomes here:** probability-estimation
-strategies must overcome 6.29% prop vig and nothing built has supplied it —
-they fail. Structural-exploitation strategies (arb, correlated legs, line
-movement) require no probability estimate — they work. **State which shape a
-proposal is before building it.**
+**Side effect of the time-series pull:** moneyline CLV on those 2024 games moved
+from +0.0209 to **-0.0588**, because the entry price is now a REAL T-120h quote
+instead of falling back to the close. The negative number is the more honest one.
 
----
+### 8. Code review — 13 findings, all fixed 2026-08-23
 
-## Working with this repo
+Full detail in methodology_backlog.md. Three HIGH (bankroll double-counting via a
+`corrects` string mismatch; CLV computed on games that had not kicked off; three
+notebook call sites broken by making `vig` required). Ten MEDIUM/LOW. 854 tests,
+ruff clean.
 
-- `graphify query "<question>"` first for codebase questions — the graph is
-  current (1,986 nodes / 5,259 edges, rebuilt 2026-08-23 and includes
-  `prop_book_coverage` and `pinnacle_arrival_message`).
-- `graphify update .` after modifying code (AST-only, free).
-- Run tests with the venv active: `source .venv/bin/activate && pytest -q`.
+**Process note worth keeping:** the agent review found 9 findings with **zero
+overlap** against a self-review's 4 — and every HIGH was same-session work. Two
+bugs were in code written specifically to improve correctness. Self-review is not
+a substitute here.
+
+### 7. Cosmetic / housekeeping — mostly DONE 2026-08-23
+
+- ~~Lint debt~~ **CLEAN.** `ruff check src/ tests/ scripts/` passes with 0
+  errors (was 17). Two intentional naive-datetime tests carry an explicit
+  `noqa: DTZ001` rather than being "fixed" into meaninglessness.
+- ~~Notebook "(20)" label~~ **FIXED, and made unbreakable.** It was
+  `len(bucket_pairs) x n_seasons` and the 2025 refresh silently made it 22. The
+  registry keys are now **derived** (`f"{name} ({len(pvals)})"`) instead of
+  hand-typed — a hardcoded count in a multiple-comparison registry is exactly
+  the number that must not be wrong.
+- ~~ARCHITECTURE role-vs-reachability~~ **FIXED.** The `Status` column mixed
+  role (LIB/ENTRY/RESEARCH) with reachability (LIVE/ORPHAN), so rows disagreed
+  with the audit by construction. It is now a `Reach` column, **generated** by
+  `make sync-arch` from `make audit`, and idempotent. Role lives in Notes prose
+  where it cannot contradict a fact. 23 cells were wrong.
+- **STILL OPEN:** `notebooks/model_backtest_results.ipynb` cell 95 has stale
+  OUTPUTS showing the superseded 0.0575. Source and prose are correct; the
+  outputs were deliberately not hand-edited (that would be fabricating a
+  result). Needs a kernel re-run on `nfl-clv`.
+
