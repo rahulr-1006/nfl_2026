@@ -95,7 +95,7 @@ def test_combined_poll_targets_are_time_ordered_across_all_three_tiers():
     assert list(POLL_TARGETS_HOURS) == sorted(POLL_TARGETS_HOURS, reverse=True)
     assert POLL_TARGETS_HOURS[0] == 504.0  # first early-probe target (21 days)
     assert POLL_TARGETS_HOURS[-1] == 0.5  # last arb target, closest to kickoff
-    assert {t.tier for t in POLL_TARGETS} == {"early", "sparse", "dense", "arb"}
+    assert {t.tier for t in POLL_TARGETS} == {"early", "sparse", "dense", "close", "arb"}
 
 
 def test_dense_and_arb_tiers_interleave_in_the_final_hours_by_design():
@@ -110,7 +110,7 @@ def test_dense_and_arb_tiers_interleave_in_the_final_hours_by_design():
     from src.collect.props_budget import ARB_WINDOW_HOURS, POLL_TARGETS
 
     final = [t for t in POLL_TARGETS if t.hours_before_kickoff <= ARB_WINDOW_HOURS]
-    assert {t.tier for t in final} == {"dense", "arb"}  # both present in the same window
+    assert {t.tier for t in final} == {"dense", "close", "arb"}  # all three present in the same window
     assert final[-1].tier == "arb"  # the very last poll before kickoff is a cheap one
 
 
@@ -182,18 +182,36 @@ def test_decision_carries_the_markets_the_scheduler_must_request():
     assert decision.tier == "arb"
 
 
-def test_realistic_season_cost_fits_the_grant_and_worst_case_is_labelled_unreachable():
+def test_realistic_season_cost_fits_the_monthly_cap_and_worst_case_is_labelled_unreachable():
     """The worst case assumes every early probe returns data at full price. It
     cannot happen: empty polls bill 0 credits, and on 2026-08-23 exactly 2 of
     272 upcoming games had props posted. `realistic_season_credit_cost` is the
     planning number.
+
+    **The bound here is deliberately monthly, not a season total** (corrected
+    2026-09-02). This test used to assert `< 80_000` under the name "fits the
+    grant", encoding a premise that turned out to be wrong: the paid plan resets
+    to 100K on the 1st of every month, so a season total was never the binding
+    constraint. When the close tier pushed the season figure to 80,011 the honest
+    fix was to assert the constraint that actually binds, not to raise the number
+    until the old assertion passed again.
+
+    The NFL regular season spans Sep-Jan, i.e. five monthly grants. Measured
+    peak-month load against the real 2026 schedule is 27,408 credits (27.4% of
+    one month's cap) at the measured 10 credits/poll, so a 50% ceiling on the
+    per-month average keeps real regression teeth -- roughly a doubling of the
+    schedule would trip it.
     """
     from src.collect.props_budget import (
         realistic_season_credit_cost,
         season_credit_cost,
     )
 
-    assert realistic_season_credit_cost(285) < 80_000  # comfortable margin
+    MONTHLY_CAP = 100_000
+    MONTHS_IN_REGULAR_SEASON = 5  # Sep, Oct, Nov, Dec, Jan -- one grant each
+
+    per_month = realistic_season_credit_cost(285) / MONTHS_IN_REGULAR_SEASON
+    assert per_month < MONTHLY_CAP * 0.5
     assert season_credit_cost(285) > realistic_season_credit_cost(285)  # ceiling is above it
 
 

@@ -58,6 +58,8 @@ from src.signal.props_scan import (
     format_prop_ev_alert_message,
     prop_alert_key,
 )
+from src.signal.shadow_log import recheck as shadow_recheck
+from src.signal.shadow_log import record_alert as shadow_record
 from src.store.pit_store import PointInTimeStore, kickoffs_from_store
 
 log = logging.getLogger(__name__)
@@ -123,6 +125,7 @@ def _alert_batch(
     edge_column: str,
     phone_number: str | None,
     label: str,
+    strategy: str,
 ) -> tuple[list[pd.Series], dict[str, AlertRecord]]:
     """Dedup -> format -> send one class of alert. Shared by all three
     signals so they can't drift apart in dedup or error handling.
@@ -153,6 +156,14 @@ def _alert_batch(
     # future attempts at the same spot.
     if sent_rows:
         state = record_alerts(pd.DataFrame(sent_rows), state, key_fn=key_fn, edge_column=edge_column)
+        # Shadow log: record what the price WAS at alert time, so the next
+        # re-check can measure whether it survived the ~35min detection
+        # latency. Guarded because this is measurement, not alerting -- a
+        # shadow-log failure must never cost a real alert.
+        try:
+            shadow_record(pd.DataFrame(sent_rows), strategy, key_fn)
+        except Exception:
+            log.exception("shadow log: failed to record %s alerts (alerts still sent)", label)
     return sent_rows, state
 
 
@@ -236,7 +247,8 @@ def run(
     arb_spots = _safe(lambda: find_live_prop_arb_spots(store, min_margin=arb_margin_threshold), "prop arb")
     arb_spots, remaining = _apply_exposure_cap(arb_spots, remaining)
     sent, state = _alert_batch(
-        arb_spots, state, format_arb_alert_message, prop_alert_key, "arb_margin", phone_number, "prop arb"
+        arb_spots, state, format_arb_alert_message, prop_alert_key, "arb_margin", phone_number,
+        "prop arb", "prop_arb",
     )
     all_sent.extend(sent)
 
@@ -244,7 +256,7 @@ def run(
     ml_spots, remaining = _apply_exposure_cap(ml_spots, remaining)
     sent, state = _alert_batch(
         ml_spots, state, format_alert_message, lambda r: f"{r['event_id']}|{r['side']}|{r['book']}",
-        "edge", phone_number, "moneyline",
+        "edge", phone_number, "moneyline", "moneyline_ev",
     )
     all_sent.extend(sent)
 
@@ -253,9 +265,19 @@ def run(
     )
     prop_ev_spots, remaining = _apply_exposure_cap(prop_ev_spots, remaining)
     sent, state = _alert_batch(
-        prop_ev_spots, state, format_prop_ev_alert_message, prop_alert_key, "edge", phone_number, "prop EV"
+        prop_ev_spots, state, format_prop_ev_alert_message, prop_alert_key, "edge", phone_number,
+        "prop EV", "prop_ev",
     )
     all_sent.extend(sent)
+
+    # Re-observe still-open alerted spots. Store-only, 0 credits. Runs after
+    # the scans so an alert fired this cycle is recorded before its first
+    # re-check, and guarded like everything else here: this is measurement,
+    # and it must not be able to break the alert path.
+    try:
+        shadow_recheck(store)
+    except Exception:
+        log.exception("shadow log: re-check failed, continuing")
 
     # Persist if anything changed -- alerts sent OR entries pruned. Saving only
     # on `all_sent` would leave the prune in memory and re-do it every cycle

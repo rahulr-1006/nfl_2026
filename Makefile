@@ -3,7 +3,7 @@
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
 	middle-scan-once steam-scan-once \
 	props-collect props-collect-once \
-	props-service-install props-service-uninstall props-service-status clean
+	props-service-install props-service-uninstall props-service-status clean shadow-report
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -140,6 +140,12 @@ steam-scan-once:
 # track record. Local parquet only, no Odds API cost.
 team-total-scan-once:
 	$(PY) -m src.signal.team_total_scan
+
+# Shadow execution log: did alerted prices survive the ~35min detection latency?
+# Store-only, 0 credits. The monitor populates it automatically; this re-checks
+# open alerts on demand and prints the survival report.
+shadow-report:
+	$(PY) -m src.signal.shadow_log
 
 # Record a bet you actually placed. WITHOUT THIS, CLV CANNOT BE COMPUTED FOR
 # ANY REAL BET -- CLV needs an entry price and nothing else stores one.

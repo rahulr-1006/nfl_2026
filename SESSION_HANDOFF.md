@@ -27,8 +27,12 @@ open-items list:
 - **Two Odds API keys.** `ODDS_API_KEY` (free tier, live mainline collector) vs
   `ODDS_API_KEY_PAID` (the 100K grant, historical + props). Do not mix them —
   using the free key for props starves the mainline collector.
-- **The paid 100K was a one-time grant, not a recurring monthly allowance.**
-  Budget accordingly.
+- **The paid plan resets to 100K on the 1st of every month** (corrected
+  2026-08-25 -- this file previously recorded it as a one-time non-renewing
+  grant, and that wrong premise drove two rounds of polling-density compression
+  in `props_budget.py`). The binding constraint is a **monthly** cap. Simulated
+  against the real 2026 schedule, peak month is Oct at 23,780 credits = **23.8%
+  of the allowance**; the season-total figure is no longer meaningful.
 - Notebooks need the **`nfl-clv` kernel** (`.venv`), not the user's `algobetting`
   conda env.
 
