@@ -54,6 +54,7 @@ without touching the free tier at all -- see `src/collect/props_run.py`.
 from __future__ import annotations
 
 import json
+import math
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -87,10 +88,37 @@ SPARSE_POLL_INTERVAL_HOURS = 12.0  # spacing for "basic" polls covering the peri
 # The early period gets its own coarse tier instead: cheap probes to catch the
 # moment props appear, then the real schedule takes over.
 SPARSE_WINDOW_HOURS = 120.0
-EARLY_POLL_INTERVAL_HOURS = 72.0  # coarse probing across the 21-day -> 5-day stretch
+# 2026-09-02: 72.0 -> 24.0 (daily). Two reasons, both measured on live 2026 data:
+#
+# 1. **The old spacing left a 96h blind spot.** See the `ceil` fix in
+#    `early_poll_targets_hours` -- at 72h the tier's last target was 216h (9 days)
+#    and the sparse tier does not begin until 120h (5 days). On 2026-09-02 the
+#    live store showed prop captures stopping dead at 215.6h with the opener
+#    180.6h out: 60.6h of posted, moving lines with zero capture scheduled.
+# 2. **Pinnacle was mid-ramp inside that gap** (2 of 16 games quoted on 09-02),
+#    and this window is not re-collectable -- every historical prop row in this
+#    project is a single ~20-minutes-to-kickoff snapshot, so pre-kickoff movement
+#    can only ever be observed live, once, as it happens.
+#
+# Cost is an upper bound: empty probes bill 0 and `poll_count` advances only on
+# capture, so the daily probes before a book posts are free.
+EARLY_POLL_INTERVAL_HOURS = 24.0  # daily probing across the 21-day -> 5-day stretch
 # 2026-08-22: trimmed from 2h/8h (33 polls/event, ~94K blended season cost) to 3h/12h
-# after confirming the paid plan is a ONE-TIME ~100K grant (resets 9/1, no rollover,
+# after recording the paid plan as a ONE-TIME ~100K grant (resets 9/1, no rollover,
 # user isn't renewing past that) rather than recurring monthly.
+#
+# **2026-08-25: that premise was WRONG and both trims below were made under it.**
+# The plan resets to 100K on the 1st of every month (user-confirmed; the "resets
+# 9/1" clause above was right, the "isn't renewing" clause was not). The binding
+# constraint is therefore a MONTHLY cap, not a season total -- and the season total
+# is no longer a meaningful number. Simulated against the real 2026 schedule (272
+# REG games, credits attributed to the month each poll actually fires):
+#
+#     Aug 924 | Sep 19,710 | Oct 23,780 | Nov 22,996 | Dec 23,728 | Jan 8,414
+#
+# Peak month is **23.8% of the monthly allowance**. The 99,552 season figure that
+# drove the compression below is ~24% utilization, not 99%. Density is no longer
+# budget-constrained; see the arb-tier widening under ARB_WINDOW_HOURS.
 #
 # 2026-08-23: dense interval trimmed again, 3h -> 4h. Adding the arb tier below had
 # pushed the schedule to 99,180 credits -- **99.2% of the entire grant**, which is not
@@ -100,8 +128,14 @@ EARLY_POLL_INTERVAL_HOURS = 72.0  # coarse probing across the 21-day -> 5-day st
 # a close, so intermediate sampling density costs almost nothing methodologically,
 # whereas 30-minute arb density is exactly what the one validated live edge depends
 # on. Result: 29 polls/event, 84,360 theoretical (~84% of grant, ~15.6K margin).
+#
+# 2026-08-25: the reasoning above still holds on the METHODOLOGY (CLV genuinely does
+# not need intermediate density), so the dense tier is deliberately left at 4h even
+# though the budget would now allow 2h. Reverting it would buy ~0 methodologically
+# and cost 34.5% of the monthly cap instead of 23.8%. The arb tier is the one that
+# was starved for budget reasons, so that is the one being widened.
 DEFAULT_COST_PER_POLL = 14  # regions=us,eu x 7 markets, theoretical max (real blended cost runs lower -- see props_ev_backtest memory, ~101/10=~10/event on the historical endpoint's 10x rate)
-DEFAULT_SAFETY_RESERVE_CREDITS = 500  # large relative to a single poll's cost -- props credits are meant to leave headroom for a possible future historical batch 2, not be spent to the floor
+DEFAULT_SAFETY_RESERVE_CREDITS = 500  # large relative to a single poll's cost -- props credits are meant to leave headroom for a possible future historical batch 2, not be spent to the floor. 2026-08-25: that rationale was written against a non-renewing balance; under the monthly reset the reserve now just guards the tail of each month, which is a weaker but still valid reason to keep it.
 
 # --- arb tier (2026-08-23) ---------------------------------------------------
 # The 3h dense interval above was chosen for CLV, which only needs an entry price
@@ -121,9 +155,47 @@ DEFAULT_SAFETY_RESERVE_CREDITS = 500  # large relative to a single poll's cost -
 # This is a MEASURED subset, not a guess. If a future session widens it, re-derive
 # it from a fresh arb concentration check rather than adding markets by intuition.
 ARB_MARKETS = "player_receptions,player_pass_tds"
-ARB_WINDOW_HOURS = 6.0  # final hours before kickoff, where prices move most and arb windows actually open
+# 2026-08-25: widened 6.0 -> 12.0 once the monthly-reset correction above removed the
+# budget ceiling. Arb is the one signal density genuinely helps (fleeting cross-book
+# windows) and one of only two validated edges here, so it gets the freed headroom
+# rather than the dense tier. Measured cost: **44 polls/event, 406 credits/event,
+# peak month 26,208 (26.2% of the monthly cap, up from 23.8%)**. Cheaper than the
+# +12.8pp a naive count suggests, because the arb tier now overlaps the dense tier
+# below 48h and `build_poll_targets` dedupes on `hours_before_kickoff` -- the
+# collision keeps the dense target (all 7 markets) rather than adding a second poll.
+#
+# **This widens COVERAGE, not detection latency.** Worst-case time from a price
+# appearing to a text arriving is bounded by the poll spacing plus the monitor's own
+# cadence: ARB_POLL_INTERVAL_HOURS (0.5h) + com.nflclv.monitor's 300s StartInterval
+# = ~35 min. Widening the window adds sampling points; it does not make any single
+# detection faster. Cutting that latency means cutting ARB_POLL_INTERVAL_HOURS *and*
+# props_scheduler.DEFAULT_TICK_MINUTES (30.0) together -- the tick is a hard floor,
+# a 0.25h target cannot fire on a 30-minute service tick.
+ARB_WINDOW_HOURS = 12.0  # final hours before kickoff, where prices move most and arb windows actually open
 ARB_POLL_INTERVAL_HOURS = 0.5
 ARB_COST_PER_POLL = 4  # regions=us,eu x 2 markets
+
+# --- close tier (2026-09-02) -------------------------------------------------
+# **One full-market capture inside CLOSE_MAX, so props CLV can be computed at
+# all.** The dense tier bottoms out at DENSE_POLL_INTERVAL_HOURS (4.0h) and
+# everything below it is the arb tier, which requests only ARB_MARKETS. That left
+# `player_pass_yds`, `player_rush_yds`, `player_rush_tds`, `player_reception_yds`
+# and `player_reception_tds` with an entry series and **no close** -- five of the
+# seven markets silently uncomputable for CLV, this project's headline metric.
+#
+# The cause was not a CLV bug: it was the arb tier's market-narrowing (a cost
+# optimisation for a different signal) deciding what CLV was allowed to measure.
+# `build_poll_targets` already dedupes keeping the more comprehensive tier for
+# exactly this reason -- but no full-market target existed down here to keep.
+#
+# 1.5h rather than 0.5h deliberately: it sits inside rolling_clv_2024.py's
+# CLOSE_MAX (2.0h) while leaving the arb tier's 1.0h and 0.5h captures untouched,
+# so the one validated live edge keeps its densest pre-kickoff sampling.
+#
+# Cost is ~0.4pp of the monthly cap (peak month 27,408 -> 27,780 at the measured
+# 10 credits/poll) and POLLS_PER_EVENT does not change, because this REPLACES the
+# arb target at the same offset instead of adding one.
+CLOSE_CAPTURE_HOURS = 1.5
 
 
 def dense_poll_targets_hours(dense_window_hours: float = DENSE_WINDOW_HOURS, dense_poll_interval_hours: float = DENSE_POLL_INTERVAL_HOURS) -> list[float]:
@@ -152,7 +224,15 @@ def early_poll_targets_hours(
     span = posting_window_days * 24.0 - sparse_window_hours
     if span <= 0:
         return []
-    n = max(1, round(span / early_poll_interval_hours))
+    # `ceil`, not `round` (2026-09-02). With round(), a span that is not a whole
+    # number of intervals drops the final target instead of adding one: at the old
+    # 72h spacing, span=384h gave round(5.33)=5 targets ending at 216h, while the
+    # sparse tier does not start until `sparse_window_hours` (120h) -- a 96h hole in
+    # the middle of the posting window, wider than either neighbouring interval.
+    # ceil() closes the tier down to the sparse handoff. The last target is always
+    # > sparse_window_hours by construction (span excludes it), so this cannot
+    # collide with or overshoot the sparse tier.
+    n = max(1, math.ceil(span / early_poll_interval_hours))
     return [posting_window_days * 24.0 - i * early_poll_interval_hours for i in range(n)]
 
 
@@ -223,6 +303,10 @@ def build_poll_targets(
         [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "early") for h in early_poll_targets_hours()]
         + [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "sparse") for h in sparse_poll_targets_hours()]
         + [PollTarget(h, full_markets, DEFAULT_COST_PER_POLL, "dense") for h in dense_poll_targets_hours()]
+        # Before the arb tier: dedupe keeps the FIRST target at a given hour, and
+        # this one must win over the arb target at the same offset (see
+        # CLOSE_CAPTURE_HOURS -- it is the only full-market close there is).
+        + [PollTarget(CLOSE_CAPTURE_HOURS, full_markets, DEFAULT_COST_PER_POLL, "close")]
         + [PollTarget(h, arb_markets, ARB_COST_PER_POLL, "arb") for h in arb_poll_targets_hours()]
     )
     targets.sort(key=lambda t: -t.hours_before_kickoff)

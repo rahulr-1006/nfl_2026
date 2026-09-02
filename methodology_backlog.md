@@ -26,6 +26,35 @@ contract-sides with ≥3 books quoting. But it recovers only ~1.3 of the ~3.1
 points of per-side vig, leaving a **~4.7% structural deficit** at the best
 available price.
 
+### Collection cost: measured 10 credits/poll, not the 14 every projection assumed
+
+Measured 2026-09-02 from real `x-requests-remaining` deltas across **16
+consecutive live per-event prop polls** (all of Week 1, early tier, all 7 markets
+requested): every single poll billed exactly **10 credits**, not the theoretical
+14. The Odds API bills per *(market x region)* **that actually returns data**, and
+not all 7 prop markets quote on every game this far out.
+
+`DEFAULT_COST_PER_POLL = 14` is therefore a ~29% overestimate, and **every credit
+projection in this repo inherits that error** — they are upper bounds, not
+forecasts:
+
+| Basis | Peak month | % of the 100K monthly cap |
+|---|---|---|
+| Theoretical, 14/poll | 36,288 | 36.3% |
+| **Measured, 10/poll** | **27,408** | **27.4%** |
+
+Two caveats that stop this from being over-claimed:
+
+- **One observation, one tier, one week.** All 16 polls were early-tier at
+  180-300h out, while books are still ramping (Pinnacle quoted only 2 of 16
+  games). As breadth grows the blended cost should drift back toward 14. Treat
+  10 as *today's floor*, not a season constant, and re-measure once every book
+  is quoting every market.
+- **`DEFAULT_COST_PER_POLL` was deliberately NOT lowered.** It gates
+  `decide_props_poll`'s affordability check, where understating cost risks
+  overspending. A conservative upper bound is the correct value for a budget
+  gate; this measurement belongs in the projections, not in the guard.
+
 ### The design rule this implies
 
 Every strategy tried here falls into one of two shapes, and the shape predicts
@@ -570,6 +599,53 @@ estimation problem this project has failed at 7 times.
 
 **Props.** At 7 markets a prop series is ~700 credits/game, so the remaining
 budget buys ~5 games. Props rolling CLV stays a live-forward measurement.
+
+---
+
+## Props rolling CLV: the schedule cannot currently produce a CLOSE for 5 of 7 markets
+
+Found 2026-09-02 while checking whether the live props series can feed a props
+version of `scripts/rolling_clv_2024.py`. **The entry windows all work; the close
+does not exist.**
+
+`rolling_clv_2024.py` needs a capture within `CLOSE_MAX = 2.0h` of kickoff. Our
+prop schedule's dense (all-7-market) tier bottoms out at **4.0h**, and everything
+below that is the **arb tier, which requests only `player_receptions` and
+`player_pass_tds`**:
+
+```
+lowest FULL-market capture : 4.0h before kickoff
+lowest ARB-market  capture : 0.5h before kickoff
+CLOSE (<= 2.0h): full markets -> NONE.  arb markets -> 2.0, 1.5, 1.0, 0.5
+```
+
+Entry offsets are fine — T-120/72/48/24h land exactly on sparse/dense targets,
+and T-6h is covered by the 8.0h and 4.0h dense captures.
+
+**Consequence: props CLV — this project's headline metric — is computable for
+`receptions` and `passing_tds` only.** The other five (`pass_yds`, `rush_yds`,
+`rush_tds`, `reception_yds`, `reception_tds`) would have an entry series and no
+close, which yields nothing. This is not a bug in the CLV code; it is the arb
+tier's market-narrowing (a deliberate cost optimisation for a *different*
+signal) silently deciding what CLV can measure.
+
+**It is also time-critical and irreversible.** Week 1 kicks off 2026-09-10. A
+close not captured is not re-buyable at any price — the historical endpoint sells
+5-minute snapshots, but at ~700 credits/game for a full prop series, which is why
+props rolling CLV was deferred to live-forward measurement in the first place.
+
+**Proposed fix (not yet applied):** promote the existing 1.5h arb target to a
+full-market capture, so every prop market gets one quote inside `CLOSE_MAX`.
+Measured cost:
+
+| | Peak month | % cap |
+|---|---|---|
+| Current | 27,408 | 27.4% |
+| + full-market close @1.5h | 27,780 | 27.8% |
+
+**+0.4pp**, and poll count stays 55 because it replaces the arb-only target at
+that offset rather than adding one. The arb tier keeps its 0.5h/1.0h/2.0h
+captures, so nothing the arb signal depends on is lost.
 
 ## Code review, 2026-08-23 — 13 findings, all fixed
 
