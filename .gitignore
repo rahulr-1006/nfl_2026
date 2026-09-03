@@ -19,3 +19,14 @@ logs/
 graphify-out/cost.json
 graphify-out/cache/
 data/demo_snapshots/
+
+# graphify writes a dated backup of the curated graph on every `graphify update`.
+# They are byte-for-byte regenerable and were adding ~18MB across 8 directories,
+# more than the whole data/ tree. The CURRENT outputs stay tracked -- CLAUDE.md
+# routes codebase questions through graphify-out/graph.json, and
+# .graphify_labels.json holds LLM-curated community names that a rebuild does not
+# reproduce for free.
+graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+# Absolute interpreter path for whoever last ran graphify -- machine-local, and
+# tracking it hands every other clone a path that does not exist there.
+graphify-out/.graphify_python
