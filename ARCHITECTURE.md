@@ -76,16 +76,16 @@ own docstring), **UNDECIDED** (built and tested, wired to nothing, no verdict
 yet), **UNREF** (nothing reaches it at all).
 
 Reachability is never decided by reading imports alone — that misses make
-targets, and it produced two wrong ORPHAN verdicts here (`preseason_report.py`
-and `demo_pipeline.py`).
+targets, and it produced two wrong ORPHAN verdicts here (`preseason_report.py`,
+since retired, and `demo_pipeline.py`).
 
 ### store/ — foundation (all LIVE)
 | Module | Imported by | Reach | Notes |
 |---|---|---|---|
 | `pit_store.py` | 18 | **LIVE** | Most-depended-on module in the repo. The leakage guard. |
 | `schema.py` | 12 | **LIVE** | `OddsSnapshot`/`Market`/`Side`. |
-| `settlement.py` | 2 | **MANUAL** | Game-score grading. |
-| `prop_settlement.py` | 2 | **MANUAL** | Player-stat grading + name reconciliation. |
+| `settlement.py` | 2 | **LIVE** | Game-score grading. |
+| `prop_settlement.py` | 2 | **LIVE** | Player-stat grading + name reconciliation. |
 
 ### collect/ — data acquisition
 | Module | Imported by | Reach | Notes |
@@ -98,9 +98,8 @@ and `demo_pipeline.py`).
 | `props_run.py` | — | **LIVE** | Loaded as `com.nflclv.props` (2026-08-23); the 9/2 blocker cleared early when props posted 17 days out. |
 | `props_scheduler.py` / `props_budget.py` | 1 / 1 | **LIVE** | 3-tier cadence, 84.4% of credit grant. |
 | `props.py` | 4 | **LIVE** | Prop parsing + market definitions. |
-| `props_historical.py` | 1 | **PARKED** | Executed: 2023+2024 props pulled. |
-| `mainline_historical.py` | 0 | **PARKED** | Completed one-shot pull (570 games); gap confirmed real but inconsequential (0.000138 Brier). Park verdict 2026-08-23, reason in its docstring. |
-| `preseason.py` | 1 | **MANUAL** | Superseded by the real season — retire after 9/9. |
+| `props_historical.py` | 1 | **MANUAL** | Executed: 2023+2024 props pulled. |
+| `mainline_historical.py` | 0 | **MANUAL** | Completed one-shot pull (570 games); gap confirmed real but inconsequential (0.000138 Brier). Park verdict 2026-08-23, reason in its docstring. |
 
 ### model/ — feature/rating layer (trains ONLY on free nflverse data)
 | Module | Imported by | Reach | Notes |
@@ -121,12 +120,12 @@ and `demo_pipeline.py`).
 ### backtest/ — strategies & evaluation
 | Module | Imported by | Reach | Notes |
 |---|---|---|---|
-| `engine.py` | 1 | **MANUAL** | Point-in-time backtester. Look-ahead bug fixed 2026-08-23. |
+| `engine.py` | 1 | **LIVE** | Point-in-time backtester. Look-ahead bug fixed 2026-08-23. |
 | `middling.py` / `steam.py` | 2 / 1 | **MANUAL** | |
 | `middle_scan.py` / `steam_scan.py` | — | **MANUAL** | Manual `make` targets. No service, no track record. |
 | `props_ev_backtest.py` | 1 | **LIVE** | Now also powers live props scanning. |
 | `correlated_props.py` | 0 | **MANUAL** | 11 public fns, 2 notebooks. `price_bucket_bet` is the gated entrypoint **no live scanner calls**. |
-| `team_total_props.py` | 0 | **RESEARCH** | Validated edge (underdog +6.6%/+14.1%), **not wired to anything**. |
+| `team_total_props.py` | 0 | **UNDECIDED** | Validated edge (underdog +6.6%/+14.1%), **not wired to anything**. |
 | `validation.py` | 0 | **RESEARCH** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
 | `evaluation.py` | 0 | **MANUAL** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
@@ -142,8 +141,7 @@ and `demo_pipeline.py`).
 | `signal/sizing.py` | 5 | **LIVE** | Kelly + bankroll caps. |
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
-| `clv/metrics.py` | 3 | **MANUAL** | The project's headline metric. |
-| `clv/preseason_report.py` | 0 | **MANUAL** | `make preseason-report`. Was mis-filed ORPHAN by import-only reasoning. Preseason-only; retire after 9/9. |
+| `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
 | `features/load_static.py` | 1 | **LIVE** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
@@ -163,7 +161,7 @@ and `demo_pipeline.py`).
 | `clv_portfolio.py` | ~~Wire~~ **DONE 2026-08-23** -- consumed by `season_review.py`. |
 | `individual_pass_rush_elo.py` | **Decide.** Built and tested but used nowhere — either feed it into prop pricing or mark it explicitly parked. |
 | `mainline_historical.py` | **Document** as a one-shot backfill tool, or add a `make` target. |
-| `clv/preseason_report.py`, `collect/preseason.py` | **Retire after 9/9** — the real season supersedes the dry run. |
+| `clv/preseason_report.py`, `collect/preseason.py` | ~~Retire after 9/9~~ **DONE 2026-09-03** — deleted with their tests, `make` targets and notebook. |
 | `demo_pipeline.py` | Keep only if it runs in CI; otherwise delete. |
 
 ---
@@ -175,7 +173,6 @@ and `demo_pipeline.py`).
 | `model_backtest_results.ipynb` | 134 | **Primary results.** ⚠️ Reads **stale 2015-2024 data in 6 places** while `src/` moved to 2015-2025. |
 | `clv_tracker_validation.ipynb` | 14 | Current — synthetic CLV validation (mainline + props). |
 | `training_frame_exploration.ipynb` | 14 | Current — feature-correlation EDA. |
-| `preseason_dry_run.ipynb` | 18 | Superseded after 9/9; also reads stale data (2 places). |
 
 > **The 134-cell notebook is the single biggest coherence problem.** It holds the
 > comparison registry, the BH correction family, and most reported results — on data
@@ -257,4 +254,11 @@ live at the top of `methodology_backlog.md`.
 3. **Wire or park the four validated-but-orphaned modules** (`team_total_props`,
    `parlay`, `price_bucket_bet`, `drift/monitor`).
 4. **Delete stale `_2015_2024` parquets** once (2) is done.
-5. **Retire preseason modules** after 9/9.
+5. ~~Retire preseason modules after 9/9~~ **DONE 2026-09-03.** `collect/preseason.py`,
+   `clv/preseason_report.py`, both test files, `preseason_dry_run.ipynb`, and the
+   `preseason-poll`/`preseason-report` make targets are deleted. Retired 6 days
+   early: the NFL preseason itself ended in August, so the modules could no longer
+   collect anything, and the live pipeline they existed to de-risk is proven
+   (3 services running, health checks green, 21,907 prop rows). The collected
+   preseason snapshots are KEPT at `data/snapshots_preseason/` — deleting the code
+   that produced evidence is not the same as deleting the evidence.

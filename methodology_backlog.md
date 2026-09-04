@@ -602,6 +602,119 @@ budget buys ~5 games. Props rolling CLV stays a live-forward measurement.
 
 ---
 
+## CLV power: the paper's n≈3140 rests on an ASSUMED sigma, and the real one is 3-7x smaller
+
+**Corrects a load-bearing claim in this project's own honesty framing.**
+`paper/nfl_clv_case_study.md` §4.7 states that a 0.5% mean-CLV edge needs
+**n≈3140** bets, "well beyond what one NFL season of a few hundred bets can
+confirm." That number is reproducible from the paper's stated inputs -- 
+`power_analysis(0.005, 0.10**2)` returns exactly 3,140 -- which shows the **10%
+bet-to-bet noise was assumed, never measured.**
+
+Measured 2026-09-03 off the purchased 2024 Pinnacle mainline series (the 5-offset
+pull, 105 games), sigma is the sd of `close_fair - entry_fair` across games:
+
+| Entry | n games | sd(CLV) | n for 0.5% | n for 1.0% |
+|---|---|---|---|---|
+| T-120h | 97 | 0.0351 | 388 | 97 |
+| T-72h | 105 | 0.0334 | 350 | 88 |
+| T-48h | 103 | 0.0248 | 194 | 49 |
+| T-24h | 105 | 0.0206 | 133 | 34 |
+| T-6h | 105 | 0.0143 | 65 | 17 |
+
+The paper's assumed 0.10 is **2.8x to 7.0x** the measured value, and since
+`n` scales with sigma-squared, its sample requirement is overstated **8x (at a
+T-120h entry) to 48x (at T-6h)**.
+
+### What this changes, and what it does not
+
+**Changes:** "one season can never confirm a CLV edge" is not supported by this
+project's own data. At a realistic ~6 qualifying alerts/week over an 18-week season
+(~108 bets), a **1% edge is detectable from any entry horizon** (n=17-97), and a
+0.5% edge is detectable if entry is inside ~T-48h (n=65-194 vs 108 available -- so
+T-24h and T-6h clear it, T-48h does not).
+
+**Does not change:** nothing here says an edge EXISTS. This is only the sample size
+needed to find out, and detecting CLV is not the same as profit.
+
+### The horizon tradeoff this exposes -- the part worth actually thinking about
+
+sigma **falls monotonically** as entry approaches kickoff (0.0351 -> 0.0143), so
+late entry needs far fewer bets for the same power. But late entry also leaves less
+line movement left to capture, which is the very thing CLV measures. **Entering
+early maximises the available edge and the noise simultaneously.** This is a real
+design tension in the betting policy and it has never been stated anywhere in the
+repo. It is not resolved here.
+
+### An error caught in-flight, recorded so the table above is not misread
+
+The first pass at this reported sigma=0.0143 labelled as a **T-48h** entry and
+concluded n=65. Wrong label: the entry window was `(2.0, 51)` hours and the helper
+takes `.iloc[-1]` -- the LATEST capture in the window, i.e. the one nearest kickoff.
+That is a T-6h entry, not T-48h. The real T-48h figure is sigma=0.0248, **n=194**,
+three times larger. Any future reuse of a single sigma must state the entry horizon
+it was measured at; a bare "CLV sigma" is meaningless.
+
+---
+
+## Prop price persistence at the alert latency — MEASURED 2026-09-03, first live movement data
+
+**The first pre-kickoff prop movement this project has ever held.** Every
+historical prop row is a single ~20-minutes-to-kickoff snapshot, so price
+persistence was structurally unobservable until the live 2026 series accumulated
+multiple captures per contract. 18,427 consecutive-capture pairs across 3,480
+contract-sides.
+
+**Conditioned on the gap between observations** — the confound that has to be
+removed first, because a 3-day gap moving more than a 30-minute gap is a gap-length
+effect, not a horizon effect:
+
+| Gap | Pairs | Price changed | Line moved | Median move |
+|---|---|---|---|---|
+| **~30 min** | **13,519** | **1.9%** | **0.6%** | 5 pts |
+| 2-8h | 1,514 | 13.7% | 5.6% | 4.5 pts |
+| 8-26h | 2,355 | 29.0% | 15.4% | 4 pts |
+| 1-4d | 979 | 35.3% | 28.6% | 5 pts |
+
+**At the ~35-minute detection latency, 98.1% of prop prices and 99.4% of lines are
+unchanged.** The execution books are the *most* stable of all: DraftKings 0.25%,
+BetRivers 0.31%, FanDuel 0.94% price-change rate over 30 minutes.
+
+### What this does and does not license
+
+**Does:** it removes latency as the presumed blocker on acting on alerts in the
+early window. The earlier framing — that ~35 minutes "decides whether any of this
+works" — is not supported at this horizon.
+
+**Does NOT:** every pair here sits **177-422 hours before kickoff (7.4-17.6 days)**,
+because that is all the live series covers so far. The arb tier polls every 30
+minutes inside 12h precisely because movement is expected to concentrate there, and
+**that window remains entirely unmeasured.** Do not read 98.1% as an arb-window
+survival rate. Re-run this against the final-12h captures after Week 1; that is the
+number that actually governs whether arb is capturable.
+
+### Two book-level oddities worth remembering
+
+- **Fanatics reprices 10-100x faster than anyone else**: 21.3% at 30 minutes vs
+  0.25-1.7% elsewhere. It is *not* in `live_scan.EXECUTION_BOOKS`, so it does not
+  reach the arb/EV scanners — but it is being stored, and any future analysis
+  pooling books without splitting it will inherit its volatility.
+- **Bovada changed 0 times in 740 pairs.** Exactly zero is more consistent with a
+  stale or slowly-refreshed feed than with a real market. Treat its quotes as
+  suspect until something confirms they are live.
+
+### An analysis artifact caught in-flight, recorded so it is not repeated
+
+The first cut reported **0.0% line movement at every gap including >4 days**, which
+is obviously wrong. Cause: `line` was in the grouping key, so a line change created
+a *different* group and could never register as movement within one. Line movement
+must be grouped on `event/player/stat/side/book` **without** `line`. The corrected
+figures are the ones tabled above. The same shape of mistake — a metric that cannot
+come out any other way — has now bitten this project three times (`beat_rate` fixed
+at 0.5000 by devig symmetry; the T-6h entry window swallowing its own close).
+
+---
+
 ## Props rolling CLV: the schedule cannot currently produce a CLOSE for 5 of 7 markets
 
 Found 2026-09-02 while checking whether the live props series can feed a props

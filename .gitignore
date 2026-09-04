@@ -27,6 +27,12 @@ data/demo_snapshots/
 # .graphify_labels.json holds LLM-curated community names that a rebuild does not
 # reproduce for free.
 graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
+# The graph itself is a derived artifact: `graphify update .` rebuilds it from the
+# AST with no LLM and no API cost. Tracking it buried every real diff -- commit
+# d4e31df was 213,391 insertions of which ~800 were the actual work, the rest
+# graph.json churning 23,939 lines and graph.html rewriting wholesale.
+graphify-out/graph.json
+graphify-out/graph.html
 # Absolute interpreter path for whoever last ran graphify -- machine-local, and
 # tracking it hands every other clone a path that does not exist there.
 graphify-out/.graphify_python

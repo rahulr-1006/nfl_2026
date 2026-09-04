@@ -1,4 +1,4 @@
-.PHONY: venv install test lint demo collect collect-once preseason-poll preseason-report props-poll \
+.PHONY: venv install test lint demo collect collect-once props-poll \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
 	middle-scan-once steam-scan-once \
@@ -53,15 +53,6 @@ collect:
 
 collect-once:
 	$(PY) -m src.collect.run --once
-
-# Preseason dry run (src/collect/preseason.py): invoke by hand a handful of
-# times during the preseason window, not on a schedule -- see that module's
-# docstring for why (shared Odds API credit budget with the real season).
-preseason-poll:
-	$(PY) -m src.collect.preseason
-
-preseason-report:
-	$(PY) -m src.clv.preseason_report
 
 # Player props (src/collect/props.py): PREPPED, NOT ACTIVE as of 2026-08-17
 # -- live-checked and confirmed NFL props aren't posted this far before
