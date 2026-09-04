@@ -186,10 +186,22 @@ games (KC 27-20 BAL, PHI 34-29 GB), bets settled win/loss correctly, bankroll
 $100 -> $102 -> $100, real CLV of +0.0209 computed from actual Pinnacle
 snapshots, and `season_review` correctly returning INSUFFICIENT_DATA at n=2.
 
-### 6. Retire the preseason modules after 9/9
+### 6. ~~Retire the preseason modules~~ DONE 2026-09-03
 
-`collect/preseason.py`, `clv/preseason_report.py`. Validation scaffolding, not a
-result.
+Deleted: `collect/preseason.py`, `clv/preseason_report.py`, both test files,
+`notebooks/preseason_dry_run.ipynb`, and the `preseason-poll` / `preseason-report`
+make targets. Test suite 883 -> 872 (the 11 preseason tests went with them);
+`make audit` now reports 61 modules, still 0 UNREFERENCED.
+
+Done 6 days before the stated 9/9 condition, deliberately: the NFL preseason ended
+in August so these could no longer collect anything, and the pipeline they existed
+to de-risk is proven in production. **The preseason snapshots themselves are kept**
+(`data/snapshots_preseason/`, 2 parquets) — the code was scaffolding, the data is
+evidence.
+
+Three live modules mention preseason in prose (`collect/transform.py`,
+`collect/props.py`, `features/load_static.py`). Only `props.py` pointed at the
+deleted *paths*; those references were reworded rather than left dangling.
 
 ### 9. Paper run of the full loop — DONE 2026-08-23, found 2 real bugs
 

@@ -7,13 +7,13 @@ no Pinnacle. NFL player props are typically posted Tuesday-Thursday of
 game week, not weeks ahead like mainline spreads/totals, so this can't be
 exercised against real data yet. This module exists so the moment props
 actually start filling in, turning it on is a config/invocation change,
-not a design-from-scratch scramble -- same pattern as
-src/collect/preseason.py before the preseason window opened.
+not a design-from-scratch scramble -- the same pattern the preseason dry-run
+collector followed before its window opened (retired 2026-09-03).
 
 Structural differences from the mainline collector (src/collect/scheduler.py):
 - Uses the per-event endpoint (OddsApiClient.get_event_odds), one call per
   game, not one call for the whole slate -- real nflverse game_ids exist
-  for the regular season (unlike preseason), so matching reuses
+  for the regular season (unlike the preseason games the dry run polled), so matching reuses
   src/collect/transform.py's match_event/build_schedule_index directly.
 - Only Over/Under-style prop markets (PROP_MARKET_TO_STAT) are parsed.
   Proposition-style markets (player_anytime_td and similar) are out of
@@ -42,8 +42,8 @@ Structural differences from the mainline collector (src/collect/scheduler.py):
   methodology_backlog.md.
 - No launchd service, no budget-aware scheduling: meant to be invoked by
   hand (`python -m src.collect.props`) once props are actually observed
-  to exist, the same "manual/sparse invocation" discipline
-  src/collect/preseason.py uses and for the same reason -- credits are a
+  to exist, the same "manual/sparse invocation" discipline the retired
+  preseason collector used and for the same reason -- credits are a
   shared, finite resource with the real collector.
 """
 
