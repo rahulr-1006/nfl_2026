@@ -207,6 +207,17 @@ def best_middle_for_game(snapshots: pd.DataFrame, market: Market) -> MiddleOppor
         raise ValueError(f"middling only supports SPREAD/TOTAL, got {market}")
 
     df = snapshots.dropna(subset=["line"])
+
+    # One quote per (book, side): that book's NEWEST. Without this the "best
+    # line ever seen" wins, which silently pairs a live price against a number
+    # a book moved off days ago -- found 2026-09-08, when wiring this into the
+    # unattended monitor produced a GB@MIN middle whose BetRivers leg had been
+    # captured 13 days earlier. A middle is only real if BOTH legs can still be
+    # placed, so a stale leg does not make it a worse bet, it makes it not a
+    # bet. `steam.py` already selects this way; this brings middling in line.
+    if "capture_time" in df.columns and not df.empty:
+        df = df.loc[df.groupby(["book", "side"])["capture_time"].idxmax()]
+
     side_a, side_b = _MARKET_SIDES[market]
 
     rows: dict[Side, pd.Series] = {}
@@ -343,6 +354,15 @@ def middle_ev(opp: MiddleOpportunity, mu: float, sigma: float, stake_a: float = 
     }
 
 
+# A leg older than this is treated as no longer quoted. Mirrors
+# `live_scan.DEFAULT_MAX_CAPTURE_GAP`, which guards the moneyline path against
+# the same failure: comparing a price that is live against one that is not.
+# Measured against the newest capture in the frame rather than wall-clock, so a
+# scan run while the collector is down degrades to "found nothing" instead of
+# silently pricing off whatever it last saw.
+DEFAULT_MAX_LEG_STALENESS = pd.Timedelta(minutes=90)
+
+
 def find_middle_opportunities(
     store: PointInTimeStore,
     sigma_margin: float,
@@ -350,6 +370,7 @@ def find_middle_opportunities(
     books: Sequence[str] = EXECUTION_BOOKS,
     stake: float = 2.0,
     as_of: datetime | None = None,
+    max_leg_staleness: pd.Timedelta | None = DEFAULT_MAX_LEG_STALENESS,
 ) -> pd.DataFrame:
     """One row per game where a real, bettable middle exists right now --
     the top-level live scan this module exists to support, mirroring
@@ -374,6 +395,11 @@ def find_middle_opportunities(
         return pd.DataFrame()
 
     bettable = df[df["book"].isin(books)]
+    if max_leg_staleness is not None and not bettable.empty:
+        # Per event: a book that dropped out of the feed must not keep offering
+        # its last known number forever.
+        freshest = bettable.groupby("event_id")["capture_time"].transform("max")
+        bettable = bettable[freshest - bettable["capture_time"] <= max_leg_staleness]
     event_meta = df[["event_id", "home_team", "away_team", "event_start_time"]].drop_duplicates("event_id")
 
     rows = []
@@ -402,6 +428,11 @@ def find_middle_opportunities(
                 "line_b": opp.line_b,
                 "book_b": opp.book_b,
                 "price_decimal_b": opp.price_decimal_b,
+                # Per-leg, not one value for the pair: each leg is a distinct
+                # quote sampled at a distinct instant, and CLV latency must be
+                # measured against the instant the price was actually seen.
+                "capture_time_a": opp.capture_time_a,
+                "capture_time_b": opp.capture_time_b,
                 "window_lo": opp.window_lo,
                 "window_hi": opp.window_hi,
                 "window_width": opp.window_width,

@@ -57,6 +57,7 @@ from typing import Any
 import pandas as pd
 from pydantic import BaseModel, field_validator
 
+from src.devig.convert import decimal_to_american
 from src.signal.live_scan import upcoming_only
 from src.store.bet_log import STRATEGIES
 from src.store.pit_store import PointInTimeStore
@@ -122,6 +123,26 @@ class ShadowObservation(BaseModel):
         return v
 
 
+def _market_of(row: pd.Series, is_prop: bool) -> Market:
+    """The row's own market when it reports one, else moneyline.
+
+    Middling and steam trade SPREAD and TOTAL, so the previous
+    `PLAYER_PROP if is_prop else MONEYLINE` would have filed every one of their
+    shadow rows under the wrong market -- silently, since `Market` accepts both
+    values happily. Trusting the row's `market` column keeps the shadow log's
+    market matching what was actually bet.
+    """
+    if is_prop:
+        return Market.PLAYER_PROP
+    raw = row.get("market") if "market" in row.index else None
+    if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+        return Market.MONEYLINE
+    try:
+        return Market(str(raw))
+    except ValueError:
+        return Market.MONEYLINE
+
+
 def legs_from_spot(row: pd.Series, strategy: str, alert_key: str) -> list[dict[str, Any]]:
     """Split one scanner row into its leg(s).
 
@@ -131,12 +152,11 @@ def legs_from_spot(row: pd.Series, strategy: str, alert_key: str) -> list[dict[s
     cannot disagree about what shape a row is.
     """
     is_prop = "player_name" in row.index and pd.notna(row.get("player_name"))
-    market = Market.PLAYER_PROP if is_prop else Market.MONEYLINE
     common = {
         "alert_key": alert_key,
         "strategy": strategy,
         "event_id": str(row["event_id"]),
-        "market": market,
+        "market": _market_of(row, is_prop),
         "line": float(row["line"]) if "line" in row.index and pd.notna(row.get("line")) else None,
         "player_name": str(row["player_name"]) if is_prop else None,
         "prop_stat": str(row["prop_stat"]) if is_prop and pd.notna(row.get("prop_stat")) else None,
@@ -151,6 +171,28 @@ def legs_from_spot(row: pd.Series, strategy: str, alert_key: str) -> list[dict[s
              "price_american": int(row["price_american_under"]),
              "edge": float(row["arb_margin"]) if pd.notna(row.get("arb_margin")) else None},
         ]
+
+    if "book_a" in row.index:  # two-leg middle (src/backtest/middling.py)
+        edge = float(row["ev_rate"]) if "ev_rate" in row.index and pd.notna(row.get("ev_rate")) else None
+        return [
+            {**common, "leg": leg, "side": Side(str(row[f"side_{suffix}"])),
+             "book": str(row[f"book_{suffix}"]),
+             "line": float(row[f"line_{suffix}"]),
+             "price_american": decimal_to_american(float(row[f"price_decimal_{suffix}"])),
+             "capture_time": row.get(f"capture_time_{suffix}"),
+             "edge": edge}
+            for leg, suffix in (("a", "a"), ("b", "b"))
+        ]
+
+    if "stale_book" in row.index:  # single stale leg (src/backtest/steam.py)
+        return [{
+            **common, "leg": "single", "side": Side(str(row["side"])),
+            "book": str(row["stale_book"]),
+            "line": float(row["stale_line"]),
+            "price_american": decimal_to_american(float(row["price_decimal"])),
+            "capture_time": row.get("capture_time"),
+            "edge": float(row["edge"]) if pd.notna(row.get("edge")) else None,
+        }]
 
     return [{
         **common, "leg": "single", "side": Side(str(row["side"])), "book": str(row["book"]),
@@ -208,9 +250,17 @@ def record_alert(
         if capture_times is not None and idx in capture_times.index:
             ct = capture_times.loc[idx]
         for leg in legs_from_spot(row, strategy, key):
+            # A leg that knows its own capture time wins: multi-leg spots
+            # (middles) sample each leg separately, so one row-level timestamp
+            # would misdate at least one of them.
+            leg_ct = leg.pop("capture_time", None)
+            effective_ct = leg_ct if leg_ct is not None and pd.notna(leg_ct) else ct
             rows.append(ShadowObservation(
                 **leg, alerted_at=now, observed_at=now, is_alert=True,
-                capture_time=pd.Timestamp(ct).to_pydatetime() if ct is not None and pd.notna(ct) else None,
+                capture_time=(
+                    pd.Timestamp(effective_ct).to_pydatetime()
+                    if effective_ct is not None and pd.notna(effective_ct) else None
+                ),
             ))
     n = append(rows, path)
     log.info("shadow log: recorded %d leg(s) for %d %s alert(s)", n, len(spots), strategy)

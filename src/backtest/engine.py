@@ -146,6 +146,7 @@ def _market_rows(
     player_name: str | None = None,
     prop_stat: str | None = None,
     line: float | None = None,
+    event_id: str | None = None,
 ) -> pd.DataFrame:
     """Rows for one book's quote on one specific *contract*, at or before
     `as_of`.
@@ -159,28 +160,57 @@ def _market_rows(
     Mainline markets have exactly one contract per (book, market) and are
     unaffected; the filters below are no-ops when their arguments are None.
 
-    **`line` is filtered for PLAYER_PROP only, and that asymmetry is
-    load-bearing** (a real bug caught by `test_hand_computed_clv_and_win_payout`
-    during this build, not a hypothetical): a prop's two sides share one
-    line (Over 45.5 / Under 45.5), so filtering by it correctly isolates one
-    contract among a player's alternate lines. A spread's two sides carry
-    *mirrored* lines (home -4.5 / away +4.5), so filtering by either one
-    would keep a single side and silently break the two-sided pair
-    `latest_fair_prob` needs to devig at all -- turning every mainline CLV
-    number into None. Mainline markets need no line filter regardless, since
-    a (book, market) pair already identifies exactly one contract.
+    **`line` must be filtered for every market that HAS a line -- the shape of
+    the filter differs, the need for it does not (fixed 2026-09-10).** The
+    earlier rule here was "PLAYER_PROP only", justified by the claim that a
+    (book, market) pair identifies exactly one mainline contract. That is false
+    for TOTAL and SPREAD: the line moves, so a book quotes 44.5 now and 44.0 at
+    the close, and comparing across them measures two different bets. The real
+    2026_01_NE_SEA close did exactly this -- a steam leg on Under 44.5 was
+    scored against Pinnacle's Under 44.0 and reported +0.0171 CLV that compared
+    nothing to nothing.
+
+    The per-market shape follows from how each market carries its line:
+
+    - PLAYER_PROP and TOTAL: both sides share ONE line (Over 45.5 / Under 45.5,
+      Over 44.5 / Under 44.5 -- verified 15/15 events in the live store), so an
+      exact match isolates one contract and keeps the two-sided pair intact.
+    - SPREAD: the sides carry *mirrored* lines (home -4.5 / away +4.5 --
+      verified 0/15 events share a value), so an exact match would keep a single
+      side and silently break the pair `latest_fair_prob` needs to devig at all,
+      turning every spread CLV into None. Matching on the ABSOLUTE value keeps
+      both sides of one spread while still excluding alternate spreads.
+    - MONEYLINE: genuinely has no line, and `line is None` makes this a no-op.
+
+    A bet whose contract is no longer quoted at the close now yields None rather
+    than a number computed off the wrong contract. That is the intended
+    trade-off and it is this project's standing rule: no measurement beats a
+    confidently wrong one.
     """
     mask = (
         (snapshots["book"] == book)
         & (snapshots["market"] == market.value)
         & (snapshots["capture_time"] <= as_of)
     )
+    # **Scoping to one game is mandatory, not an optimisation (fixed 2026-09-08).**
+    # Without it this returns one book's quotes for EVERY game in the store, and
+    # `latest_fair_prob`'s "exactly two sides at the latest timestamp" check then
+    # sees 2 rows per event (32 across 16 games in the real 2026 store) and
+    # returns None every time. Mainline CLV was therefore never computable from
+    # an unfiltered frame; props escaped only by accident, because player_name +
+    # prop_stat happen to isolate a single game. `_close_price_decimal` in
+    # `store/bet_log.py` always filtered event_id -- this path simply did not.
+    if event_id is not None:
+        mask &= snapshots["event_id"] == event_id
     if player_name is not None:
         mask &= snapshots["player_name"] == player_name
     if prop_stat is not None:
         mask &= snapshots["prop_stat"] == prop_stat
-    if line is not None and market == Market.PLAYER_PROP:
-        mask &= snapshots["line"] == line
+    if line is not None:
+        if market in (Market.PLAYER_PROP, Market.TOTAL):
+            mask &= snapshots["line"] == line
+        elif market == Market.SPREAD:
+            mask &= snapshots["line"].abs() == abs(line)
     return snapshots[mask]
 
 
@@ -194,6 +224,8 @@ def latest_fair_prob(
     player_name: str | None = None,
     prop_stat: str | None = None,
     line: float | None = None,
+    *,
+    event_id: str,
 ) -> float | None:
     """Fair probability for `side`, devigged from `book`'s most recent
     two-sided quote at or before `as_of`. None if `book` never quoted both
@@ -208,8 +240,14 @@ def latest_fair_prob(
     contract -- required for PLAYER_PROP, ignored for mainline markets. See
     `_market_rows` for why omitting them on a prop is a correctness bug, not
     a convenience gap.
+
+    `event_id` is keyword-only and REQUIRED (2026-09-08). It was previously
+    absent, and callers that passed a whole-store frame silently got `None` for
+    every mainline market -- see `_market_rows`. Making it required rather than
+    optional is deliberate: the failure mode is a silent None, not an error, so
+    a default would leave the trap armed for the next caller.
     """
-    candidates = _market_rows(snapshots, book, market, as_of, player_name, prop_stat, line)
+    candidates = _market_rows(snapshots, book, market, as_of, player_name, prop_stat, line, event_id)
     if candidates.empty:
         return None
     latest_time = candidates["capture_time"].max()
@@ -385,12 +423,14 @@ class BacktestEngine:
             )
 
         entry_prob_fair = latest_fair_prob(
-            visible, self.closing_book, order.market, order.side, decision_time, self.devig_method, **contract
+            visible, self.closing_book, order.market, order.side, decision_time, self.devig_method,
+            event_id=event_id, **contract
         )
         close = _latest_price(pre_kickoff, self.closing_book, order.market, order.side, kickoff, **contract)
         close_price_decimal = float(close["price_decimal"]) if close is not None else None
         close_prob_fair = latest_fair_prob(
-            pre_kickoff, self.closing_book, order.market, order.side, kickoff, self.devig_method, **contract
+            pre_kickoff, self.closing_book, order.market, order.side, kickoff, self.devig_method,
+            event_id=event_id, **contract
         )
 
         outcome = self._grade(order, event_id)

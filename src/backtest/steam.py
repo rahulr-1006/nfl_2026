@@ -290,6 +290,9 @@ def find_steam_opportunities(
                             "side": side.value,
                             "stale_book": stale_book,
                             "stale_line": float(latest["line"]),
+                            # When the stale price was actually sampled -- the
+                            # clock CLV latency is measured against.
+                            "capture_time": latest["capture_time"],
                             "books_moved": ",".join(steam.books_moved),
                             "n_books_moved": len(steam.books_moved),
                             "steam_direction": steam.direction,

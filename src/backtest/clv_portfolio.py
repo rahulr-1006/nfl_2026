@@ -86,6 +86,14 @@ def bets_to_frame(bets: Sequence[BacktestBet]) -> pd.DataFrame:
                 "fair_prob": b.entry_prob_fair,
                 "won": None if b.outcome is None else (b.outcome == Outcome.WIN),
                 "close_prob_fair": b.close_prob_fair,
+                # `close_price_decimal` is the raw close `clv_price` is derived
+                # from. Omitting it made `shadow_clv.format_summary` raise a
+                # KeyError -- and only once a game had ACTUALLY closed, because
+                # the line that reads it sits after an early return that fires
+                # while every row is still unmeasurable. The first real close of
+                # the season (2026_01_NE_SEA) was therefore also the first run
+                # that could ever hit it.
+                "close_price_decimal": b.close_price_decimal,
                 "clv_price": b.clv_price,
                 "clv_probability": b.clv_probability,
                 "outcome": b.outcome.value if b.outcome is not None else None,

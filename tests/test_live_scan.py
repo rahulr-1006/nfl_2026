@@ -167,7 +167,7 @@ def test_format_alert_message_names_the_bet_and_book():
             "away_team": "NE",
             "side": "home",
             "book": "fanduel",
-            "book_price_american": 120,
+            "price_american": 120,
             "edge": 0.034,
             "suggested_stake": 2.0,
         }

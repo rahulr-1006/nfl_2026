@@ -92,7 +92,9 @@ def closing_fair_probabilities(
         if snaps.empty:
             continue
         snaps = snaps.drop_duplicates(subset=["capture_time", "event_id", "book", "market", "side", "line"])
-        p = latest_fair_prob(snaps, book, Market.MONEYLINE, Side.HOME, _ALL_TIME, devig_method)
+        p = latest_fair_prob(
+            snaps, book, Market.MONEYLINE, Side.HOME, _ALL_TIME, devig_method, event_id=event_id
+        )
         if p is not None:
             rows.append({"game_id": event_id, "close_fair_prob": p})
     return pd.DataFrame(rows)
