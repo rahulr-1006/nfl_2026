@@ -29,6 +29,7 @@ collector tick.
 
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -81,6 +82,57 @@ def fit_residual_stds() -> tuple[float, float]:
     total_model = fit_total_model(train_df, feature_columns=COMBINED_QB_FEATURE_COLUMNS)
     sigma_margin = fit_residual_std(margin_model, calib_df, COMBINED_QB_FEATURE_COLUMNS, "margin")
     sigma_total = fit_residual_std(total_model, calib_df, COMBINED_QB_FEATURE_COLUMNS, "total_points")
+    return sigma_margin, sigma_total
+
+
+_SIGMA_CACHE_PATH = Path("data/residual_sigma_cache.json")
+_SIGMA_MEMO: dict[str, tuple[float, float]] = {}
+
+
+def _training_data_fingerprint() -> str:
+    """Identifies the exact training inputs a cached sigma was fitted on, so the
+    cache invalidates itself when the cached parquet files are refreshed (as
+    they were for the 2025 season) rather than silently pricing live bets off
+    a stale model.
+    """
+    parts = []
+    for name in ("schedules_2015_2025.parquet", "pbp_2015_2025.parquet"):
+        stat = (_DATA_ROOT / name).stat()
+        parts.append(f"{name}:{stat.st_mtime_ns}:{stat.st_size}")
+    return "|".join(parts)
+
+
+def cached_residual_stds(cache_path: Path = _SIGMA_CACHE_PATH) -> tuple[float, float]:
+    """`fit_residual_stds()` memoized in-process and on disk.
+
+    The uncached fit reads the full 2015-2025 play-by-play parquet and fits Elo,
+    QB Elo and two regressions -- ~10s. That is fine for a hand-run scan, but
+    `src/notify/monitor_run.py` runs every ~5 minutes and would otherwise redo
+    the identical fit ~288 times a day to recover two numbers that only change
+    when the cached training data does.
+    """
+    fingerprint = _training_data_fingerprint()
+    if fingerprint in _SIGMA_MEMO:
+        return _SIGMA_MEMO[fingerprint]
+
+    if cache_path.exists():
+        try:
+            cached = json.loads(cache_path.read_text())
+            if cached.get("fingerprint") == fingerprint:
+                sigmas = (float(cached["sigma_margin"]), float(cached["sigma_total"]))
+                _SIGMA_MEMO[fingerprint] = sigmas
+                return sigmas
+        except (json.JSONDecodeError, KeyError, ValueError, TypeError):
+            log.warning("residual-sigma cache at %s is unreadable, refitting", cache_path)
+
+    sigma_margin, sigma_total = fit_residual_stds()
+    _SIGMA_MEMO[fingerprint] = (sigma_margin, sigma_total)
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    cache_path.write_text(json.dumps({
+        "fingerprint": fingerprint,
+        "sigma_margin": sigma_margin,
+        "sigma_total": sigma_total,
+    }))
     return sigma_margin, sigma_total
 
 

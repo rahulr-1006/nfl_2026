@@ -40,6 +40,7 @@ from __future__ import annotations
 
 import logging
 import pathlib
+from collections.abc import Callable
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -209,6 +210,7 @@ def to_backtest_bets(
     devig_method: str = "shin",
     anchor_book: str = PINNACLE,
     as_of: datetime | None = None,
+    residual_stds: Callable[[], tuple[float, float]] | None = None,
 ) -> list[BacktestBet]:
     """Enrich logged bets with entry/closing fair probabilities and CLV, so
     `season_review` / `clv_portfolio` / `evaluation` can consume them unchanged.
@@ -234,10 +236,15 @@ def to_backtest_bets(
     if snapshots.empty:
         log.warning("snapshot store is empty -- no CLV can be computed")
 
+    # Resolved once per call, and only if a spread/total bet actually needs it:
+    # `cached_residual_stds` reads the full play-by-play parquet on a cache miss,
+    # which no prop-only or moneyline-only run should ever pay for.
+    sigmas = _SigmaProvider(residual_stds)
+
     out: list[BacktestBet] = []
     for b in bets:
         kickoff = _kickoff_for(snapshots, b.event_id)
-        entry_fair = _fair_at(snapshots, b, anchor_book, b.placed_at, devig_method)
+        entry_fair = _anchor_fair_for_bet(snapshots, b, anchor_book, b.placed_at, devig_method, sigmas)
 
         # "Close" = the last quote at or before kickoff -- a filter that EVERY row
         # trivially satisfies while kickoff is still in the future, which would
@@ -247,7 +254,7 @@ def to_backtest_bets(
         # there can retire a strategy on nothing. A bet is only closed once its
         # game has actually started.
         closed = kickoff is not None and kickoff <= now_bound
-        close_fair = _fair_at(snapshots, b, anchor_book, kickoff, devig_method) if closed else None
+        close_fair = _anchor_fair_for_bet(snapshots, b, anchor_book, kickoff, devig_method, sigmas) if closed else None
         close_dec = _close_price_decimal(snapshots, b, kickoff) if closed else None
 
         out.append(BacktestBet(
@@ -276,10 +283,114 @@ def to_backtest_bets(
 
 
 def _kickoff_for(snapshots: pd.DataFrame, event_id: str) -> datetime | None:
+    """The most recently OBSERVED kickoff for this event.
+
+    **Latest-observed, not `.max()` (fixed 2026-09-08).** A game's scheduled time
+    can be revised: the store already holds one real case, 2026_01_NE_SEA moving
+    00:15 -> 00:20 UTC on 2026-09-02. `.max()` returned the largest VALUE, which
+    was right there only by luck. NFL flex scheduling moves games by hours, and
+    it moves them EARLIER as well as later -- when it does, `.max()` returns the
+    stale later time, the close window extends past real kickoff, and an in-play
+    quote silently becomes the "closing" line that every CLV number is measured
+    against. Ordering by capture_time asks the question we actually mean: what
+    does the market currently say the kickoff is?
+    """
     if snapshots.empty:
         return None
     rows = snapshots[snapshots["event_id"] == event_id]
-    return None if rows.empty else rows["event_start_time"].max()
+    if rows.empty:
+        return None
+    return rows.loc[rows["capture_time"].idxmax(), "event_start_time"]
+
+
+class _SigmaProvider:
+    """Lazily resolves (sigma_margin, sigma_total), fetching at most once.
+
+    `middle_scan.cached_residual_stds` is disk- and process-cached, but on a
+    cold cache it fits Elo, QB Elo and two regressions off the full play-by-play
+    parquet. Wrapping it means a `to_backtest_bets` call over props or
+    moneylines alone -- which needs no sigma at all -- never pays that cost, and
+    a call over 500 spread bets pays it once rather than 500 times. It is
+    injectable so tests can pin sigma instead of fitting a model.
+    """
+
+    def __init__(self, fetch: Callable[[], tuple[float, float]] | None) -> None:
+        self._fetch = fetch
+        self._value: tuple[float, float] | None = None
+
+    def for_market(self, market: Market) -> float | None:
+        if self._value is None:
+            fetch = self._fetch
+            if fetch is None:
+                from src.backtest.middle_scan import cached_residual_stds
+
+                fetch = cached_residual_stds
+            self._value = fetch()
+        sigma_margin, sigma_total = self._value
+        if market == Market.SPREAD:
+            return sigma_margin
+        return sigma_total if market == Market.TOTAL else None
+
+
+def _anchor_fair_for_bet(
+    snapshots: pd.DataFrame,
+    bet: LoggedBet,
+    book: str,
+    as_of: datetime | None,
+    devig_method: str,
+    sigmas: _SigmaProvider,
+) -> float | None:
+    """The anchor's fair probability **for this bet's own contract** at `as_of`.
+
+    For a moneyline or a prop this is just `_fair_at`. For a spread or total it
+    cannot be, because the anchor may not be quoting the bet's line at all: read
+    the anchor at whatever line IT is on, then translate that probability onto
+    the bet's line (see `src/clv/line_adjust.py` for the method and its
+    assumptions). Demanding an exact line match instead returns either nothing
+    or a badly stale quote from whenever the anchor last sat on that number --
+    for 2026_01_NE_SEA's Under 44.5 that quote was 8h48m old and predated the
+    very steam move the alert fired on, making entry and close the same snapshot
+    and CLV an exact and meaningless 0.0000.
+    """
+    if as_of is None or snapshots.empty:
+        return None
+    if bet.line is None or bet.market not in (Market.SPREAD, Market.TOTAL):
+        return _fair_at(snapshots, bet, book, as_of, devig_method)
+
+    anchor_line = _anchor_line_at(snapshots, bet, book, as_of)
+    if anchor_line is None:
+        return None
+    fair = latest_fair_prob(
+        snapshots, book=book, market=bet.market, side=bet.side, as_of=as_of,
+        devig_method=devig_method, line=anchor_line, event_id=bet.event_id,
+    )
+    if fair is None or anchor_line == bet.line:
+        return fair
+
+    sigma = sigmas.for_market(bet.market)
+    if sigma is None:
+        return None
+    from src.clv.line_adjust import translate_fair_prob
+
+    return translate_fair_prob(bet.market, bet.side, anchor_line, bet.line, fair, sigma)
+
+
+def _anchor_line_at(
+    snapshots: pd.DataFrame, bet: LoggedBet, book: str, as_of: datetime
+) -> float | None:
+    """The line `book` was actually quoting this bet's market/side on, as of
+    `as_of` -- the line the translation starts from.
+    """
+    rows = snapshots[
+        (snapshots["event_id"] == bet.event_id)
+        & (snapshots["book"] == book)
+        & (snapshots["market"] == bet.market.value)
+        & (snapshots["side"] == bet.side.value)
+        & (snapshots["capture_time"] <= as_of)
+    ]
+    if rows.empty:
+        return None
+    return float(rows.loc[rows["capture_time"].idxmax(), "line"])
 
 
 def _fair_at(
@@ -291,12 +402,25 @@ def _fair_at(
         snapshots, book=book, market=bet.market, side=bet.side, as_of=as_of,
         devig_method=devig_method, player_name=bet.player_name,
         prop_stat=bet.prop_stat, line=bet.line,
+        # This frame is the WHOLE store, unlike the engine's per-event slices.
+        # Omitting event_id here is what made mainline CLV silently unmeasurable
+        # for every logged bet (2026-09-08).
+        event_id=bet.event_id,
     )
 
 
 def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datetime) -> float | None:
     """The bet's OWN book's last decimal price before kickoff -- price CLV asks
     whether you beat the number you actually took, at the book you took it from.
+
+    The line filter applies to ANY market that carries a line, not just props
+    (fixed 2026-09-10, alongside the same bug in `engine._market_rows`). A
+    total or spread line MOVES, so without it the close for a bet on Under 44.5
+    is read off the same book's later Under 44.0 quote -- a different contract,
+    and a price CLV that compares nothing to nothing. Unlike `_market_rows`,
+    `rows` here is already narrowed to one side, so an exact match is correct
+    for spreads too: the mirrored-line problem only arises when both sides must
+    survive the filter together.
     """
     if snapshots.empty:
         return None
@@ -309,8 +433,8 @@ def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datet
     ]
     if bet.is_prop():
         rows = rows[(rows["player_name"] == bet.player_name) & (rows["prop_stat"] == bet.prop_stat)]
-        if bet.line is not None:
-            rows = rows[rows["line"] == bet.line]
+    if bet.line is not None:
+        rows = rows[rows["line"] == bet.line]
     if rows.empty:
         return None
     return float(rows.loc[rows["capture_time"].idxmax(), "price_decimal"])

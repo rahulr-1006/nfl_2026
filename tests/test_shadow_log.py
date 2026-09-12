@@ -243,3 +243,177 @@ def test_append_returns_count_and_round_trips(tmp_path):
     )
     assert append([obs], p) == 1
     assert load(p)[0].model_dump() == obs.model_dump()
+
+
+# --- real scanner output, not a hand-built row ---------------------------
+#
+# Every test above feeds `legs_from_spot` a dict written by hand to match what
+# the shadow log already expects, which is exactly why a live bug survived
+# them: the moneyline scanner emitted `book_price_american`/`book_time` while
+# `legs_from_spot` read `price_american`/`capture_time`, so every moneyline
+# alert from 2026-09-03 onward was texted and then dropped by the shadow log
+# (caught only as a swallowed `KeyError` in monitor.err.log). These tests run
+# the REAL scanner output through the REAL sink so the two cannot drift again.
+
+
+def _moneyline_spots(tmp_path):
+    from src.signal.live_scan import find_positive_ev_spots
+
+    store = PointInTimeStore(root=str(tmp_path / "ml"))
+    store.write([
+        OddsSnapshot.from_american(
+            capture_time=T0, event_id="2026_01_NE_SEA", season=2026, week=1,
+            home_team="SEA", away_team="NE", event_start_time=KICKOFF,
+            book=book, market=Market.MONEYLINE, side=side, price_american=price,
+        )
+        for book, side, price in [
+            ("pinnacle", Side.HOME, -150), ("pinnacle", Side.AWAY, 130),
+            ("fanduel", Side.HOME, 120), ("fanduel", Side.AWAY, -140),
+        ]
+    ])
+    return find_positive_ev_spots(store, threshold=0.02, as_of=T0 + timedelta(minutes=1))
+
+
+def test_real_moneyline_scan_output_survives_the_shadow_log(tmp_path):
+    from src.signal.live_scan import _alert_key
+
+    spots = _moneyline_spots(tmp_path)
+    assert not spots.empty, "fixture must produce a spot or this proves nothing"
+
+    legs = legs_from_spot(spots.iloc[0], "moneyline_ev", _alert_key(spots.iloc[0]))
+
+    assert len(legs) == 1
+    assert legs[0]["market"] is Market.MONEYLINE
+    assert legs[0]["side"] is Side.HOME
+    assert legs[0]["price_american"] == 120
+    assert legs[0]["player_name"] is None
+
+
+def test_moneyline_alert_records_the_book_capture_time_not_none(tmp_path):
+    """The whole point of the shadow log is latency against the market's own
+    clock, so a moneyline leg landing with `capture_time=None` would silently
+    make every survival number unmeasurable rather than wrong.
+    """
+    from src.signal.live_scan import _alert_key
+
+    path = tmp_path / "shadow.jsonl"
+    n = record_alert(_moneyline_spots(tmp_path), "moneyline_ev", _alert_key, path=path)
+
+    assert n == 1
+    obs = load(path)[0]
+    assert obs.capture_time == T0
+
+
+# --- middle / steam leg shapes (2026-09-08) ----------------------------------
+#
+# `legs_from_spot` previously understood exactly two row shapes: two-leg prop
+# arb and a generic single leg, and hardcoded every non-prop row's market to
+# MONEYLINE. Middling and steam trade SPREAD and TOTAL and carry neither a
+# `book` nor a `price_american` column, so wiring them into the monitor without
+# this would have raised KeyError inside the shadow-record path -- caught and
+# logged, so the alerts would still have sent while their CLV rows silently
+# vanished. That is exactly the failure mode that hid the moneyline gap.
+
+
+def _middle_row():
+    return pd.Series({
+        "event_id": "2026_01_NE_SEA", "market": "spread",
+        "book_a": "fanduel", "side_a": "home", "line_a": -3.0, "price_decimal_a": 1.91,
+        "book_b": "draftkings", "side_b": "away", "line_b": 7.0, "price_decimal_b": 1.95,
+        "ev": 0.2, "total_risked": 4.0, "ev_rate": 0.05,
+    })
+
+
+def _steam_row():
+    return pd.Series({
+        "event_id": "2026_01_NE_SEA", "market": "total", "side": "over",
+        "stale_book": "fanduel", "stale_line": 44.5, "price_decimal": 1.91,
+        "edge": 0.03, "suggested_stake": 1.25,
+    })
+
+
+def test_middle_row_becomes_two_legs_with_per_leg_lines():
+    from src.signal.shadow_log import legs_from_spot
+
+    legs = legs_from_spot(_middle_row(), "middle", "k")
+    assert [leg["leg"] for leg in legs] == ["a", "b"]
+    assert [leg["book"] for leg in legs] == ["fanduel", "draftkings"]
+    # Each leg keeps its OWN line -- a middle is two different numbers, and
+    # collapsing them to one would make the window unrecoverable from the log.
+    assert [leg["line"] for leg in legs] == [-3.0, 7.0]
+    assert [leg["side"].value for leg in legs] == ["home", "away"]
+    assert all(leg["edge"] == 0.05 for leg in legs)
+
+
+def test_middle_and_steam_legs_record_their_real_market():
+    from src.signal.shadow_log import legs_from_spot
+    from src.store.schema import Market
+
+    assert all(leg["market"] == Market.SPREAD for leg in legs_from_spot(_middle_row(), "middle", "k"))
+    assert legs_from_spot(_steam_row(), "steam", "k")[0]["market"] == Market.TOTAL
+
+
+def test_steam_row_becomes_one_leg_on_the_stale_book():
+    from src.signal.shadow_log import legs_from_spot
+
+    legs = legs_from_spot(_steam_row(), "steam", "k")
+    assert len(legs) == 1
+    assert legs[0]["book"] == "fanduel"
+    assert legs[0]["line"] == 44.5
+    assert legs[0]["edge"] == 0.03
+
+
+def test_decimal_prices_are_converted_to_american():
+    """Middling and steam price in decimal; the shadow log stores American.
+    An unconverted 1.91 would round to an integer 1 and corrupt every CLV
+    comparison made against it.
+    """
+    from src.signal.shadow_log import legs_from_spot
+
+    assert legs_from_spot(_steam_row(), "steam", "k")[0]["price_american"] == -110
+    legs = legs_from_spot(_middle_row(), "middle", "k")
+    assert legs[0]["price_american"] == -110
+    assert legs[1]["price_american"] == -105  # decimal 1.95, still a favourite
+
+
+def test_moneyline_rows_still_default_to_the_moneyline_market():
+    """The market resolver must not change behaviour for rows that carry no
+    `market` column -- that is every existing moneyline scanner row.
+    """
+    from src.signal.shadow_log import legs_from_spot
+    from src.store.schema import Market
+
+    row = pd.Series({
+        "event_id": "2026_01_NE_SEA", "side": "home", "book": "fanduel",
+        "price_american": -110, "edge": 0.04,
+    })
+    assert legs_from_spot(row, "moneyline_ev", "k")[0]["market"] == Market.MONEYLINE
+
+
+def test_unrecognised_market_value_falls_back_rather_than_raising():
+    from src.signal.shadow_log import legs_from_spot
+    from src.store.schema import Market
+
+    row = pd.Series({
+        "event_id": "2026_01_NE_SEA", "market": "not_a_market", "side": "home",
+        "book": "fanduel", "price_american": -110, "edge": 0.04,
+    })
+    assert legs_from_spot(row, "moneyline_ev", "k")[0]["market"] == Market.MONEYLINE
+
+
+def test_middle_and_steam_rows_survive_a_full_record_alert_roundtrip(tmp_path):
+    """End-to-end: the shape the scanner emits must actually persist, not just
+    build a leg dict. This is the assertion whose absence let the moneyline
+    rows disappear.
+    """
+    from src.signal.movement_scan import middle_alert_key, steam_alert_key
+    from src.signal.shadow_log import load, record_alert
+
+    path = tmp_path / "shadow.jsonl"
+    assert record_alert(pd.DataFrame([_middle_row()]), "middle", middle_alert_key, path=path) == 2
+    assert record_alert(pd.DataFrame([_steam_row()]), "steam", steam_alert_key, path=path) == 1
+
+    rows = load(path)
+    assert len(rows) == 3
+    assert {r.strategy for r in rows} == {"middle", "steam"}
+    assert {r.market.value for r in rows} == {"spread", "total"}

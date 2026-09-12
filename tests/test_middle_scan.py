@@ -38,7 +38,13 @@ def _seed_store_with_real_movement(root):
         [
             _snapshot("pinnacle", Side.HOME, -150, -5.0, LATE),
             _snapshot("pinnacle", Side.AWAY, 130, 5.0, LATE),
+            # FanDuel has held home -3.0 since EARLY and is STILL quoting it in
+            # the latest poll -- real collection re-captures every book present
+            # in a poll, so a live leg always carries a fresh capture_time. A
+            # leg whose newest row is old is one the book no longer offers, and
+            # `find_middle_opportunities` now drops it (2026-09-08).
             _snapshot("fanduel", Side.HOME, -110, -3.0, EARLY),
+            _snapshot("fanduel", Side.HOME, -110, -3.0, LATE),
             _snapshot("draftkings", Side.AWAY, -105, 7.0, LATE),
         ]
     )

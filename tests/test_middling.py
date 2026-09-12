@@ -461,8 +461,14 @@ def test_find_middle_opportunities_end_to_end(tmp_path):
         [
             _snapshot("pinnacle", Market.SPREAD, Side.HOME, -150, line=-5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
             _snapshot("pinnacle", Market.SPREAD, Side.AWAY, 130, line=5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
-            # Real movement on a bettable book: home line drifted from -3 to -7.
+            # A real, bettable middle: the two books disagree RIGHT NOW.
+            # FanDuel has been sitting on home -3 since CAPTURE_TIME and is
+            # still quoting it in the latest poll, while DraftKings offers away
+            # +7. Both legs are re-captured in that latest poll -- which is what
+            # real collection produces, since every book present in a poll gets
+            # a fresh row even when its number has not changed.
             _snapshot("fanduel", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME),
+            _snapshot("fanduel", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
             _snapshot("draftkings", Market.SPREAD, Side.AWAY, -105, line=7.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
         ]
     )
@@ -488,7 +494,7 @@ def test_find_middle_opportunities_excludes_offshore_books_from_the_bettable_leg
             _snapshot("pinnacle", Market.SPREAD, Side.HOME, -150, line=-5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
             _snapshot("pinnacle", Market.SPREAD, Side.AWAY, 130, line=5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
             # A juicy "opportunity" only exists at a non-execution book -- must be ignored.
-            _snapshot("onexbet", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME),
+            _snapshot("onexbet", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
             _snapshot("onexbet", Market.SPREAD, Side.AWAY, -105, line=7.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
         ]
     )
@@ -508,3 +514,65 @@ def test_find_middle_opportunities_returns_empty_when_nothing_moved(tmp_path):
     )
     report = find_middle_opportunities(store, sigma_margin=13.0, sigma_total=10.0, as_of=CAPTURE_TIME + timedelta(days=4))
     assert report.empty
+
+
+# --- leg freshness (2026-09-08) ----------------------------------------------
+#
+# Both of these were live false positives before the fix. Wiring middling into
+# the unattended monitor produced a GB@MIN alert whose BetRivers leg had been
+# captured 13 days earlier: BetRivers' home line was +1.0 back then and is -1.0
+# now, so the "middle" required placing a bet at a number no longer on the
+# board. Real collection re-captures every book present in a poll, so a leg
+# whose newest row is old is a leg that is no longer being offered.
+
+
+def test_a_book_only_offers_its_latest_line_not_its_best_ever(tmp_path):
+    """BetRivers at home +1.0 (13 days ago) then home -1.0 (now) must be treated
+    as offering -1.0. Picking the historical +1.0 because it makes a wider
+    window is picking a bet that cannot be placed.
+    """
+    store = PointInTimeStore(root=tmp_path / "snapshots")
+    store.write(
+        [
+            _snapshot("pinnacle", Market.SPREAD, Side.HOME, -150, line=-5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+            _snapshot("pinnacle", Market.SPREAD, Side.AWAY, 130, line=5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+            # The wide line, long gone.
+            _snapshot("betrivers", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME),
+            # What BetRivers actually offers now.
+            _snapshot("betrivers", Market.SPREAD, Side.HOME, -110, line=-7.5, capture_time=CAPTURE_TIME + timedelta(days=3)),
+            _snapshot("draftkings", Market.SPREAD, Side.AWAY, -105, line=7.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+        ]
+    )
+    report = find_middle_opportunities(
+        store, sigma_margin=13.0, sigma_total=10.0, as_of=CAPTURE_TIME + timedelta(days=4)
+    )
+    # -7.5 vs +7.0 is not a middle at all; the stale -3.0 would have made one.
+    assert report.empty
+
+
+def test_a_leg_that_stopped_being_quoted_is_dropped(tmp_path):
+    """A book that vanishes from the feed must not keep offering its last known
+    number forever -- bounded by DEFAULT_MAX_LEG_STALENESS.
+    """
+    store = PointInTimeStore(root=tmp_path / "snapshots")
+    store.write(
+        [
+            _snapshot("pinnacle", Market.SPREAD, Side.HOME, -150, line=-5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+            _snapshot("pinnacle", Market.SPREAD, Side.AWAY, 130, line=5.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+            # FanDuel's only quote is days older than the freshest in the event.
+            _snapshot("fanduel", Market.SPREAD, Side.HOME, -110, line=-3.0, capture_time=CAPTURE_TIME),
+            _snapshot("draftkings", Market.SPREAD, Side.AWAY, -105, line=7.0, capture_time=CAPTURE_TIME + timedelta(days=3)),
+        ]
+    )
+    report = find_middle_opportunities(
+        store, sigma_margin=13.0, sigma_total=10.0, as_of=CAPTURE_TIME + timedelta(days=4)
+    )
+    assert report.empty
+
+    # Opting the bound out restores the old behaviour, so backtests that
+    # deliberately span a long window can still ask for it explicitly.
+    unbounded = find_middle_opportunities(
+        store, sigma_margin=13.0, sigma_total=10.0,
+        as_of=CAPTURE_TIME + timedelta(days=4), max_leg_staleness=None,
+    )
+    assert len(unbounded) == 1

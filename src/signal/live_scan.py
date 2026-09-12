@@ -37,7 +37,7 @@ from src.store.pit_store import PointInTimeStore
 EXECUTION_BOOKS = ("draftkings", "fanduel", "betmgm", "betrivers", "williamhill_us")  # williamhill_us = Caesars Sportsbook's Odds API key
 DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked
 # Under normal operation the collector fetches Pinnacle + execution books in
-# one combined poll, so book_time and pinnacle_time land together (gap ~0).
+# one combined poll, so capture_time and pinnacle_time land together (gap ~0).
 # The gap only opens when Pinnacle is missing from a specific poll cycle (an
 # event the API didn't return that call) and _latest_two_sided_pinnacle falls
 # back to an OLDER Pinnacle price while the execution book's price stays
@@ -45,7 +45,7 @@ DEFAULT_EDGE_THRESHOLD = 0.02  # 2% EV per dollar staked
 # comfortably wider than any single-poll write jitter but far tighter than
 # the gap a real stale-fallback would produce (at least one full missed poll
 # cycle). Found via a 2026-08-21 adversarial audit; this was previously
-# unguarded -- book_time/pinnacle_time were captured and returned but never
+# unguarded -- capture_time/pinnacle_time were captured and returned but never
 # actually checked against each other.
 DEFAULT_MAX_CAPTURE_GAP = pd.Timedelta(minutes=30)
 
@@ -147,10 +147,10 @@ def find_positive_ev_spots(
                     "side": row.side,
                     "book": book,
                     "pinnacle_fair_prob": fair,
-                    "book_price_american": row.price_american,
+                    "price_american": row.price_american,
                     "edge": edge,
                     "suggested_stake": stake,
-                    "book_time": row.capture_time,
+                    "capture_time": row.capture_time,
                     "pinnacle_time": row.pinnacle_time,
                 }
             )
@@ -164,7 +164,7 @@ def find_positive_ev_spots(
 
 def format_alert_message(row: pd.Series) -> str:
     side_team = row["home_team"] if row["side"] == "home" else row["away_team"]
-    price = row["book_price_american"]
+    price = row["price_american"]
     price_str = f"+{price}" if price > 0 else str(price)
     return (
         f"{row['away_team']} @ {row['home_team']}: {row['book'].title()} {side_team} ML {price_str} "

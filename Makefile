@@ -146,6 +146,12 @@ shadow-report:
 log-bet:
 	$(PY) -m src.store.bet_log $(ARGS)
 
+# CLV over ALERTS THAT WERE NEVER BET -- the measurement for a deliberate
+# no-bet observation window, when data/bet_log.jsonl is empty and season-review
+# therefore has nothing to read. Store-only, 0 credits.
+clv-report:
+	$(PY) -m src.clv.shadow_clv
+
 # Weekly in-season health check over the live bet log: CLV + drift CUSUM +
 # bettability -> continue/monitor/retire, segmented per strategy.
 season-review:
