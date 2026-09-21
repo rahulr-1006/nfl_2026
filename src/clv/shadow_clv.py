@@ -59,11 +59,30 @@ def shadow_alerts_as_bets(
     would score the bet against a market state it was never offered at. Legs with
     no capture_time fall back to `alerted_at` (and legs with no price are dropped:
     a contract that was not quoted has no entry to value).
+
+    **One bet per (alert_key, leg), keeping the EARLIEST** (added 2026-09-21).
+    The same contract legitimately produces several alert rows -- `live_scan`
+    re-alerts when an edge improves, and until the same day `props_scan` could
+    emit one contract twice in a single scan. Both are correct for *alerting* and
+    wrong for *measurement*: re-observations of one contract are not independent
+    samples, so counting them narrows the CI and skews the beat rate that
+    `decision_report` reads. Measured when found: **22 of 96 prop_ev and 18 of 65
+    moneyline_ev alert legs were redundant** -- 23% and 28%.
+
+    Earliest, not best-priced: it is the moment the opportunity was first
+    detectable, and therefore the entry a human acting on the first text would
+    have got. Keeping the best price would round the entry toward self-flattery,
+    which is the one direction this project's tie-break rules forbid.
     """
+    seen: set[tuple[str, str]] = set()
     bets: list[LoggedBet] = []
-    for o in load(path):
+    for o in sorted(load(path), key=lambda o: o.alerted_at):
         if not o.is_alert or o.price_american is None:
             continue
+        key = (o.alert_key, o.leg)
+        if key in seen:
+            continue
+        seen.add(key)
         bets.append(LoggedBet(
             placed_at=o.capture_time or o.alerted_at,
             event_id=o.event_id,

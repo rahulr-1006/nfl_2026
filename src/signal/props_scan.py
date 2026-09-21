@@ -148,11 +148,29 @@ def find_live_prop_ev_spots(
     Pinnacle price it's compared against; `max_quote_age` bounds both in
     ABSOLUTE terms. Two stale-but-mutually-consistent prices pass the former
     and fail the latter, which is the correct outcome for a live alert.
+
+    **Only the LATEST capture per contract**, same as `find_live_prop_arb_spots`
+    and for the same reason -- this was missing until 2026-09-21 and it was a
+    real defect, not a nicety. Inside the 2h freshness window a contract can have
+    several captures, and without the filter each one became its own "spot": one
+    scan emitted the same player/stat/line/book twice at two prices (e.g. 122 and
+    118). That inflated the shadow log with non-independent observations --
+    measured at **22 of 96 prop_ev alert legs redundant** -- which narrows the CI
+    on a metric the go/no-go decision reads.
     """
     as_of = as_of or datetime.now(UTC)
     props = _fresh_only(_live_props(store, as_of), as_of, max_quote_age)
     if props.empty:
         return pd.DataFrame()
+
+    # Keyed per SIDE as well as contract, unlike the arb scanner: arb pairs the
+    # two sides against each other so it wants them together, while an EV spot is
+    # one-sided and over/under are independently priced quotes.
+    group_cols = ["event_id", "player_name", "prop_stat", "line", "book", "side"]
+    present = [c for c in group_cols if c in props.columns]
+    latest = props.groupby(present)["capture_time"].transform("max")
+    props = props[props["capture_time"] == latest]
+
     return find_prop_ev_spots(props, threshold=threshold, books=books, max_capture_gap=max_capture_gap)
 
 
