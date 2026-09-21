@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 
 from src.signal.team_total_scan import (
+    DEFAULT_EDGE_THRESHOLD,
     VALIDATED_TEAM_TOTAL_LIFT,
     find_team_total_spots,
     format_team_total_alert,
@@ -174,10 +175,18 @@ def test_measured_vig_by_event_reads_the_real_quote(tmp_path):
 
 
 def test_priced_spot_carries_the_vig_actually_measured(tmp_path):
+    """-200/+170 puts the away side in the `underdog` bucket. It used to be an
+    even -110/-110 line (the `narrow` bucket), which stopped producing a spot on
+    2026-09-04 when the lifts were corrected from the 2023-train fit to the
+    realized 2024 out-of-sample values: narrow rushing went 1.149 -> 1.045, whose
+    edge at this 4.76% vig is NEGATIVE. That is the corrected constants working,
+    not a regression -- so this test moved to a bucket that still prices, rather
+    than loosening the threshold to keep an unprofitable bucket firing.
+    """
     from src.backtest.correlated_props import MEASURED_PROP_VIG
 
     store = PointInTimeStore(root=tmp_path)
-    store.write(_ml(-110, -110) + _prop("RB1", 60.5))
+    store.write(_ml(-200, 170) + _prop("RB1", 60.5))
     spots = find_team_total_spots(store, "rushing_yards", as_of=NOW, threshold=0.0)
     assert not spots.empty
     assert spots.iloc[0]["vig"] == pytest.approx(0.047619, abs=1e-5)
@@ -193,3 +202,46 @@ def test_event_with_no_measurable_vig_is_skipped_not_assumed(tmp_path):
     store.write(_ml(-110, -110) + _one_sided_prop("RB1", 60.5))
     assert measured_vig_by_event(store, "rushing_yards", as_of=NOW) == {}
     assert find_team_total_spots(store, "rushing_yards", as_of=NOW, threshold=0.0).empty
+
+
+# --- the constants must stay the OUT-OF-SAMPLE fit, not the train fit --------
+
+
+def test_lift_constants_are_the_realized_out_of_sample_values_not_the_train_fit():
+    """Guards the 2026-09-04 correction from being silently reverted.
+
+    The scanner priced live bets with the 2023-TRAIN lifts (rushing 1.226,
+    passing 1.311) on a leakage-avoidance rationale that is right for validating
+    a finding and wrong for pricing a bet: the train fit is optimistically biased,
+    and this project's own out-of-sample check measured the decay. Train was also
+    the highest of the three available estimates (train > pooled > realized),
+    i.e. rounding toward self-flattery.
+
+    Every value here is reproducible from raw data via
+    `team_total_props.fit_team_total_lift_by_bucket(..., seasons=[2024])`.
+    """
+    assert VALIDATED_TEAM_TOTAL_LIFT == {
+        "rushing_yards": {"underdog": 1.167, "narrow": 1.045},
+        "passing_yards": {"underdog": 1.216, "narrow": 0.943},
+    }
+    train_fit = {"rushing_yards": 1.226, "passing_yards": 1.311}
+    for stat, train in train_fit.items():
+        assert VALIDATED_TEAM_TOTAL_LIFT[stat]["underdog"] < train
+
+
+def test_only_passing_underdog_clears_the_threshold_at_realistic_vig():
+    """The practical consequence, pinned so it is visible rather than inferred:
+    at the vig actually measured live (6.54%), the corrected lifts leave exactly
+    ONE firing bucket. Under the train fit both stats fired, which is what made
+    the scanner project ~36 spots/week once Pinnacle broadens.
+    """
+    from src.backtest.correlated_props import bucket_edge
+
+    vig = 0.0654
+    firing = {
+        (stat, bucket)
+        for stat, buckets in VALIDATED_TEAM_TOTAL_LIFT.items()
+        for bucket, lift in buckets.items()
+        if bucket_edge(lift, vig) >= DEFAULT_EDGE_THRESHOLD
+    }
+    assert firing == {("passing_yards", "underdog")}

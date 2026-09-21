@@ -12,6 +12,10 @@ data/snapshots_preseason/**/*.parquet
 data/collect_state.json
 data/props_collect_state.json
 data/alert_state.json
+# Live CLV measurement record, written by the monitor every cycle -- runtime
+# state like the three above, not source. Committing it would also make the
+# working tree fight the running service on every pull.
+data/shadow_log.jsonl
 .DS_Store
 .ipynb_checkpoints/
 **/.ipynb_checkpoints/

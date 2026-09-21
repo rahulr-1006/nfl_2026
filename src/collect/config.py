@@ -38,6 +38,11 @@ class Config:
     tick_minutes: float = 5.0
     budget_period_days: int = 30
     budget_period_anchor: date | None = None
+    # "rolling" (roll the anchor forward by budget_period_days) or
+    # "calendar_month" (refill at 00:00 UTC on the 1st). The paid key bills
+    # on the calendar month; the free key's anchor is arbitrary. See
+    # `src/collect/budget.py::current_period_end`.
+    budget_period_mode: str = "rolling"
     max_consecutive_failures: int = 20
     request_timeout_seconds: float = 15.0
     store_root: Path = Path("data/snapshots")
@@ -60,20 +65,35 @@ def load_config(env: Mapping[str, str] | None = None) -> Config:
     """
     src = env if env is not None else os.environ
 
-    api_key = src.get("ODDS_API_KEY")
+    # COLLECT_USE_PAID_KEY moves the MAINLINE collector onto ODDS_API_KEY_PAID
+    # (2026-09-08). The two keys are separate credit pools: the free key is
+    # 500/month, the paid key 100,000/month RECURRING (it refills on the 1st;
+    # see `budget.py::current_period_end`, which documents the log evidence).
+    # The mainline collector was starving on the free key -- 206 credits left,
+    # a 3.4h poll cadence 34 hours before Week 1 -- while ~97,800 paid credits
+    # sat unused. At 6 credits/poll a true 30-minute cadence costs ~8.6K/month,
+    # which the paid pool absorbs comfortably alongside props polling.
+    use_paid_key = src.get("COLLECT_USE_PAID_KEY", "").strip().lower() in {"1", "true", "yes"}
+    key_name = "ODDS_API_KEY_PAID" if use_paid_key else "ODDS_API_KEY"
+    api_key = src.get(key_name)
     if not api_key:
-        raise ValueError("ODDS_API_KEY is not set (add it to .env or the environment)")
+        raise ValueError(f"{key_name} is not set (add it to .env or the environment)")
 
     anchor_str = src.get("COLLECT_BUDGET_PERIOD_ANCHOR")
     anchor = date.fromisoformat(anchor_str) if anchor_str else None
+
+    default_budget = "100000" if use_paid_key else "500"
+    default_mode = "calendar_month" if use_paid_key else "rolling"
 
     return Config(
         api_key=api_key,
         regions=src.get("ODDS_API_REGIONS", "eu,us"),
         markets=src.get("ODDS_API_MARKETS", "h2h,spreads,totals"),
         season=int(src.get("COLLECT_SEASON", "2026")),
-        monthly_budget=int(src.get("ODDS_API_MONTHLY_BUDGET", "500")),
+        monthly_budget=int(src.get("ODDS_API_MONTHLY_BUDGET", default_budget)),
         safety_reserve_credits=int(src.get("COLLECT_SAFETY_RESERVE_CREDITS", "20")),
+        dense_interval_minutes=float(src.get("COLLECT_DENSE_INTERVAL_MINUTES", "30")),
         tick_minutes=float(src.get("COLLECT_TICK_MINUTES", "5")),
         budget_period_anchor=anchor,
+        budget_period_mode=src.get("COLLECT_BUDGET_PERIOD_MODE", default_mode),
     )
