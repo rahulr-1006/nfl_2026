@@ -20,11 +20,14 @@ Verified via `launchctl list`:
 |---|---|---|
 | `com.nflclv.collector` | `src.collect.run` | **RUNNING** (PID 6121) |
 | `com.nflclv.monitor` | `src.notify.monitor_run` | **LOADED** (interval job, idle between ticks) |
-| `com.nflclv.props` | `src.collect.props_run` | **NOT LOADED** |
+| `com.nflclv.props` | `src.collect.props_run` | **RUNNING** (loaded 2026-08-23) |
 
-> **Blocker for the season:** the props scheduler plist exists and the code is tested,
-> but the service has never been loaded. Props start posting ~9/2. Everything the
-> props CLV/arb work depends on is downstream of this one deployment step.
+> ~~**Blocker for the season:** the props scheduler plist exists and the code is tested,
+> but the service has never been loaded.~~ **CLEARED 2026-08-23** — the service was
+> loaded early, and props turned out to post on 2026-08-23 — 17 days before the opener,
+> not the ~9/2 assumed here. All three services verified running 2026-09-16. This paragraph and cleanup
+> #1 in §9 stayed stale for three weeks while claiming to be the live status map;
+> if you change what runs, change this table in the same commit.
 
 Everything else in this repo is invoked by hand, by a notebook, or by nothing.
 
@@ -104,12 +107,12 @@ since retired, and `demo_pipeline.py`).
 ### model/ — feature/rating layer (trains ONLY on free nflverse data)
 | Module | Imported by | Reach | Notes |
 |---|---|---|---|
-| `elo.py` | 8 | **MANUAL** | Base team Elo — the one comparison that survives BH correction. |
-| `features.py` / `train.py` | 1 / 2 | **MANUAL** | Feature builder, splits, fitting. |
+| `elo.py` | 8 | **LIVE** | Base team Elo — the one comparison that survives BH correction. |
+| `features.py` / `train.py` | 1 / 2 | **LIVE** | Feature builder, splits, fitting. |
 | `baseline.py` | 4 | **LIVE** | Devigged market baseline. |
-| `qb_elo.py` | 1 | **MANUAL** | In `COMBINED_QB_FEATURE_COLUMNS`. |
-| `stadiums.py` | 1 | **MANUAL** | Rest/travel (feature tested negative). |
-| `calibration.py` / `evaluate.py` | 1 / 1 | **MANUAL** | |
+| `qb_elo.py` | 1 | **LIVE** | In `COMBINED_QB_FEATURE_COLUMNS`. |
+| `stadiums.py` | 1 | **LIVE** | Rest/travel (feature tested negative). |
+| `calibration.py` / `evaluate.py` | 1 / 1 | **LIVE** | |
 | `receiver_elo.py` | 0 | **RESEARCH** | Notebook + tests only. Never fed a live decision. |
 | `pass_rush_elo.py` | 0 | **RESEARCH** | Same. |
 | `game_level_features.py` | 0 | **RESEARCH** | Rolls the above to game level; tested negative. |
@@ -121,11 +124,11 @@ since retired, and `demo_pipeline.py`).
 | Module | Imported by | Reach | Notes |
 |---|---|---|---|
 | `engine.py` | 1 | **LIVE** | Point-in-time backtester. Look-ahead bug fixed 2026-08-23. |
-| `middling.py` / `steam.py` | 2 / 1 | **MANUAL** | |
-| `middle_scan.py` / `steam_scan.py` | — | **MANUAL** | Manual `make` targets. No service, no track record. |
+| `middling.py` / `steam.py` | 2 / 1 | **LIVE** | |
+| `middle_scan.py` / `steam_scan.py` | — | **LIVE / MANUAL** | Manual `make` targets. No service, no track record. |
 | `props_ev_backtest.py` | 1 | **LIVE** | Now also powers live props scanning. |
 | `correlated_props.py` | 0 | **MANUAL** | 11 public fns, 2 notebooks. `price_bucket_bet` is the gated entrypoint **no live scanner calls**. |
-| `team_total_props.py` | 0 | **UNDECIDED** | Validated edge (underdog +6.6%/+14.1%), **not wired to anything**. |
+| `team_total_props.py` | 0 | **UNDECIDED** | Validated edge, **not wired to anything**. Edge figures here previously read +6.6%/+14.1%; those came from the TRAIN fit and were corrected 2026-09-04 to the realized out-of-sample values (**rushing +2.8%, passing +7.1%** at 6.54% vig — only passing/underdog clears the 3% threshold). |
 | `validation.py` | 0 | **RESEARCH** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
 | `evaluation.py` | 0 | **MANUAL** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
@@ -154,13 +157,17 @@ since retired, and `demo_pipeline.py`).
 
 | Module | Recommendation |
 |---|---|
-| `parlay.py` | **Wire.** Parlay EV has no live path; correlated-props edge is the natural consumer. |
+> **All rows below were decided 2026-08-23** (`make audit`: 0 undecided, 0 unreferenced).
+> The "Wire."/"Decide." wording survived the decision and is kept only to show what was
+> recommended at audit time — the verdict that binds is in `methodology_backlog.md`.
+
+| `parlay.py` | ~~Wire~~ **PARKED 2026-08-23** (blocked). Parlay EV has no live path. |
 | `drift/monitor.py` | ~~Wire~~ **DONE 2026-08-23** -- consumed by `season_review.py`. |
-| `team_total_props.py` | **Wire.** Has a validated out-of-sample edge and no way to act on it. |
-| `correlated_props.price_bucket_bet` | **Wire.** Deliberately-gated pricing entrypoint that nothing calls. |
+| `team_total_props.py` | ~~Wire~~ **DECIDED 2026-08-23**: scanner wired as `make team-total-scan-once` (manual). Deliberately NOT in `monitor_run`, so it has **no exposure cap** — see methodology_backlog.md. |
+| `correlated_props.price_bucket_bet` | ~~Wire~~ **DONE 2026-08-23** — the underdog/narrow-only gate is enforced in code. |
 | `clv_portfolio.py` | ~~Wire~~ **DONE 2026-08-23** -- consumed by `season_review.py`. |
-| `individual_pass_rush_elo.py` | **Decide.** Built and tested but used nowhere — either feed it into prop pricing or mark it explicitly parked. |
-| `mainline_historical.py` | **Document** as a one-shot backfill tool, or add a `make` target. |
+| `individual_pass_rush_elo.py` | ~~Decide~~ **PARKED 2026-08-23** — would spend a BH slot and the 2025 holdout for no live consumer. |
+| `mainline_historical.py` | ~~Document~~ **DONE** — `make mainline-timeseries` exists; manual and deliberate, never scheduled. |
 | `clv/preseason_report.py`, `collect/preseason.py` | ~~Retire after 9/9~~ **DONE 2026-09-03** — deleted with their tests, `make` targets and notebook. |
 | `demo_pipeline.py` | Keep only if it runs in CI; otherwise delete. |
 
@@ -248,11 +255,12 @@ live at the top of `methodology_backlog.md`.
 
 ## 9. Highest-leverage cleanups
 
-1. **Load `com.nflclv.props`** — hard blocker, everything props depends on it.
+1. ~~**Load `com.nflclv.props`**~~ **DONE 2026-08-23** — running since.
 2. **Repoint `model_backtest_results.ipynb` to 2015-2025** and re-run, so the
    headline results match the code.
-3. **Wire or park the four validated-but-orphaned modules** (`team_total_props`,
-   `parlay`, `price_bucket_bet`, `drift/monitor`).
+3. ~~**Wire or park the four validated-but-orphaned modules**~~ **DONE 2026-08-23** —
+   all nine decided; `make audit` reports 0 undecided, 0 unreferenced. See the
+   verdicts in `methodology_backlog.md`, not the stale table in §7 above.
 4. **Delete stale `_2015_2024` parquets** once (2) is done.
 5. ~~Retire preseason modules after 9/9~~ **DONE 2026-09-03.** `collect/preseason.py`,
    `clv/preseason_report.py`, both test files, `preseason_dry_run.ipynb`, and the

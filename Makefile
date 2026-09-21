@@ -3,7 +3,9 @@
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
 	middle-scan-once steam-scan-once \
 	props-collect props-collect-once \
-	props-service-install props-service-uninstall props-service-status clean shadow-report
+	props-service-install props-service-uninstall props-service-status clean shadow-report \
+	audit sync-arch mainline-timeseries team-total-scan-once \
+	log-bet clv-report decision-report season-review
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -151,6 +153,21 @@ log-bet:
 # therefore has nothing to read. Store-only, 0 credits.
 clv-report:
 	$(PY) -m src.clv.shadow_clv
+
+# THE GO/NO-GO TABLE: one row per strategy, one verdict each, against a bar
+# fixed on 2026-09-14 before the Week 2/3 data existed (n>=30, beat_rate>50%,
+# mean_clv>0). This is the artifact the end-of-September decision is made from --
+# run it, read the verdict column, and do not re-derive the numbers by hand.
+#
+# Two things it does that clv-report and shadow-report cannot:
+#   - scores prop_arb on CAPTURABILITY, not CLV. An arb is market-neutral by
+#     construction so its mean_clv ~ 0 is the predicted value; the CLV bar would
+#     retire it for a mathematically guaranteed reason.
+#   - measures survival at the FIRST re-check, not the last. shadow-report's
+#     number is a 4-6 hour horizon, which is not the actionable question.
+# Store-only, 0 credits.
+decision-report:
+	$(PY) -m src.clv.decision_report
 
 # Weekly in-season health check over the live bet log: CLV + drift CUSUM +
 # bettability -> continue/monitor/retire, segmented per strategy.
