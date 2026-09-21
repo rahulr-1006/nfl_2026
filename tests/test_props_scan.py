@@ -306,3 +306,39 @@ def test_upcoming_games_still_alert_alongside_finished_ones(tmp_path):
     spots = find_live_prop_arb_spots(store, as_of=NOW, min_margin=0.0)
     assert len(spots) == 1
     assert spots.iloc[0]["event_id"] == "2026_01_KC_LAC"
+
+
+def test_prop_ev_returns_one_spot_per_contract_side(monkeypatch):
+    """A contract can have several captures inside the 2h freshness window. Until
+    2026-09-21 each became its own "spot", so one scan emitted the same
+    player/stat/line/book twice at two prices -- 22 of 96 logged prop_ev legs were
+    redundant as a result. `find_live_prop_arb_spots` already did this; the EV
+    scanner did not.
+    """
+    import pandas as pd
+
+    from src.signal import props_scan
+
+    captured: dict[str, pd.DataFrame] = {}
+
+    def _fake_find(props, **kwargs):
+        captured["props"] = props
+        return pd.DataFrame()
+
+    base = {"event_id": "E", "player_name": "P", "prop_stat": "receptions", "line": 2.5,
+            "book": "fanduel", "side": "over", "market": "player_prop"}
+    frame = pd.DataFrame([
+        {**base, "capture_time": pd.Timestamp("2026-09-21T10:00Z"), "price_american": 122},
+        {**base, "capture_time": pd.Timestamp("2026-09-21T11:00Z"), "price_american": 118},
+        {**base, "side": "under", "capture_time": pd.Timestamp("2026-09-21T11:00Z"), "price_american": -140},
+    ])
+    monkeypatch.setattr(props_scan, "_live_props", lambda *a, **k: frame)
+    monkeypatch.setattr(props_scan, "_fresh_only", lambda df, *a, **k: df)
+    monkeypatch.setattr(props_scan, "find_prop_ev_spots", _fake_find)
+
+    props_scan.find_live_prop_ev_spots(store=None, as_of=pd.Timestamp("2026-09-21T11:30Z").to_pydatetime())
+
+    got = captured["props"]
+    assert len(got) == 2, "one row per contract+side, not per capture"
+    over = got[got.side == "over"]
+    assert len(over) == 1 and over.iloc[0]["price_american"] == 118, "keeps the LATEST capture"

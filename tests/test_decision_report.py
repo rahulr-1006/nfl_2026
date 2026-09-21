@@ -270,3 +270,29 @@ def test_ci_includes_zero_handles_missing_bounds():
     assert not ci_includes_zero(float("nan"), 0.01)
     assert ci_includes_zero(-0.01, 0.01)
     assert not ci_includes_zero(0.001, 0.01)
+
+
+# --- the non-independence defect found 2026-09-21 ------------------------------
+
+def test_shadow_alerts_dedupe_to_one_bet_per_leg_keeping_earliest(tmp_path):
+    """The same contract legitimately alerts more than once (live_scan re-alerts
+    on an improved edge). For ALERTING that is correct; for MEASUREMENT those are
+    re-observations of one contract, not independent samples, and counting them
+    narrows the CI on the number the go/no-go decision reads.
+
+    Earliest wins, not best price -- that is the entry a human acting on the
+    first text would actually have got.
+    """
+    from src.clv.shadow_clv import shadow_alerts_as_bets
+
+    path = tmp_path / "shadow.jsonl"
+    append([
+        _obs("k1", "single", "moneyline_ev", 150, is_alert=True, minutes=0),
+        _obs("k1", "single", "moneyline_ev", 200, is_alert=True, minutes=30),  # improved, re-alerted
+        _obs("k2", "single", "moneyline_ev", 120, is_alert=True, minutes=5),
+    ], path)
+
+    bets = shadow_alerts_as_bets(path)
+    assert len(bets) == 2, "one bet per (alert_key, leg)"
+    k1 = next(b for b in bets if b.alert_key == "k1")
+    assert k1.price_american == 150, "earliest alert wins, not the better price"
