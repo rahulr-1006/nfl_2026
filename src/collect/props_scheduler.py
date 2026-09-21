@@ -39,7 +39,11 @@ from src.store.pit_store import PointInTimeStore
 log = logging.getLogger(__name__)
 
 DEFAULT_STATE_PATH = Path("data/props_collect_state.json")
-DEFAULT_TICK_MINUTES = 30.0  # cheap (free events list + gated per-event polls), no need for the mainline collector's 5-min cadence
+DEFAULT_TICK_MINUTES = 15.0  # cheap (free events list + gated per-event polls), no need for the mainline collector's 5-min cadence.
+# 2026-09-14: 30.0 -> 15.0, **paired with props_budget.ARB_POLL_INTERVAL_HOURS 0.5 -> 0.25.**
+# This tick is a hard floor on arb detection latency: a target scheduled every 0.25h cannot
+# fire more often than the loop that evaluates it, so halving either constant alone buys
+# nothing. Change them together or not at all -- see props_budget.py's ARB tier block.
 
 
 @dataclass

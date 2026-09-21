@@ -602,6 +602,87 @@ budget buys ~5 games. Props rolling CLV stays a live-forward measurement.
 
 ---
 
+## Team-total scanner audit (2026-09-04) — it was pricing with the most optimistic lift available
+
+Audited before placing any Week 1 money on it, because it was the **only** signal
+firing. Three findings, all fixed.
+
+### 1. It priced with the TRAIN fit, the highest of three available estimates
+
+Three lift values exist for the same finding. The scanner hardcoded the highest:
+
+| Estimate | rushing | passing | edge @ 6.54% vig |
+|---|---|---|---|
+| Realized 2024 out-of-sample | 1.167 | 1.216 | +2.8% / +7.1% |
+| Pooled full-sample | 1.192 | 1.276 | +5.0% / +12.4% |
+| **2023 TRAIN — what it used** | **1.226** | **1.311** | **+8.0% / +15.5%** |
+
+The justification in the docstring was leakage avoidance -- "a number that was
+never allowed to see its own outcome". **That is the right discipline for
+validating a finding and the wrong one for pricing a bet.** The train fit is
+optimistically biased by construction, and this project's own out-of-sample check
+had already measured the decay. Using it quoted an edge the honest split showed
+was not there -- and it rounded toward self-flattery, the one direction
+`read_as_of`'s tie-break rule says a betting system must never round.
+
+**Fixed:** constants swapped to the realized 2024 values. Live effect, same slate:
+**4 spots -> 2**, edges **+15.5% -> +7.1%**, stakes ~$1.55 -> ~$0.65. Both rushing
+spots dropped out (+2.8% is below the 3% threshold). Pinned by
+`test_lift_constants_are_the_realized_out_of_sample_values_not_the_train_fit`.
+
+### 2. The constants had NO producing code anywhere in the repo
+
+`1.226` / `1.311` appeared in exactly four places: the scanner's dict,
+`methodology_backlog.md`, the paper, and a test asserting the constant against the
+dict it came from. **No function, notebook or script computed them.** An
+unreproducible number priced with real money is indistinguishable from a typo, and
+nothing in the test suite could have caught one.
+
+**Fixed:** `team_total_props.build_team_outcomes` +
+`fit_team_total_lift_by_bucket` now derive the whole table from raw data. Verified
+the day they were written -- **all six documented values reproduce exactly**
+(rushing 1.226/1.167/1.192, passing 1.311/1.216/1.276, train/test/pooled).
+
+### 3. The player lines never entered the price
+
+`find_team_total_spots` loads `team_total_lines_from_store`, checks it is
+non-empty, and then uses it **only for a display count**. All pricing runs through
+`bucket_edge = lift/(1+vig)^2 - 1`, whose own docstring states the game-specific
+probability cancels exactly. So the "edge" is a constant per (bucket, stat, vig) --
+which is why two different games both showed `0.154943` to six decimals.
+
+**This is by design, not a bug, but it means the scanner is not detecting a
+mispriced team total.** It asserts "this team is an underdog, therefore bet". The
+summed player lines that look like the evidence are decorative. NOT changed --
+recorded so nobody reads a spot as game-specific evidence.
+
+Related: `n_event_player_lines` counts BOTH teams (the code says so), so "2 player
+lines" never meant two lines for the side being bet.
+
+### The blowup this was heading for
+
+Bucketing needs Pinnacle **moneyline** (all 16 games); vig needs Pinnacle **props**
+(2 games). That gap is the only thing holding the count at 2. Across all 16 games
+there are 14 underdog + 4 narrow team-sides, so under the train fit this projected
+**~36 spots/week** once Pinnacle broadens -- ~$54/week against a $100 bankroll.
+
+**And it has no exposure cap:** `team_total_scan` is a manual `make` target, NOT
+wired into `monitor_run`, so it never passes through `_apply_exposure_cap`. An
+earlier note in this session claimed it did; that was wrong.
+
+The corrected lifts shrink this a lot on their own -- only passing/underdog clears
+the threshold now, so the ceiling is 14 spots/week, not 36 (pinned by
+`test_only_passing_underdog_clears_the_threshold_at_realistic_vig`). Still worth a
+deliberate decision before wiring it to an alert channel.
+
+### Also fixed in passing
+
+`build_team_total_lines` raised `KeyError: 'book'` on a column-less frame instead
+of returning the empty result the next line already intended. Reporting paths call
+it unattended.
+
+---
+
 ## CLV power: the paper's n≈3140 rests on an ASSUMED sigma, and the real one is 3-7x smaller
 
 **Corrects a load-bearing claim in this project's own honesty framing.**
@@ -747,7 +828,9 @@ close not captured is not re-buyable at any price — the historical endpoint se
 5-minute snapshots, but at ~700 credits/game for a full prop series, which is why
 props rolling CLV was deferred to live-forward measurement in the first place.
 
-**Proposed fix (not yet applied):** promote the existing 1.5h arb target to a
+**Fix (APPLIED 2026-09-02 as `props_budget.CLOSE_CAPTURE_HOURS = 1.5`; this
+heading said "not yet applied" until 2026-09-14, which was stale):** promote the
+existing 1.5h arb target to a
 full-market capture, so every prop market gets one quote inside `CLOSE_MAX`.
 Measured cost:
 
@@ -1004,3 +1087,67 @@ claims about those describe wiring *to each other*, not to the pipeline.
   well-known angle, but needs a paid bet-percentage feed (Action Network,
   VSiN, or similar) this project doesn't have. Revisit if/when such a source
   gets added.
+
+
+---
+
+## Arb detection latency halved (2026-09-14)
+
+`ARB_POLL_INTERVAL_HOURS` 0.5 -> 0.25 **and** `props_scheduler.DEFAULT_TICK_MINUTES`
+30.0 -> 15.0. These two must move together: the service tick is a hard floor, so a
+0.25h target cannot fire on a 30-minute tick and halving either alone buys nothing.
+
+Worst case from a price appearing to a text arriving: **~35 min -> ~20 min** (poll
+spacing, then com.nflclv.monitor's 300s StartInterval). Chosen because arb is one of
+only two validated edges here, its windows are fleeting, and `shadow_log.py` exists
+precisely because price survival across the detection latency has never been
+measured -- cutting the latency is the one lever that improves that answer rather
+than just measuring it.
+
+**Comparability warning:** any shadow-log survival rate measured before 2026-09-14
+was measured against the ~35-min budget. `alerted_at` is what separates the two
+regimes; do not pool them.
+
+### Cost
+
+Simulated against the real 272-game 2026 REG schedule at measured billing rates
+(empty early probes free, 5-of-7 markets returning), credits attributed to the month
+each poll fires:
+
+| month | current | new | delta |
+|---|---|---|---|
+| 2026-09 | 14,669 | 17,960 | +3,291 |
+| 2026-10 | 18,190 | 22,304 | +4,114 |
+| 2026-11 | 17,888 | **22,756** | +4,868 |
+| 2026-12 | 18,161 | 22,413 | +4,252 |
+| 2027-01 | 7,065 | 9,191 | +2,126 |
+
+Peak month **22.8% of the 100K monthly cap** (was 18.2%). `POLLS_PER_EVENT` 55 -> 79.
+
+### The deployment hazard this exposed, which is the more reusable finding
+
+**`poll_count` is an INDEX into `POLL_TARGETS`, not a count of hours.** Changing the
+grid silently moves every in-flight event. Measured on the live state at the moment
+of the change: DEN@KC sat at index 44 with 5.88h to kickoff; index 44 meant 5.5h on
+the old grid and **8.75h on the new one**. Since `props_scheduler` advances at most
+one index per tick, it would have walked forward from 8.75h and run out of clock at
+3.0h -- **missing the 1.5h close capture and every arb target below it**, on the one
+game still upcoming that day.
+
+Simulated both ways before touching anything:
+
+```
+WITHOUT migration  polls= 24  reaches 1.5h close=False  lowest target=3.0h
+WITH    migration  polls= 22  reaches 1.5h close=True   lowest target=0.25h
+```
+
+`scripts/migrate_props_poll_state.py` re-indexes by TIME rather than ordinal, backs
+up the state file first, and has a `--dry-run`. On the live file: 15 finished events
+stayed finished (55 -> 79, still `already_fully_polled`), DEN@KC 44 -> 57 (5.5h ->
+5.5h), and the one event still in the early tier was untouched. Pinned by
+`tests/test_migrate_props_poll_state.py`, including the direction property that
+matters -- a migrated index must never point FURTHER from kickoff than the old one.
+
+**Rule for any future change to the poll grid mid-season: migrate the state file, or
+change the grid only when nothing is in flight.** A grid change alone is not a
+no-op deployment.
