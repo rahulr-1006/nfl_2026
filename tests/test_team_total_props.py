@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 import pandas as pd
+import pytest
 
 from src.backtest.team_total_props import (
     build_team_total_lines,
@@ -133,3 +134,107 @@ def test_team_total_over_indicator_matches_actual_vs_line():
     )
     result = team_total_over_indicator(team_totals)
     assert list(result) == [True, False, False]  # exactly-equal does not count as "over"
+
+
+# --- lift derivation: the constants must be reproducible from data ----------
+
+
+def _outcome_snaps(event_id, home_price, away_price, capture, kickoff):
+    from src.store.schema import Market, OddsSnapshot, Side
+    return [
+        OddsSnapshot.from_american(
+            capture_time=capture, event_id=event_id, season=2024, week=1,
+            home_team="KC", away_team="LAC", event_start_time=kickoff,
+            book="pinnacle", market=Market.MONEYLINE, side=side, price_american=price,
+        )
+        for side, price in ((Side.HOME, home_price), (Side.AWAY, away_price))
+    ]
+
+
+def test_build_team_outcomes_emits_both_sides_with_complementary_results():
+    from datetime import UTC, datetime, timedelta
+
+    from src.backtest.team_total_props import build_team_outcomes
+
+    ko = datetime(2024, 9, 8, 17, 0, tzinfo=UTC)
+    snaps = _outcome_snaps("2024_01_LAC_KC", -200, 170, ko - timedelta(hours=1), ko)
+    df = pd.DataFrame([s.model_dump() for s in snaps])
+    df["market"] = df["market"].map(lambda m: getattr(m, "value", m))
+    df["side"] = df["side"].map(lambda s: getattr(s, "value", s))
+    sched = pd.DataFrame([{"game_id": "2024_01_LAC_KC", "home_team": "KC", "away_team": "LAC",
+                           "home_score": 27, "away_score": 20, "season": 2024}])
+
+    out = build_team_outcomes(df, sched)
+    assert len(out) == 2
+    assert set(out.team) == {"KC", "LAC"}
+    # Exactly one winner, and the devigged probabilities sum to 1.
+    assert out.team_won.sum() == 1
+    assert out[out.team == "KC"].team_won.iloc[0] == 1
+    assert out.team_market_prob.sum() == pytest.approx(1.0, abs=1e-9)
+
+
+def test_build_team_outcomes_drops_games_with_no_result():
+    """An unplayed game has no `team_won`; including it would silently grade
+    every pending game as a loss."""
+    from datetime import UTC, datetime, timedelta
+
+    from src.backtest.team_total_props import build_team_outcomes
+
+    ko = datetime(2026, 9, 10, 17, 0, tzinfo=UTC)
+    snaps = _outcome_snaps("2026_01_LAC_KC", -200, 170, ko - timedelta(hours=1), ko)
+    df = pd.DataFrame([s.model_dump() for s in snaps])
+    df["market"] = df["market"].map(lambda m: getattr(m, "value", m))
+    df["side"] = df["side"].map(lambda s: getattr(s, "value", s))
+    sched = pd.DataFrame([{"game_id": "2026_01_LAC_KC", "home_team": "KC", "away_team": "LAC",
+                           "home_score": None, "away_score": None, "season": 2026}])
+    assert build_team_outcomes(df, sched).empty
+
+
+def test_fit_lift_by_bucket_recovers_a_planted_correlation():
+    """Independent legs give lift ~1.0; a planted co-occurrence gives lift > 1.
+    Without this the constants the live scanner prices with are unfalsifiable."""
+    from src.backtest.team_total_props import fit_team_total_lift_by_bucket
+
+    # 200 underdog team-games. In HALF of them the team both wins and goes over,
+    # which is far more co-occurrence than independence would produce.
+    n = 200
+    won = [1] * 100 + [0] * 100
+    over = [1] * 100 + [0] * 100          # perfectly coupled -> lift ~2.0
+    totals = pd.DataFrame({
+        "event_id": [f"g{i}" for i in range(n)], "team": ["KC"] * n,
+        "implied_team_total_line": [50.0] * n,
+        "actual_team_total": [60.0 if o else 40.0 for o in over],
+    })
+    outcomes = pd.DataFrame({
+        "event_id": [f"g{i}" for i in range(n)], "team": ["KC"] * n,
+        "team_market_prob": [0.30] * n, "team_won": won, "season": [2024] * n,
+    })
+
+    class _Stub:
+        @staticmethod
+        def build(*_a, **_k):
+            return totals
+
+    import src.backtest.team_total_props as mod
+    real = mod.build_team_total_lines
+    mod.build_team_total_lines = lambda *a, **k: totals
+    try:
+        got = fit_team_total_lift_by_bucket(pd.DataFrame(), pd.DataFrame(), outcomes, "rushing_yards")
+    finally:
+        mod.build_team_total_lines = real
+
+    under = got[got.bucket == "underdog"]
+    assert not under.empty
+    assert float(under.lift.iloc[0]) > 1.5      # planted coupling is detected
+    assert int(under["n"].iloc[0]) == n
+
+
+def test_fit_lift_by_bucket_on_empty_inputs_is_empty_not_a_crash():
+    from src.backtest.team_total_props import fit_team_total_lift_by_bucket
+
+    out = fit_team_total_lift_by_bucket(
+        pd.DataFrame(), pd.DataFrame(),
+        pd.DataFrame(columns=["event_id", "team", "team_market_prob", "team_won", "season"]),
+        "rushing_yards",
+    )
+    assert out.empty

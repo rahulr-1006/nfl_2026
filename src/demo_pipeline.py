@@ -152,7 +152,7 @@ def main() -> None:
         print(f"  no spot cleared the {EV_THRESHOLD:.0%} threshold -- tweak the prices above and re-run")
         return
     print(f"  found {len(spots)} spot(s) clearing {EV_THRESHOLD:.0%} EV:")
-    print(spots[["side", "book", "pinnacle_fair_prob", "book_price_american", "edge", "suggested_stake"]].to_string(index=False))
+    print(spots[["side", "book", "pinnacle_fair_prob", "price_american", "edge", "suggested_stake"]].to_string(index=False))
 
     _step(4, "DECIDE -- src/signal/live_scan.py::format_alert_message()")
     top = spots.iloc[0]

@@ -2,7 +2,7 @@
 
 **Why this exists: the edge had no way to be acted on.** `team_total_props.py`
 produced this project's most rigorously validated finding -- underdog-bucket
-team-total rushing (+5.5%) and passing (+12.9%), surviving chi-square, a
+team-total rushing and passing, surviving chi-square, a
 10K-shuffle permutation test, an honest 2023-train/2024-test split, and BH
 correction inside a 69-p-value family. It was then wired to nothing, alongside
 `correlated_props.price_bucket_bet`, the deliberately-gated pricing entrypoint
@@ -41,14 +41,33 @@ from src.model.baseline import market_baseline
 from src.signal.live_scan import upcoming_only
 from src.store.pit_store import PointInTimeStore
 
-# Lift by bucket, per stat, from the 2023-train fit in `team_total_props.py`'s
-# validation -- TRAIN-ONLY values, deliberately not refit on everything, so a
-# live bet is priced with a number that was never allowed to see its own
-# outcome. Only validated buckets are listed; `price_bucket_bet` enforces that
-# independently.
+# Lift by bucket, per stat: the **REALIZED 2024 out-of-sample** values.
+#
+# **Changed 2026-09-04 from the 2023-TRAIN fit (rushing 1.226/1.149, passing
+# 1.311/0.950), which priced live bets too high.** The original rationale was
+# leakage avoidance -- "a number that was never allowed to see its own outcome".
+# That is the right discipline for *validating* a finding and the wrong one for
+# *pricing* a future bet: the train fit is optimistically biased by construction,
+# and this project's own out-of-sample check measured exactly how much it decays
+# (rushing 1.226 -> 1.167, passing 1.311 -> 1.216). Using the train number meant
+# quoting an edge the honest split had already shown was not there.
+#
+# It was also the highest of the three estimates available (train > pooled >
+# realized), i.e. rounding toward self-flattery -- the one direction
+# `pit_store.read_as_of`'s tie-break rule says a betting system must never round.
+#
+# Effect at the measured live vig (6.54%), via `bucket_edge = lift/(1+vig)^2 - 1`:
+#
+#   rushing underdog:  +8.01% -> +2.81%  (now BELOW DEFAULT_EDGE_THRESHOLD, stops firing)
+#   passing underdog: +15.49% -> +7.13%  (still fires)
+#
+# Every value below is reproducible from raw data via
+# `team_total_props.fit_team_total_lift_by_bucket(..., seasons=[2024])` -- which
+# is why that function now exists. These were bare literals with no producing
+# code for months; see its docstring.
 VALIDATED_TEAM_TOTAL_LIFT: Mapping[str, Mapping[str, float]] = {
-    "rushing_yards": {"underdog": 1.226, "narrow": 1.149},
-    "passing_yards": {"underdog": 1.311, "narrow": 0.950},
+    "rushing_yards": {"underdog": 1.167, "narrow": 1.045},
+    "passing_yards": {"underdog": 1.216, "narrow": 0.943},
 }
 # Base rate of a team clearing its own summed prop line, measured on the real
 # 2023-24 contracts (`team_total_props` build). Near 0.5 by construction, which

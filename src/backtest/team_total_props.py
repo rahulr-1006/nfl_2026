@@ -58,6 +58,8 @@ more trustworthy out of the gate.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pandas as pd
 
 from src.model.elo import canonical_team
@@ -79,6 +81,14 @@ def build_team_total_lines(props: pd.DataFrame, player_stats: pd.DataFrame, prop
     validated against real book-vs-nflverse name mismatches -- reused
     here, not duplicated.
     """
+    # A frame with no columns at all (an empty store read, or an empty default
+    # DataFrame from a caller) raised KeyError here rather than returning the
+    # empty result the next line already intends. Reporting paths call this
+    # unattended, so a missing column is an empty answer, not an exception.
+    required = {"book", "market", "prop_stat", "side", "capture_time", "event_id", "player_name", "line"}
+    if props.empty or not required.issubset(props.columns):
+        return pd.DataFrame(columns=["event_id", "team", "implied_team_total_line", "actual_team_total"])
+
     pin = props[
         (props["book"] == "pinnacle") & (props["market"] == "player_prop") & (props["prop_stat"] == prop_stat)
     ].copy()
@@ -137,3 +147,84 @@ def team_total_over_indicator(team_totals: pd.DataFrame) -> pd.Series:
     (design decision #1) instead of a fixed threshold.
     """
     return team_totals["actual_team_total"] > team_totals["implied_team_total_line"]
+
+
+def build_team_outcomes(moneyline: pd.DataFrame, schedule: pd.DataFrame, book: str = "pinnacle") -> pd.DataFrame:
+    """Per (event_id, team): `team_market_prob` (devigged moneyline win prob),
+    `team_won`, and `season` -- the three columns
+    `fit_team_total_lift_by_bucket` needs to stratify by favourite strength.
+
+    Uses the LATEST quote per (event, side), i.e. the close, matching how the
+    lift was originally measured.
+    """
+    from src.model.baseline import market_baseline
+
+    ml = moneyline[(moneyline["market"] == "moneyline") & (moneyline["book"] == book)]
+    if ml.empty:
+        return pd.DataFrame(columns=["event_id", "team", "team_market_prob", "team_won", "season"])
+    ml = ml.sort_values("capture_time").drop_duplicates(["event_id", "side"], keep="last")
+    wide = ml.pivot_table(index="event_id", columns="side", values="price_american", aggfunc="last").dropna()
+    if not {"home", "away"}.issubset(wide.columns):
+        return pd.DataFrame(columns=["event_id", "team", "team_market_prob", "team_won", "season"])
+
+    played = schedule.dropna(subset=["home_score", "away_score"])
+    results = {
+        r.game_id: (canonical_team(r.home_team), canonical_team(r.away_team),
+                    int(r.home_score > r.away_score), int(r.season))
+        for r in played.itertuples()
+    }
+
+    rows = []
+    for event_id, r in wide.iterrows():
+        if event_id not in results:
+            continue
+        home, away, home_won, season = results[event_id]
+        prices = [int(r["home"]), int(r["away"])]
+        rows.append({"event_id": event_id, "team": home, "season": season,
+                     "team_market_prob": market_baseline(prices, side_index=0), "team_won": home_won})
+        rows.append({"event_id": event_id, "team": away, "season": season,
+                     "team_market_prob": market_baseline(prices, side_index=1), "team_won": 1 - home_won})
+    return pd.DataFrame(rows)
+
+
+def fit_team_total_lift_by_bucket(
+    props: pd.DataFrame,
+    player_stats: pd.DataFrame,
+    team_outcomes: pd.DataFrame,
+    prop_stat: str,
+    seasons: Sequence[int] | None = None,
+) -> pd.DataFrame:
+    """Lift of (team wins AND team clears its own implied total), by
+    favourite-strength bucket. Restrict to `seasons` for a train/test split.
+
+    **Why this function exists (added 2026-09-04).** The lift numbers this
+    project prices live bets with -- `signal/team_total_scan.py`'s
+    `VALIDATED_TEAM_TOTAL_LIFT` -- existed for months as bare float literals
+    with **no code anywhere that produced them**. They appeared only in that
+    dict, in `methodology_backlog.md`, in the paper, and in a test that
+    asserted the constant against itself. An unreproducible number priced with
+    real money is indistinguishable from a typo, and the scanner's test could
+    not have caught one.
+
+    Verified on the real 2023+2024 pull the day it was written: this
+    reproduces all six documented values exactly -- rushing underdog
+    1.226 (train 2023) / 1.167 (test 2024) / 1.192 (pooled), passing underdog
+    1.311 / 1.216 / 1.276.
+    """
+    totals = build_team_total_lines(props, player_stats, prop_stat)
+    if totals.empty:
+        return pd.DataFrame(columns=["bucket", "lift", "n"])
+    totals = totals.copy()
+    totals["over"] = team_total_over_indicator(totals).to_numpy()
+
+    merged = totals.merge(team_outcomes, on=["event_id", "team"], how="inner")
+    if seasons is not None:
+        merged = merged[merged["season"].isin(list(seasons))]
+    if merged.empty:
+        return pd.DataFrame(columns=["bucket", "lift", "n"])
+
+    from src.backtest.correlated_props import measure_leg_correlation_by_bucket
+
+    return measure_leg_correlation_by_bucket(
+        merged["team_won"], merged["over"], merged["team_market_prob"]
+    )

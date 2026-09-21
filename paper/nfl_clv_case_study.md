@@ -111,7 +111,7 @@
       fixed 2 real latent gaps (neither had ever produced a wrong result, both would
       have the moment live multi-poll data reached them): props arbitrage/EV backtest
       never checked simultaneity, and the live +EV monitor never checked its own
-      `book_time`/`pinnacle_time` gap despite capturing both. `PointInTimeStore` and
+      `capture_time`/`pinnacle_time` gap despite capturing both. `PointInTimeStore` and
       devig/sizing came back clean. Surfaced one real caveat: the same 2023-2024 test
       split has been evaluated 8 separate times across this project's history —
       documented honestly in §6.4
@@ -1475,7 +1475,7 @@ on two different underdog moneylines relative to Pinnacle's fair value at that m
 Confirms the comparison logic end-to-end on real data; not a claim about the strategy's
 long-run edge, which only the live season (§5) can establish.
 
-**A real, live gap found and fixed (2026-08-21 adversarial audit).** `book_time` and
+**A real, live gap found and fixed (2026-08-21 adversarial audit).** `capture_time` and
 `pinnacle_time` were both already captured and returned on every spot, but never
 actually checked against each other before flagging or texting an alert. Under normal
 operation this doesn't matter (Pinnacle and the execution books are fetched in one

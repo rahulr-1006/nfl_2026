@@ -7,7 +7,7 @@ spots, texts about them, and exits. Cheap: no network calls of its own,
 just local parquet reads, so it can run far more often than the collector
 without touching the Odds API credit budget at all.
 
-**Scans three signals as of 2026-08-23**, in descending order of how much
+**Scans five signals as of 2026-09-08**, in descending order of how much
 this project actually trusts them:
   1. **Prop cross-book arbitrage** (`src/signal/props_scan.py`) --
      mathematically guaranteed if both legs place. Highest confidence.
@@ -15,10 +15,20 @@ this project actually trusts them:
      original signal.
   3. **Prop EV vs Pinnacle** -- EXPERIMENTAL, tested null on real 2024 data,
      labeled as such in the alert text and gated behind a higher threshold.
+  4. **Middling** and 5. **steam** (`src/signal/movement_scan.py`) --
+     EXPERIMENTAL, no live track record yet, labeled as such.
 
 Props were previously invisible here, which was the project's biggest
 structural gap: the only alerted market was the one the model reliably loses
 to, while every validated edge was prop-adjacent.
+
+**The two LINE-MOVEMENT strategies were invisible here too until 2026-09-08.**
+`middle_scan.py` and `steam_scan.py` existed and worked, but only as hand-run
+scripts, so nothing watched for line movement between the times someone
+happened to run them -- and line movement is the one signal that is worthless
+after the fact. Their pricing needs a residual sigma, which is why this module
+pulls in `cached_residual_stds`; the cache is what makes a ~5-minute cadence
+affordable (see `src/backtest/middle_scan.py`).
 """
 
 from __future__ import annotations
@@ -27,10 +37,12 @@ import logging
 import os
 from collections.abc import Callable
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pandas as pd
 from dotenv import load_dotenv
 
+from src.backtest.middle_scan import cached_residual_stds
 from src.notify.health_check import (
     check_all,
     pinnacle_arrival_message,
@@ -49,6 +61,16 @@ from src.signal.live_scan import (
     record_alerts,
     save_alert_state,
 )
+from src.signal.movement_scan import (
+    DEFAULT_MIDDLE_EV_THRESHOLD,
+    DEFAULT_STEAM_EDGE_THRESHOLD,
+    find_live_middle_spots,
+    find_live_steam_spots,
+    format_middle_alert_message,
+    format_steam_alert_message,
+    middle_alert_key,
+    steam_alert_key,
+)
 from src.signal.props_scan import (
     DEFAULT_ARB_MARGIN_THRESHOLD,
     DEFAULT_PROP_EV_THRESHOLD,
@@ -58,6 +80,7 @@ from src.signal.props_scan import (
     format_prop_ev_alert_message,
     prop_alert_key,
 )
+from src.signal.shadow_log import SHADOW_LOG_PATH
 from src.signal.shadow_log import recheck as shadow_recheck
 from src.signal.shadow_log import record_alert as shadow_record
 from src.store.pit_store import PointInTimeStore, kickoffs_from_store
@@ -126,6 +149,7 @@ def _alert_batch(
     phone_number: str | None,
     label: str,
     strategy: str,
+    shadow_path: Path = SHADOW_LOG_PATH,
 ) -> tuple[list[pd.Series], dict[str, AlertRecord]]:
     """Dedup -> format -> send one class of alert. Shared by all three
     signals so they can't drift apart in dedup or error handling.
@@ -161,7 +185,7 @@ def _alert_batch(
         # latency. Guarded because this is measurement, not alerting -- a
         # shadow-log failure must never cost a real alert.
         try:
-            shadow_record(pd.DataFrame(sent_rows), strategy, key_fn)
+            shadow_record(pd.DataFrame(sent_rows), strategy, key_fn, path=shadow_path)
         except Exception:
             log.exception("shadow log: failed to record %s alerts (alerts still sent)", label)
     return sent_rows, state
@@ -172,9 +196,12 @@ def run(
     threshold: float = DEFAULT_EDGE_THRESHOLD,
     prop_ev_threshold: float = DEFAULT_PROP_EV_THRESHOLD,
     arb_margin_threshold: float = DEFAULT_ARB_MARGIN_THRESHOLD,
+    middle_ev_threshold: float = DEFAULT_MIDDLE_EV_THRESHOLD,
+    steam_edge_threshold: float = DEFAULT_STEAM_EDGE_THRESHOLD,
     max_exposure: float = DEFAULT_MAX_SUGGESTED_EXPOSURE,
+    shadow_path: Path = SHADOW_LOG_PATH,
 ) -> int:
-    """One scan-and-alert cycle across all three signals. Returns the number
+    """One scan-and-alert cycle across all five signals. Returns the number
     of alerts actually sent. Never raises for expected failure modes (no
     phone number configured, a single SMS send failing, one scan erroring)
     -- this runs unattended and a single bad tick must not stop the next one.
@@ -238,7 +265,7 @@ def run(
             log.exception("%s scan failed, skipping it this cycle", label)
             return pd.DataFrame()
 
-    # One exposure budget shared across all three signals, spent in confidence
+    # One exposure budget shared across all five signals, spent in confidence
     # order: guaranteed arbitrage first, then moneyline, then the experimental
     # props-EV signal last -- so a flood of low-confidence alerts can never
     # crowd out a real lock.
@@ -248,7 +275,7 @@ def run(
     arb_spots, remaining = _apply_exposure_cap(arb_spots, remaining)
     sent, state = _alert_batch(
         arb_spots, state, format_arb_alert_message, prop_alert_key, "arb_margin", phone_number,
-        "prop arb", "prop_arb",
+        "prop arb", "prop_arb", shadow_path=shadow_path,
     )
     all_sent.extend(sent)
 
@@ -256,7 +283,7 @@ def run(
     ml_spots, remaining = _apply_exposure_cap(ml_spots, remaining)
     sent, state = _alert_batch(
         ml_spots, state, format_alert_message, lambda r: f"{r['event_id']}|{r['side']}|{r['book']}",
-        "edge", phone_number, "moneyline", "moneyline_ev",
+        "edge", phone_number, "moneyline", "moneyline_ev", shadow_path=shadow_path,
     )
     all_sent.extend(sent)
 
@@ -266,16 +293,58 @@ def run(
     prop_ev_spots, remaining = _apply_exposure_cap(prop_ev_spots, remaining)
     sent, state = _alert_batch(
         prop_ev_spots, state, format_prop_ev_alert_message, prop_alert_key, "edge", phone_number,
-        "prop EV", "prop_ev",
+        "prop EV", "prop_ev", shadow_path=shadow_path,
     )
     all_sent.extend(sent)
+
+    # Line movement (middling + steam). Both need the margin/total residual
+    # sigma; `cached_residual_stds` keeps that to a dict lookup after the first
+    # call instead of refitting Elo + two regressions on every tick. Guarded
+    # like every other scan -- and guarded around the FIT as well, because a
+    # missing or corrupt training parquet would otherwise take down the arb and
+    # moneyline alerts that have nothing to do with it.
+    try:
+        sigma_margin, sigma_total = cached_residual_stds()
+    except Exception:
+        log.exception("residual sigma fit failed, skipping middling and steam this cycle")
+        sigma_margin = sigma_total = None
+
+    if sigma_margin is not None:
+        middle_spots = _safe(
+            lambda: find_live_middle_spots(
+                store, sigma_margin=sigma_margin, sigma_total=sigma_total,
+                threshold=middle_ev_threshold,
+            ),
+            "middling",
+        )
+        # A middle risks BOTH legs, so charge the cap their combined stake.
+        middle_spots, remaining = _apply_exposure_cap(middle_spots, remaining, stake_column="total_risked")
+        sent, state = _alert_batch(
+            middle_spots, state, format_middle_alert_message, middle_alert_key, "ev_rate",
+            phone_number, "middling", "middle", shadow_path=shadow_path,
+        )
+        all_sent.extend(sent)
+
+        steam_spots = _safe(
+            lambda: find_live_steam_spots(
+                store, sigma_margin=sigma_margin, sigma_total=sigma_total,
+                threshold=steam_edge_threshold,
+            ),
+            "steam",
+        )
+        steam_spots, remaining = _apply_exposure_cap(steam_spots, remaining)
+        sent, state = _alert_batch(
+            steam_spots, state, format_steam_alert_message, steam_alert_key, "edge",
+            phone_number, "steam", "steam", shadow_path=shadow_path,
+        )
+        all_sent.extend(sent)
 
     # Re-observe still-open alerted spots. Store-only, 0 credits. Runs after
     # the scans so an alert fired this cycle is recorded before its first
     # re-check, and guarded like everything else here: this is measurement,
     # and it must not be able to break the alert path.
     try:
-        shadow_recheck(store)
+        shadow_recheck(store, path=shadow_path)
     except Exception:
         log.exception("shadow log: re-check failed, continuing")
 

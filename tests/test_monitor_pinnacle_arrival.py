@@ -43,10 +43,10 @@ def test_arrival_fires_once_then_never_again(tmp_path, isolated_state, monkeypat
 
     sent = []
     with patch.object(monitor_run, "send_message", side_effect=lambda m, p: sent.append(m)):
-        monitor_run.run(store_root=str(store_root))
+        monitor_run.run(store_root=str(store_root), shadow_path=tmp_path / "shadow.jsonl")
         first = [m for m in sent if "PINNACLE NOW QUOTING" in m]
-        monitor_run.run(store_root=str(store_root))
-        monitor_run.run(store_root=str(store_root))
+        monitor_run.run(store_root=str(store_root), shadow_path=tmp_path / "shadow.jsonl")
+        monitor_run.run(store_root=str(store_root), shadow_path=tmp_path / "shadow.jsonl")
         again = [m for m in sent if "PINNACLE NOW QUOTING" in m]
 
     assert len(first) == 1, "should announce on the tick Pinnacle first appears"
@@ -61,6 +61,6 @@ def test_no_arrival_alert_while_pinnacle_is_absent(tmp_path, isolated_state, mon
 
     sent = []
     with patch.object(monitor_run, "send_message", side_effect=lambda m, p: sent.append(m)):
-        monitor_run.run(store_root=str(store_root))
+        monitor_run.run(store_root=str(store_root), shadow_path=tmp_path / "shadow.jsonl")
 
     assert not [m for m in sent if "PINNACLE" in m]

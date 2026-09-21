@@ -24,6 +24,7 @@ from src.collect.budget import (
     load_state,
     parse_quota_headers,
     save_state,
+    state_for_key,
 )
 from src.collect.client import OddsApiClient, OddsApiError, RateLimitExceeded
 from src.collect.config import Config
@@ -75,8 +76,12 @@ def tick(ctx: CollectorContext) -> None:
 def _tick(ctx: CollectorContext) -> None:
     now = datetime.now(UTC)
     state = load_state(ctx.config.state_path) or _bootstrap_state(ctx.config, now)
+    # A credit balance cached from a different key must not pace this one.
+    state = state_for_key(state, ctx.config.api_key)
 
-    period_end = current_period_end(now, state.period_anchor, ctx.config.budget_period_days)
+    period_end = current_period_end(
+        now, state.period_anchor, ctx.config.budget_period_days, ctx.config.budget_period_mode
+    )
     decision = decide_poll(
         now=now,
         upcoming_kickoffs=ctx.upcoming_kickoffs,
@@ -108,6 +113,7 @@ def _tick(ctx: CollectorContext) -> None:
             remaining_credits=state.remaining_credits,
             period_anchor=state.period_anchor,
             consecutive_failures=state.consecutive_failures + 1,
+            api_key_fingerprint=state.api_key_fingerprint,
         )
         save_state(ctx.config.state_path, new_state)
         if new_state.consecutive_failures > ctx.config.max_consecutive_failures:
@@ -161,6 +167,7 @@ def _tick(ctx: CollectorContext) -> None:
             remaining_credits=quota.remaining if quota.remaining is not None else state.remaining_credits,
             period_anchor=state.period_anchor,
             consecutive_failures=0,
+            api_key_fingerprint=state.api_key_fingerprint,
         ),
     )
 
