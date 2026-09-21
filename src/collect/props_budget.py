@@ -164,15 +164,40 @@ ARB_MARKETS = "player_receptions,player_pass_tds"
 # below 48h and `build_poll_targets` dedupes on `hours_before_kickoff` -- the
 # collision keeps the dense target (all 7 markets) rather than adding a second poll.
 #
-# **This widens COVERAGE, not detection latency.** Worst-case time from a price
-# appearing to a text arriving is bounded by the poll spacing plus the monitor's own
-# cadence: ARB_POLL_INTERVAL_HOURS (0.5h) + com.nflclv.monitor's 300s StartInterval
-# = ~35 min. Widening the window adds sampling points; it does not make any single
-# detection faster. Cutting that latency means cutting ARB_POLL_INTERVAL_HOURS *and*
-# props_scheduler.DEFAULT_TICK_MINUTES (30.0) together -- the tick is a hard floor,
-# a 0.25h target cannot fire on a 30-minute service tick.
+# **The 2026-08-25 widening above bought COVERAGE, not detection latency.** Worst-case
+# time from a price appearing to a text arriving is bounded by the poll spacing plus
+# the monitor's own cadence. More sampling points inside the window does not make any
+# single detection faster; only the spacing does.
+#
+# 2026-09-14: **latency halved, 0.5h -> 0.25h.** Done together with
+# `props_scheduler.DEFAULT_TICK_MINUTES` 30.0 -> 15.0, and the two MUST move together
+# -- the service tick is a hard floor, so a 0.25h target cannot fire on a 30-minute
+# tick and halving one alone buys nothing.
+#
+#     price appears -> <=15 min (this spacing, floored by the 15-min tick)
+#                   -> <= 5 min (com.nflclv.monitor StartInterval 300s)
+#                   = ~20 min worst case, down from ~35
+#
+# Why it is worth paying for: arb is one of only two validated edges here, its windows
+# are fleeting, and `shadow_log.py` exists precisely because whether an alerted price
+# survives the detection latency has never been measured. Cutting the latency is the
+# one lever that improves the answer rather than just measuring it.
+#
+# Cost, simulated against the real 272-game 2026 REG schedule at the measured billing
+# rates (empty early probes free, 5-of-7 markets returning) rather than worst case:
+#
+#     month     current      new     delta
+#     2026-09    14,669   17,960   +3,291
+#     2026-10    18,190   22,304   +4,114
+#     2026-11    17,888   22,756   +4,868   <- peak
+#     2026-12    18,161   22,413   +4,252
+#     2027-01     7,065    9,191   +2,126
+#
+# **Peak month 22.8% of the 100K monthly cap** (was 18.2%). POLLS_PER_EVENT 55 -> 79.
+# The binding constraint is monthly, not seasonal -- see the 2026-08-25 correction
+# above. This tier is deliberately the one that gets the headroom.
 ARB_WINDOW_HOURS = 12.0  # final hours before kickoff, where prices move most and arb windows actually open
-ARB_POLL_INTERVAL_HOURS = 0.5
+ARB_POLL_INTERVAL_HOURS = 0.25  # must stay >= props_scheduler.DEFAULT_TICK_MINUTES -- see above
 ARB_COST_PER_POLL = 4  # regions=us,eu x 2 markets
 
 # --- close tier (2026-09-02) -------------------------------------------------

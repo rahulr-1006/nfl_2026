@@ -8,10 +8,15 @@ is still on the board by the time a human can act on it.
 That gap is not incidental, it is architectural. The alert path is:
 
     price appears
-      -> up to 30 min   (ARB_POLL_INTERVAL_HOURS 0.5h, floored by
-                         props_scheduler.DEFAULT_TICK_MINUTES = 30.0)
+      -> up to 15 min   (ARB_POLL_INTERVAL_HOURS 0.25h, floored by
+                         props_scheduler.DEFAULT_TICK_MINUTES = 15.0)
       -> up to  5 min   (com.nflclv.monitor StartInterval 300s)
-      = ~35 min worst case before the text is sent
+      = ~20 min worst case before the text is sent
+
+**That budget was ~35 min until 2026-09-14** (0.5h spacing on a 30-min tick). Any
+survival rate measured by this module before that date was measured against the
+wider latency and is not directly comparable to one measured after it -- the
+`alerted_at` timestamp on each row is what distinguishes the two regimes.
 
 Every historical prop row in this repo is a single ~20-minutes-to-kickoff
 snapshot, so price persistence has never been observable in the data at all. It

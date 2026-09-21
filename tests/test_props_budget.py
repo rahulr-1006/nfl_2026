@@ -90,11 +90,18 @@ def test_sparse_poll_targets_hours_covers_the_gap_before_the_dense_window():
 
 
 def test_combined_poll_targets_are_time_ordered_across_all_three_tiers():
-    from src.collect.props_budget import POLL_TARGETS, POLL_TARGETS_HOURS
+    from src.collect.props_budget import (
+        ARB_POLL_INTERVAL_HOURS,
+        POLL_TARGETS,
+        POLL_TARGETS_HOURS,
+    )
 
     assert list(POLL_TARGETS_HOURS) == sorted(POLL_TARGETS_HOURS, reverse=True)
     assert POLL_TARGETS_HOURS[0] == 504.0  # first early-probe target (21 days)
-    assert POLL_TARGETS_HOURS[-1] == 0.5  # last arb target, closest to kickoff
+    # Derived, not hardcoded: this was pinned at 0.5 and had to be hand-edited when
+    # the arb spacing was halved on 2026-09-14. The invariant worth pinning is that
+    # the schedule runs down to one arb interval before kickoff, whatever that is.
+    assert POLL_TARGETS_HOURS[-1] == ARB_POLL_INTERVAL_HOURS
     assert {t.tier for t in POLL_TARGETS} == {"early", "sparse", "dense", "close", "arb"}
 
 
