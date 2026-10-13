@@ -1,4 +1,74 @@
-# Session handoff — 2026-09-21
+# Session handoff — 2026-09-21 (updated 2026-10-04)
+
+## 2026-10-04 update — read this first
+
+The 9/29 decision was pushed to **Monday 2026-10-05**. Changes made today, all
+tested (981 passed, ruff clean), staged, **not committed**:
+
+1. **Kickoff timezone bug fixed.** nflverse `gameday`/`gametime` are US/Eastern;
+   `collect/run.py` and `backtest/engine.py` parsed them as UTC, putting every
+   kickoff 4h early (5h under EST). The collector then thought TNF/MNF had
+   started and fell to its 60-min sparse cadence for the last ~4h (measured:
+   PIT@CLE 10/1 gaps of 60-124 min; NYG@LA 9/21 the same). Shared parser now
+   lives in `features/load_static.kickoffs_utc`; validated against the Odds API's
+   own kickoffs (45/46 within 3.4 min, London games included). **Historical
+   BacktestEngine runs before today used kickoffs 4-5h early** -- their "close"
+   was a pre-close price. The decision report is unaffected (it reads kickoffs
+   from the store).
+2. **Yardage props now polled every 15 min in the final 12h.**
+   `props_budget.MOVEMENT_MARKETS` (pass/rush/reception yds) ride along on the
+   arb tier's calls; `ARB_MARKETS` itself is unchanged. Arb poll cost 4 -> 10.
+   Expect ~+20K credits/month (was ~47K/month projected, now ~67K of 100K).
+   Side effect: the props arb scanner now sees yardage lines at 15-min
+   resolution too, so `prop_arb` alerts may include more yardage arbs.
+3. **2026 schedule + player_stats re-pulled** (backups `*.bak-20261004`).
+   Weeks 1-4 now settle; CHI@GB Week 5 flexed 16:25 -> 13:00 ET.
+4. **API key redacted from client errors** (it was logged via the request URL
+   on DNS failures); existing log lines masked.
+5. **Disk filled 9/22-23** (`No space left on device`, 3 early-tier props polls
+   lost after being paid for). Not this repo (store is 97 MB): the Spotify cache
+   is 20 GB. Still 94% full until cleared.
+
+Services restarted 2026-10-04 15:28 ET to load 1-2.
+
+**Deliberately not done:** placeholder quotes (pmu_fr/betfair_ex_eu at -10000,
+gtbets spreads at -100000; 396 pre-kickoff rows, 16 games, never Pinnacle) are
+NOT filtered. Verified 0 of 5,134 shadow-log rows involve those books, so they
+affect nothing live. Filter them in any backtest that averages or devigs across
+books.
+
+~~**Still open:** bankroll rule and entry-horizon policy~~ — both decided later
+on 10/04 (items 3 and 4 below).
+
+### Later on 2026-10-04: pre-registration + Train analysis + live H1/H1b
+
+- **`preregistration_wk5-9.md`** (uncommitted draft): Train = Weeks 1–4,
+  holdout = Weeks 5–9 (scored once, on/after 11-10). **H1 frozen at M=2pp,
+  E=1%; H1b registered** (both by the user). Must be **committed before Wed
+  10-07 23:59 ET**; open [DECIDE] items are listed in
+  `analysis/train_results_2026-10-04.md` §9.
+- **Metric change:** price-based strategies are scored on **closing EV**
+  (price paid × Pinnacle's devigged close − 1). `clv_probability` never sees the
+  price paid. Pinnacle's close passed calibration for props (except **rushing
+  yards**) and for moneylines (except **short underdogs**, fair .333–.5).
+- **H1/H1b are LIVE, LOG-ONLY** via `src/signal/prereg_scan.py` in the monitor,
+  writing `data/shadow_log_prereg.jsonl`. **Do not merge that file into
+  `data/shadow_log.jsonl` and do not score it before 11-10.** The separate file
+  is what blinds it from decision/shadow/clv reports. Verified live: first ticks 19:25 and
+  19:41 ET logged 4 + 2 H1b legs, 0 H1, no tracebacks, 0 prereg rows in the main
+  log. **Cost:** the prereg block adds ~2m00s per tick (one store read in the
+  service), down from 2m49s after `ReadOnceStore` shared the read with its
+  recheck. It runs last, so it never delays a tick's own alerts, but it does
+  push back the next tick.
+- **Monitor cadence is ~10–13 min, not 5.** In the service a tick took ~4.5 min
+  (01:30→01:34 ET), and launchd skips a start while one is still running. Each
+  scanner re-reads the full store (8–24s apiece standalone). The real worst-case
+  alert latency is ~28 min, not the documented ~20. Not fixed: sharing one store
+  read per tick means refactoring the live alert path, which is the user's call.
+- **Tooling flaw:** `evaluation.random_bet_benchmark`'s null is invalid for
+  plus-money prices (see ARCHITECTURE.md, `pinnacle_lag.py` row).
+
+---
 
 Point a new session at this file. It records **live state verified today**, not
 remembered state. Everything below was checked by running it, and where a number
@@ -43,9 +113,8 @@ applying the CLV bar would retire it for a mathematically guaranteed reason.
 - **Do not edit or reference `README.md`** — a different agent owns it.
 - **Do not reference the user's other quant/portfolio goals** in this project.
   They decide when this project stops.
-- **Bankroll is a fixed $100.** Bets are placed **manually**; no bots.
-  ⚠️ **This contradicts `paper:1390`**, which allows up to 2 reloads ($300). See
-  open item 3 — unresolved, and it must be settled before money moves.
+- **Bankroll is $100 with at most 2 manual reloads ($300 total risk capital)** —
+  decided 2026-10-04, matches `paper:1390`. Bets are placed **manually**; no bots.
 - **Two Odds API keys, but the mainline collector now uses the PAID one**
   (`COLLECT_USE_PAID_KEY`, 2026-09-08). `ODDS_API_KEY` = free 500/mo;
   `ODDS_API_KEY_PAID` = 100,000/mo **recurring, refills on the 1st**. Confirmed
@@ -150,21 +219,59 @@ Weeks 2 and 3 are the entire remaining sample. `prop_arb` needs to go 9 -> 30
 alerts and `moneyline_ev` needs to hold up past n=31. The scarce resource is
 game-weeks, not engineering time.
 
-### 2. Exercise `make log-bet` for real before betting on it
-`data/bet_log.jsonl` has never existed. The command has only ever been run with
-`--path` against a throwaway file. If the first real use is the first real bet,
-any workflow bug costs money. **Do a dry run into a temp path, end to end,
-including `settle_bets`.**
+### 2. ~~Exercise `make log-bet` for real before betting on it~~ — DONE 2026-09-27
+Four real shadow-log alerts on completed Week 1 games replayed through the full
+loop (log -> `--list` -> `--corrects` -> `to_backtest_bets` -> `settle_bets` ->
+`review_all`) into a throwaway path. `data/bet_log.jsonl` still does not exist.
 
-### 3. Resolve the bankroll contradiction (blocking)
-Fixed $100 no top-ups (this file, `monitor_run.py:90`) vs. up to 2 reloads /
-$300 (`paper:1390`). Both are written as settled. Pick one.
+**It found three real bugs, all now fixed. None was reachable from unit tests.**
 
-### 4. Write an entry-horizon policy (blocking)
-`methodology_backlog.md:721-728`: sigma falls monotonically toward kickoff
-(0.0351 -> 0.0143), so **entering early maximises edge and noise together.**
-Recorded as "a real design tension … not resolved here." There is no written
-rule for when to enter. If anything clears the bar, this is needed immediately.
+1. **Nothing could settle.** All four bets returned `UNSETTLED` with the bankroll
+   frozen at $100.00, on games played two weeks earlier.
+   `data/static/schedules_2026_2026.parquet` was pulled **2026-08-14**, before
+   the season, so all 272 games had NaN scores, and `player_stats` had zero 2026
+   rows. **This fails silently:** `_grade` returning `None` is legitimate for an
+   unplayed game, so `season_review` prints "settled 0 of N; bankroll $100.00"
+   and warns only if the schedule is *empty*, never if it is full of NaN scores.
+   Fixed by re-pulling `load_schedules([2026])` + `load_player_stats([2026])`
+   (free, no API credits). All four then graded correctly and check out against
+   reality (LV 27-13 MIA; Breece Hall exactly 2 receptions).
+2. **`active_bets` deleted any bet you corrected.** The superseded filter matched
+   on `placed_at` value, so a correction reusing that instant — what the
+   docstring tells you to do, since `placed_at` is when the bet was *struck* —
+   dropped the original *and* the correction. The bet vanished from settlement,
+   bankroll and review entirely. Now matched by which row corrects which.
+3. **The stale schedule had no international venues at all**, mapping all 7
+   neutral-site 2026 games to domestic stadiums — so `add_rest_travel_features`
+   produced a *confidently wrong* travel distance (SF->LA for Melbourne), not a
+   missing one. MEL00/RIO00/MAD01/PAR00/MUN01 added to `STADIUM_COORDINATES`.
+
+**Standing lesson:** the static nflverse cache does not self-refresh and nothing
+warns when it is stale. Re-pull 2026 schedules + player_stats before trusting any
+settlement, P&L or bankroll number, and read "settled 0 of N, bankroll unchanged"
+as a stale-cache symptom, not a correct no-op.
+
+### 3. ~~Resolve the bankroll contradiction~~ — DONE 2026-10-04
+$100 + up to 2 manual reloads ($300 total), per `paper:1390`. Code comments
+aligned. Reloads are not tracked in code: at a $2 max bet, busting $100 takes
+~50 straight losses, so the accounting would never fire this season.
+
+### 4. ~~Write an entry-horizon policy~~ — DONE 2026-10-04
+User's rule: **no time restriction** — entry is allowed any time up to ~1 minute
+before kickoff. The constraint is signal clarity, not timing:
+
+1. Only alerts from a strategy whose decision-report verdict is GO.
+2. At placement, the book's price must be **equal to or better than** the alerted
+   price. Worse = skip; alerts can be up to ~20 min old (15-min poll + 5-min
+   monitor), and a moved price is a different bet.
+
+Background kept for the record: sigma falls toward kickoff (0.0351 -> 0.0143,
+`methodology_backlog.md:721-728`), so early entries carry more edge AND more
+noise; the user accepts either end.
+
+**Open question raised with the user, not decided:** whether "clear" should also
+require the strategy's 95% CI to exclude zero. Under that stricter reading,
+nothing qualifies as of 10/04 — `moneyline_ev`'s CI is [-0.0024, +0.0081].
 
 ### 5. Decide `team_total_scan`'s exposure cap
 It is a manual `make` target, deliberately NOT in `monitor_run`, so it never

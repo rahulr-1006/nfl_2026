@@ -19,7 +19,7 @@ Verified via `launchctl list`:
 | Service | Runs | Status |
 |---|---|---|
 | `com.nflclv.collector` | `src.collect.run` | **RUNNING** (PID 6121) |
-| `com.nflclv.monitor` | `src.notify.monitor_run` | **LOADED** (interval job, idle between ticks) |
+| `com.nflclv.monitor` | `src.notify.monitor_run` | **LOADED** (interval job, idle between ticks). Since 2026-10-04 it also runs the pre-registered H1/H1b **log-only** to `data/shadow_log_prereg.jsonl` (never texted). |
 | `com.nflclv.props` | `src.collect.props_run` | **RUNNING** (loaded 2026-08-23) |
 
 > ~~**Blocker for the season:** the props scheduler plist exists and the code is tested,
@@ -131,6 +131,7 @@ since retired, and `demo_pipeline.py`).
 | `team_total_props.py` | 0 | **UNDECIDED** | Validated edge, **not wired to anything**. Edge figures here previously read +6.6%/+14.1%; those came from the TRAIN fit and were corrected 2026-09-04 to the realized out-of-sample values (**rushing +2.8%, passing +7.1%** at 6.54% vig — only passing/underdog clears the 3% threshold). |
 | `validation.py` | 0 | **RESEARCH** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
 | `evaluation.py` | 0 | **MANUAL** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
+| `pinnacle_lag.py` | 1 | **LIVE** | 2026-10-04. Pre-registered H1/H1b: soft-book prop prices vs Pinnacle's devigged fair, scored on **closing EV** (`clv_probability` can't see the price paid). Frozen params live in `signal/prereg_scan.py`. ⚠️ `evaluation.random_bet_benchmark` pays the listed side's price to the opposite side (null mean ≈ price/2 − 1) — not a valid null for plus-money bets until fixed. |
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
 | `clv_portfolio.py` | 0 | **MANUAL** | Built 2026-08-23; reporting layer, no live caller yet. |
 | `season_review.py` | 0 | **MANUAL** | Phase 4. Weekly in-season health check: CLV + drift CUSUM + bettability -> continue/monitor/retire. Consumes `drift/monitor.py` and `clv_portfolio.py`, both previously orphaned. |
@@ -141,6 +142,7 @@ since retired, and `demo_pipeline.py`).
 |---|---|---|---|
 | `signal/live_scan.py` | 5 | **LIVE** | Moneyline scanner + shared alert state. |
 | `signal/props_scan.py` | 1 | **LIVE** | Props arb + EV (wired 2026-08-23). |
+| `signal/prereg_scan.py` | 1 | **LIVE** | 2026-10-04. H1/H1b **log-only** to `data/shadow_log_prereg.jsonl`, a separate file so `decision-report`/`shadow-report`/`clv-report` can't show holdout results before 2026-11-10 (`preregistration_wk5-9.md`). |
 | `signal/sizing.py` | 5 | **LIVE** | Kelly + bankroll caps. |
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
