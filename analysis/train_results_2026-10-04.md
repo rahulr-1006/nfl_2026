@@ -3,6 +3,12 @@
 Unattended run against `preregistration_wk5-9.md`. Every number here was
 produced by code that ran in this session: scratchpad `run/s1–s4`,
 `run/audit_rerun.py`, `run/audit2.py`. Anything not computed says so.
+**Reproducibility (2026-10-13):** the scratchpad scripts are gone. §5 is
+rebuilt from committed code by `python -m scripts.h1_train_grid`, which
+reproduces every H1 grid cell and the H1b control exactly (44 / 24 games,
++2.98% [+1.31, +4.51]; 211 / 47, +1.55% [+1.12, +1.98]). Its `reverted` column
+is per bet, not per move, so it differs from the 8.3% kill-check figure by
+construction. §1–4 and §6–7 are not rebuilt.
 Reusable code: `src/backtest/pinnacle_lag.py` (+8 tests) and
 `clv.metrics.clustered_bootstrap` (+4 tests); 993 tests pass, ruff clean.
 
