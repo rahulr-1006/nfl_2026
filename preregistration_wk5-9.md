@@ -331,3 +331,9 @@ deviation.
 4. H3 historical calibration gate (2023 fit → 2024 check).
 5. Shadow-only wiring for whatever survives Train, so live alerts accrue from Week 5.
 6. Fill the frozen values, settle the [DECIDE] items, commit.
+
+**Scoring code (2026-10-13, before any holdout scoring):** `src/clv/prereg_score.py`,
+run as `make prereg-score WEEKS=holdout` on or after 2026-11-10. It implements
+§3's conditions 1–6 line by line, applies the bad-quote and rushing-yards
+(calibration-gate) exclusions while reporting both groups separately, and
+refuses holdout weeks before the scoring date. It also refuses to run `WEEKS=holdout` early, with no override flag.
