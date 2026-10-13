@@ -16,8 +16,23 @@ from __future__ import annotations
 from pathlib import Path
 
 import nflreadpy as nfl
+import pandas as pd
 
 STATIC_DIR = Path("data/static")
+
+# nflverse publishes `gameday`/`gametime` as US/Eastern wall-clock time for every
+# game, international ones included. Parsing them with `utc=True` (the old code
+# in collect/run.py and backtest/engine.py) put every kickoff 4h early under EDT,
+# 5h under EST -- measured 2026-10-04: 2026_04_PIT_CLE read 20:15 UTC against a
+# real 00:15 UTC. The collector then believed TNF/MNF had already started and
+# dropped to its sparse cadence for the last ~4h before kickoff.
+NFLVERSE_TZ = "America/New_York"
+
+
+def kickoffs_utc(schedule: pd.DataFrame) -> pd.Series:
+    """Real UTC kickoff per schedule row, from nflverse's Eastern-time columns."""
+    local = pd.to_datetime(schedule["gameday"].astype(str) + " " + schedule["gametime"].astype(str))
+    return local.dt.tz_localize(NFLVERSE_TZ).dt.tz_convert("UTC")
 
 
 def load_schedules(seasons: list[int], out_dir: Path = STATIC_DIR) -> Path:

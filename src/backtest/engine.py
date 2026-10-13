@@ -47,6 +47,7 @@ import pandas as pd
 
 from src.clv.metrics import clv_price, clv_probability
 from src.devig.methods import DEVIG_METHODS
+from src.features.load_static import kickoffs_utc
 from src.store.pit_store import PointInTimeStore
 from src.store.prop_settlement import (
     build_player_stats_index,
@@ -277,17 +278,17 @@ def _latest_price(
 
 
 def _parse_kickoffs(schedule: pd.DataFrame) -> pd.Series:
-    return pd.to_datetime(
-        schedule["gameday"].astype(str) + " " + schedule["gametime"].astype(str), utc=True
-    )
+    return kickoffs_utc(schedule)
 
 
 class BacktestEngine:
     """Replays a strategy against the real point-in-time store.
 
     **Bankroll is a hard, tracked constraint (2026-08-23), not a reporting
-    afterthought.** This project runs a fixed $100 bankroll with no reloads
-    (see `src/signal/sizing.py`'s own framing). Once strategies can place
+    afterthought.** Live betting runs a $100 bankroll with at most 2 manual
+    reloads ($300 total, decided 2026-10-04); a backtest deliberately models a
+    single $100 bankroll with no reload, the conservative case (see
+    `src/signal/sizing.py`'s own framing). Once strategies can place
     several bets per game -- which props require -- "can I actually afford
     this bet right now" becomes a real question that per-bet sizing caps
     alone cannot answer: ten $2 bets on one slate is $20 of simultaneous

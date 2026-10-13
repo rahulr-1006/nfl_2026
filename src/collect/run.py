@@ -23,7 +23,7 @@ from src.collect.scheduler import (
 )
 from src.collect.teams import load_team_name_map
 from src.collect.transform import build_schedule_index
-from src.features.load_static import load_schedules
+from src.features.load_static import kickoffs_utc, load_schedules
 from src.store.pit_store import PointInTimeStore
 
 log = logging.getLogger(__name__)
@@ -38,7 +38,7 @@ def build_context(config: Config) -> CollectorContext:
 
     schedule_index = build_schedule_index(schedule)
     name_to_abbr = dict(load_team_name_map(config.season, config.resolved_schedule_path))
-    upcoming_kickoffs = pd.to_datetime(schedule["gameday"].astype(str) + " " + schedule["gametime"].astype(str), utc=True).tolist()
+    upcoming_kickoffs = kickoffs_utc(schedule).tolist()
 
     return CollectorContext(
         config=config,

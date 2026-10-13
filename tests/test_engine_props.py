@@ -40,7 +40,7 @@ def _schedule():
     return pd.DataFrame(
         [{
             "game_id": "2026_01_KC_LAC", "season": 2026, "week": 1,
-            "gameday": "2026-09-07", "gametime": "17:00",
+            "gameday": "2026-09-07", "gametime": "13:00",
             "home_team": "LAC", "away_team": "KC", "home_score": 27.0, "away_score": 20.0,
         }]
     )
