@@ -19,7 +19,12 @@ from zoneinfo import ZoneInfo
 
 import pandas as pd
 
-from src.backtest.pinnacle_lag import detect_moves, pinnacle_fair_path, score, stale_quotes
+from src.backtest.pinnacle_lag import (
+    detect_moves,
+    pinnacle_fair_path,
+    score,
+    stale_quotes,
+)
 from src.clv.metrics import clustered_bootstrap
 from src.store.pit_store import PointInTimeStore
 
