@@ -44,7 +44,19 @@ from src.store.settlement import Outcome
 # an override candidate (see module docstring).
 PLAYER_NAME_OVERRIDES: dict[str, str] = {
     "Kenneth Gainwell": "Kenny Gainwell",
+    # Found 2026-10-13: both had props on played 2026 games that never settled.
+    "Hollywood Brown": "Marquise Brown",
+    "Joshua Palmer": "Josh Palmer",
 }
+
+# Generational suffixes, which books and nflverse attach inconsistently in BOTH
+# directions (measured 2026-10-13 on Weeks 1-5): books send "Michael Pittman Jr."
+# where nflverse has "Michael Pittman", but "Chris Godwin" where nflverse has
+# "Chris Godwin Jr." -- and "Deebo Samuel" vs "Deebo Samuel Sr.". Every such
+# prop silently returned `None`, so a placed bet would never settle. Dropping
+# the suffix on both sides is safe because matching is already scoped to one
+# game: two players differing only by suffix would have to be in the same game.
+_SUFFIX = re.compile(r"\s+(jr|sr|ii|iii|iv|v)$")
 
 
 def normalize_player_name(name: str) -> str:
@@ -56,7 +68,8 @@ def normalize_player_name(name: str) -> str:
     """
     resolved = PLAYER_NAME_OVERRIDES.get(name, name)
     no_periods = resolved.replace(".", "")  # "A.J." -> "AJ", not "A J" -- periods drop out, they don't become spaces
-    return re.sub(r"\s+", " ", no_periods).strip().lower()
+    collapsed = re.sub(r"\s+", " ", no_periods).strip().lower()
+    return _SUFFIX.sub("", collapsed)
 
 
 def build_player_stats_index(player_stats: pd.DataFrame) -> dict[tuple[str, str], dict[str, float]]:
