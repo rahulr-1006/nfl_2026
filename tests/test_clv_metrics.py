@@ -1,6 +1,12 @@
 import pytest
 
-from src.clv.metrics import beat_rate, bootstrap_ci, clv_price, clv_probability
+from src.clv.metrics import (
+    beat_rate,
+    bootstrap_ci,
+    clustered_bootstrap,
+    clv_price,
+    clv_probability,
+)
 
 
 def test_clv_probability_hand_computed():
@@ -70,3 +76,47 @@ def test_bootstrap_ci_requires_at_least_two_observations():
 def test_bootstrap_ci_rejects_invalid_confidence_level():
     with pytest.raises(ValueError):
         bootstrap_ci([0.01, 0.02, 0.03], ci=1.5)
+
+
+def test_clustered_bootstrap_is_wider_than_per_bet_when_legs_share_a_game():
+    """20 games x 10 legs, each game's legs nearly identical: the per-bet CI
+    sees 200 confirmations, the honest one sees 20."""
+    import numpy as np
+
+    rng = np.random.default_rng(1)
+    game_effect = rng.normal(0.0, 0.03, size=20)
+    values = np.repeat(game_effect, 10) + rng.normal(0.0, 0.001, size=200)
+    games = np.repeat(np.arange(20), 10)
+
+    naive_lo, naive_hi = bootstrap_ci(values, random_state=0)
+    clustered = clustered_bootstrap(values, games, random_state=0)
+
+    assert clustered["n_clusters"] == 20
+    assert (clustered["ci_hi"] - clustered["ci_lo"]) > 2.5 * (naive_hi - naive_lo)
+
+
+def test_clustered_bootstrap_matches_per_bet_when_each_game_has_one_leg():
+    import numpy as np
+
+    values = np.random.default_rng(2).normal(0.01, 0.02, size=200)
+    naive_lo, naive_hi = bootstrap_ci(values, random_state=0)
+    clustered = clustered_bootstrap(values, np.arange(200), random_state=0)
+    assert clustered["ci_hi"] - clustered["ci_lo"] == pytest.approx(naive_hi - naive_lo, rel=0.1)
+
+
+def test_clustered_bootstrap_p_value_tracks_the_sign_of_the_edge():
+    import numpy as np
+
+    rng = np.random.default_rng(3)
+    games = np.repeat(np.arange(40), 3)
+    strong = clustered_bootstrap(rng.normal(0.02, 0.01, size=120), games)
+    null = clustered_bootstrap(rng.normal(0.0, 0.01, size=120), games)
+    assert strong["p_one_sided"] < 0.01
+    assert 0.05 < null["p_one_sided"] < 0.95
+
+
+def test_clustered_bootstrap_rejects_a_single_cluster_and_mismatched_lengths():
+    with pytest.raises(ValueError):
+        clustered_bootstrap([0.01, 0.02], ["g1", "g1"])
+    with pytest.raises(ValueError):
+        clustered_bootstrap([0.01, 0.02], ["g1"])
