@@ -332,3 +332,50 @@ def test_one_ungradeable_bet_does_not_abort_the_whole_settlement(tmp_path):
     assert any(o is not None for o in outcomes.values())    # the good bet still graded
     assert any(o is None for o in outcomes.values())        # the bad one degraded
     assert out[-1].bankroll_after == pytest.approx(102.0)   # only the good bet moved it
+
+
+# --- dry-run regressions (2026-09-27) ---------------------------------------
+
+
+def test_a_correction_reusing_the_same_placed_at_does_not_delete_the_bet(tmp_path):
+    """**A correction may share its target's `placed_at`, and must not erase it.**
+
+    `placed_at` is documented as the moment the bet was STRUCK, not the moment
+    it was typed, so correcting a mistyped stake on that same bet reuses that
+    instant -- which is what a user following the docstring does. Matching
+    superseded rows by timestamp value alone then dropped the correction too:
+    the bet disappeared from `active_bets`, so it was never settled, never
+    counted in the bankroll, and never reviewed. Silently losing a placed bet
+    is worse than the double-count the filter exists to prevent.
+
+    Found by the first end-to-end dry run of `make log-bet` (2026-09-27); the
+    existing round-trip test missed it by giving the correction a later
+    `placed_at`.
+    """
+    import json
+
+    p = tmp_path / "bets.jsonl"
+    log_bet(_bet(stake=3.0), path=p)
+    on_disk = json.loads(p.read_text().splitlines()[0])["placed_at"]
+
+    log_bet(_bet(placed_at=ENTRY, stake=8.0, corrects=on_disk), path=p)
+
+    assert len(load_bet_log(p)) == 2           # raw record keeps both
+    live = active_bets(p)
+    assert len(live) == 1 and live[0].stake == 8.0
+
+
+def test_a_chain_of_corrections_keeps_only_the_last(tmp_path):
+    """Corrections are append-only, so a second correction supersedes the first.
+    Only the newest row is live; every earlier one is history.
+    """
+    p = tmp_path / "bets.jsonl"
+    log_bet(_bet(stake=1.0), path=p)
+    log_bet(_bet(placed_at=ENTRY + timedelta(minutes=5), stake=2.0,
+                 corrects=ENTRY.isoformat()), path=p)
+    log_bet(_bet(placed_at=ENTRY + timedelta(minutes=9), stake=3.0,
+                 corrects=(ENTRY + timedelta(minutes=5)).isoformat()), path=p)
+
+    assert len(load_bet_log(p)) == 3
+    live = active_bets(p)
+    assert len(live) == 1 and live[0].stake == 3.0

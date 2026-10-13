@@ -79,8 +79,17 @@ def test_stadium_coordinates_has_no_stale_unused_entries():
     # Guards the table from silently drifting out of sync with the data --
     # a stadium_id here that's no longer in the real schedule is a signal
     # something upstream changed and this table needs a look.
-    schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
-    real_ids = set(schedule["stadium_id"].unique())
+    #
+    # Checked against the UNION of both cached vintages (widened 2026-09-27).
+    # The historical file alone was the wrong denominator: the current season
+    # lives in its own parquet, so every venue that appears only in 2026 --
+    # the five international sites added when the stale 2026-08-14 schedule
+    # was refreshed mid-season -- read as "stale" while actually being the
+    # newest real data in the repo. "Stale" must mean present in NEITHER file.
+    real_ids: set = set()
+    for vintage in ("schedules_2015_2025.parquet", "schedules_2026_2026.parquet"):
+        schedule = pd.read_parquet(f"data/static/{vintage}")
+        real_ids |= set(schedule["stadium_id"].dropna().unique())
     stale = set(STADIUM_COORDINATES) - real_ids
     assert stale == set(), f"STADIUM_COORDINATES has stale stadium_id(s) not in the real schedule: {stale}"
 
