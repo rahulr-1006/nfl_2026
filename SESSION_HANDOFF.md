@@ -1,4 +1,54 @@
-# Session handoff — 2026-09-21 (updated 2026-10-04)
+# Session handoff — 2026-09-21 (updated 2026-10-04, 2026-10-13)
+
+## 2026-10-13 update — read this first
+
+Everything is committed (main is ~30 commits ahead of origin, **not pushed**).
+1021 tests pass, ruff clean, 0 unreferenced modules.
+
+**Verified live state:** all 3 services up; no collection gap >3h since 9/21;
+0 tracebacks since 10-04; 79,204 paid credits left (≈51K/month pace); disk 93%
+(Spotify cache, not this repo). `bet_log.jsonl` still doesn't exist.
+
+**Decision report 10-13:** nothing is GO. `moneyline_ev` NO (n=104),
+`prop_ev` NO (n=178), `steam` NO (n=61), `middle` HOLD (n=10),
+`prop_arb` HOLD (n=24/30, expected_capture +0.0048, an upper bound).
+
+**Pre-registration:** committed **6 days late** (deadline 10-07; Week 5 had
+been played). Both consequences are logged in §6: (1) the late commit itself,
+with the 10-04 evidence; (2) H2/H3 dropped from the Weeks 5–9 family, so the
+BH family is {H1, H1b}. Score on/after 11-10 with
+`make prereg-score WEEKS=holdout`. It refuses to run earlier. Its rushing-yards
+exclusion follows §3's calibration gate. Confirm you agree before 11-10.
+`python -m scripts.h1_train_grid` reproduces the frozen Train numbers exactly.
+
+**Fixed today:**
+1. `.env.bak-*` (both API keys plus the phone number) was not gitignored in a
+   public repo. Now `.env*`. It was never committed.
+2. `random_bet_benchmark` paid the listed price to the opposite side. It now
+   uses the real opposite quote (§6 deviation, no bets change).
+3. Props for 7 players could never settle (Jr/Sr suffixes, Hollywood/Marquise
+   Brown, Joshua/Josh Palmer). Settlement coverage on Weeks 1–5 went from
+   93.1% to 94.9%; the rest didn't play (books void those).
+4. **Monitor tick 16–18 min → ~8 min.** `PointInTimeStore` caches its
+   deduped read per instance, keyed on the file listing (verified identical to
+   an uncached read on the real store).
+5. Two notebooks were **broken**, not just stale: the required `vig` and
+   `event_id` arguments were never passed, and the props section had silently
+   grown from 2024-only to the whole store, live 2026 included. Both fixed and
+   re-run; results unchanged in substance.
+6. Schedule and player_stats re-pulled through Week 5 (re-pull again before
+   any settlement). No Week 6+ kickoff moved.
+
+**Trades:** settlement and the team-total build key on (game_id, name) from
+that game's own stats row, so trades are safe by construction. 0 same-game
+name collisions in 2026.
+
+**Still open (your call):** push to origin; `team_total_scan` exposure cap;
+whether "clear" must also require the CI to exclude zero; the paper §4.7 power
+analysis; notebooks have no smoke test, which is how two of them broke unnoticed.
+
+---
+
 
 ## 2026-10-04 update — read this first
 
