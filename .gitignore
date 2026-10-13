@@ -40,3 +40,14 @@ graphify-out/graph.html
 # Absolute interpreter path for whoever last ran graphify -- machine-local, and
 # tracking it hands every other clone a path that does not exist there.
 graphify-out/.graphify_python
+
+# Any .env variant (e.g. .env.bak-20260908) holds both Odds API keys and the
+# alert phone number; `.env` alone did not match the dated backups.
+.env*
+# Runtime state written by the monitor, same reasoning as shadow_log.jsonl; it is
+# also the blinded H1/H1b holdout record (preregistration_wk5-9.md).
+data/shadow_log_prereg.jsonl
+data/residual_sigma_cache.json
+# Dated backups of runtime/static state taken before risky operations.
+data/*.bak-*
+data/static/*.bak-*
