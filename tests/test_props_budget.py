@@ -124,7 +124,7 @@ def test_dense_and_arb_tiers_interleave_in_the_final_hours_by_design():
 def test_arb_tier_polls_a_narrow_cheap_market_subset():
     from src.collect.props_budget import (
         ARB_COST_PER_POLL,
-        ARB_MARKETS,
+        ARB_TIER_MARKETS,
         DEFAULT_COST_PER_POLL,
         POLL_TARGETS,
     )
@@ -133,11 +133,24 @@ def test_arb_tier_polls_a_narrow_cheap_market_subset():
     full = [t for t in POLL_TARGETS if t.tier != "arb"]
 
     assert arb, "arb tier should exist"
-    assert all(t.markets == ARB_MARKETS for t in arb)
+    assert all(t.markets == ARB_TIER_MARKETS for t in arb)
     assert all(t.cost == ARB_COST_PER_POLL for t in arb)
     assert ARB_COST_PER_POLL < DEFAULT_COST_PER_POLL  # the whole point: cheap density
     assert all(t.cost == DEFAULT_COST_PER_POLL for t in full)
-    assert all(len(t.markets.split(",")) > len(ARB_MARKETS.split(",")) for t in full)
+    assert all(len(t.markets.split(",")) > len(ARB_TIER_MARKETS.split(",")) for t in full)
+
+
+def test_arb_tier_carries_the_yardage_markets_for_movement_data():
+    """The 15-min tier must capture yardage-line movement, while ARB_MARKETS
+    itself stays the measured arb subset."""
+    from src.collect.props_budget import ARB_MARKETS, ARB_TIER_MARKETS, POLL_TARGETS
+
+    arb = [t for t in POLL_TARGETS if t.tier == "arb"]
+    requested = set(arb[0].markets.split(","))
+    assert {"player_pass_yds", "player_rush_yds", "player_reception_yds"} <= requested
+    assert set(ARB_MARKETS.split(",")) <= requested
+    assert ARB_MARKETS == "player_receptions,player_pass_tds"
+    assert len(ARB_TIER_MARKETS.split(",")) * 2 == arb[0].cost  # 2 regions
 
 
 def test_no_duplicate_poll_hours_and_full_market_polls_win_collisions():

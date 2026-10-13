@@ -198,7 +198,23 @@ ARB_MARKETS = "player_receptions,player_pass_tds"
 # above. This tier is deliberately the one that gets the headroom.
 ARB_WINDOW_HOURS = 12.0  # final hours before kickoff, where prices move most and arb windows actually open
 ARB_POLL_INTERVAL_HOURS = 0.25  # must stay >= props_scheduler.DEFAULT_TICK_MINUTES -- see above
-ARB_COST_PER_POLL = 4  # regions=us,eu x 2 markets
+
+# 2026-10-04: **the yardage markets ride along on the arb tier's 15-min calls.**
+# This is a MOVEMENT-data decision, not an arb one -- ARB_MARKETS above is still
+# the measured arb subset and is deliberately left untouched. Before this,
+# passing/rushing/receiving yards got 4 captures in the final 12h (the 4h dense
+# tier plus the 1.5h close) against 48 for receptions/pass TDs, so the path of
+# those three lines toward the close was unrecoverable at any useful resolution.
+# Pre-kickoff movement cannot be bought back after the fact (historical props are
+# a single near-kickoff snapshot), so each week without this is lost for good.
+#
+# Cost: +6 credits x 48 polls x ~16 games ~= +4.6K/week, ~+20K/month. Measured
+# in-season burn before the change was ~10.6K/week (~47K/month projected) on the
+# 100K monthly key, so this lands near ~67K/month. rush_tds/reception_tds are not
+# added: no book in our data quotes them (SESSION_HANDOFF, 2026-09-21).
+MOVEMENT_MARKETS = "player_pass_yds,player_rush_yds,player_reception_yds"
+ARB_TIER_MARKETS = f"{ARB_MARKETS},{MOVEMENT_MARKETS}"
+ARB_COST_PER_POLL = 10  # regions=us,eu x 5 markets (2 arb + 3 movement)
 
 # --- close tier (2026-09-02) -------------------------------------------------
 # **One full-market capture inside CLOSE_MAX, so props CLV can be computed at
@@ -314,7 +330,7 @@ class PollTarget:
 
 def build_poll_targets(
     full_markets: str = _ALL_PROP_MARKETS,
-    arb_markets: str = ARB_MARKETS,
+    arb_markets: str = ARB_TIER_MARKETS,
 ) -> list[PollTarget]:
     """The full per-event schedule, descending by hours-before-kickoff:
     sparse (all markets) -> dense (all markets) -> arb (narrow subset,
