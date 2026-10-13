@@ -151,3 +151,29 @@ def test_settle_prop_snapshots_matches_via_nickname_override():
     snapshots = pd.DataFrame([_prop_row("2024_10_PHI_DAL", "Kenneth Gainwell", "rushing_yards", Side.UNDER, 30.5)])
     graded = settle_prop_snapshots(snapshots, stats)
     assert graded["outcome"].iloc[0] == "win"
+
+
+# Found 2026-10-13 on real Weeks 1-5 props: suffixes disagree in both directions.
+def test_normalize_player_name_ignores_generational_suffixes_either_way():
+    assert normalize_player_name("Michael Pittman Jr.") == normalize_player_name("Michael Pittman")
+    assert normalize_player_name("Chris Godwin") == normalize_player_name("Chris Godwin Jr.")
+    assert normalize_player_name("Deebo Samuel") == normalize_player_name("Deebo Samuel Sr.")
+    assert normalize_player_name("Marvin Harrison Jr") == normalize_player_name("Marvin Harrison")
+
+
+def test_normalize_player_name_keeps_names_that_merely_end_in_suffix_letters():
+    # "Iv" inside a surname, not a trailing token, must survive.
+    assert normalize_player_name("Ivan Pace") == "ivan pace"
+    assert normalize_player_name("Kevin Ivy") == "kevin ivy"
+
+
+def test_settle_prop_snapshots_matches_across_suffix_and_nickname_differences():
+    stats = pd.DataFrame([
+        {"game_id": "2026_01_TB_CIN", "player_display_name": "Chris Godwin Jr.", "receptions": 6.0},
+        {"game_id": "2026_01_TB_CIN", "player_display_name": "Marquise Brown", "receptions": 2.0},
+    ])
+    snapshots = pd.DataFrame([
+        _prop_row("2026_01_TB_CIN", "Chris Godwin", "receptions", Side.OVER, 4.5),
+        _prop_row("2026_01_TB_CIN", "Hollywood Brown", "receptions", Side.UNDER, 3.5),
+    ])
+    assert list(settle_prop_snapshots(snapshots, stats)["outcome"]) == ["win", "win"]
