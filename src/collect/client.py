@@ -148,7 +148,10 @@ class OddsApiClient:
                 if attempt < self._max_retries:
                     time.sleep(self._retry_backoff_seconds * (attempt + 1))
                     continue
-                raise OddsApiError(f"network error calling The Odds API: {exc}") from exc
+                # `from None`, not `from exc`: requests embeds the full URL in its
+                # exception text, apiKey query param included, and a chained
+                # cause would print it in any logged traceback.
+                raise OddsApiError(f"network error calling The Odds API: {self._redact(exc)}") from None
 
             if response.status_code in (401, 402, 429):
                 raise RateLimitExceeded(
@@ -160,7 +163,12 @@ class OddsApiClient:
                 )
             return response
 
-        raise OddsApiError(f"network error calling The Odds API: {last_error}")
+        raise OddsApiError(f"network error calling The Odds API: {self._redact(last_error)}")
+
+    def _redact(self, value: object) -> str:
+        """Error text with the API key masked. It used to reach logs/*.err.log
+        verbatim via the request URL (seen 2026-10-04 on a DNS failure)."""
+        return str(value).replace(self._api_key, "***") if self._api_key else str(value)
 
     @staticmethod
     def _to_response(events: list[dict], headers: dict, fetched_at: datetime | None = None) -> OddsApiResponse:

@@ -71,6 +71,20 @@ def test_get_odds_retries_network_errors_then_raises():
     assert session.get.call_count == 3  # initial attempt + 2 retries
 
 
+def test_network_error_message_never_contains_the_api_key():
+    session = MagicMock()
+    session.get.side_effect = requests.ConnectionError(
+        "Max retries exceeded with url: /v4/sports/americanfootball_nfl/events?apiKey=SECRET123"
+    )
+    client = OddsApiClient("SECRET123", session=session, max_retries=0, retry_backoff_seconds=0)
+
+    with pytest.raises(OddsApiError) as excinfo:
+        client.get_odds("eu", "h2h")
+
+    assert "SECRET123" not in str(excinfo.value)
+    assert excinfo.value.__cause__ is None  # a chained cause would re-expose the URL in tracebacks
+
+
 def test_get_odds_recovers_after_transient_network_error():
     session = MagicMock()
     session.get.side_effect = [requests.ConnectionError("boom"), _response(json_body=[])]
