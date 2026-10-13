@@ -242,3 +242,51 @@ def test_same_contract_at_different_times_is_not_collapsed(tmp_path):
     store = PointInTimeStore(root=tmp_path)
     store.write([_snap(1, price_american=-110), _snap(2, price_american=-120)])
     assert len(store.read_as_of(KICKOFF)) == 2
+
+
+# --- per-instance read cache (2026-10-13) -------------------------------------
+
+
+def test_cached_reads_see_a_file_written_after_the_first_read(tmp_path):
+    """The monitor reuses one store across a whole tick while the collector keeps
+    writing; a capture landing mid-tick must be visible to the next read."""
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(0)])
+    assert len(store.read_as_of(BASE + timedelta(hours=24))) == 1
+    store.write([_snap(1)])
+    assert len(store.read_as_of(BASE + timedelta(hours=24))) == 2
+
+
+def test_cached_reads_do_not_reread_disk_when_nothing_changed(tmp_path, monkeypatch):
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(0)])
+    store.read_as_of(BASE + timedelta(hours=24))
+    calls = []
+    original = PointInTimeStore._read_files
+    monkeypatch.setattr(PointInTimeStore, "_read_files", staticmethod(lambda f: calls.append(f) or original(f)))
+    store.read_as_of(BASE + timedelta(hours=1))
+    store.read_as_of(BASE + timedelta(hours=24), event_id="2026_01_KC_LAC")
+    assert calls == []
+
+
+def test_mutating_a_returned_frame_does_not_corrupt_later_reads(tmp_path):
+    store = PointInTimeStore(root=tmp_path)
+    store.write([_snap(0, price_american=-110)])
+    first = store.read_as_of(BASE + timedelta(hours=24))
+    first.loc[:, "price_american"] = 999
+    assert store.read_as_of(BASE + timedelta(hours=24)).iloc[0]["price_american"] == -110
+
+
+def test_cached_dedupe_matches_dedupe_after_filter(tmp_path):
+    """Dedupe-then-filter (cached) must equal filter-then-dedupe (the old path):
+    duplicate rows share capture_time, so a time filter keeps or drops them whole."""
+    store = PointInTimeStore(root=tmp_path)
+    for h in (0, 0, 2, 2, 5):
+        store.write([_snap(h)])
+    for cut in (0, 1, 2, 5, 24):
+        t = BASE + timedelta(hours=cut)
+        cached = store.read_as_of(t)
+        raw = store.read_as_of(t, dedupe=False)
+        expected = raw.drop_duplicates(subset=["capture_time", "event_id", "book", "market", "side",
+                                               "player_name", "prop_stat", "line"], keep="last")
+        assert cached.reset_index(drop=True).equals(expected.reset_index(drop=True))

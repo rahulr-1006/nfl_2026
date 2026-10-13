@@ -91,6 +91,10 @@ class PointInTimeStore:
     def __init__(self, root: Path | str = Path("data/snapshots")):
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # The deduped full store, keyed by the exact file listing it was read
+        # from -- see `_deduped_all` for why this is safe.
+        self._cache_files: tuple[Path, ...] | None = None
+        self._cache_frame: pd.DataFrame | None = None
 
     def write(self, snapshots: Sequence[OddsSnapshot]) -> Path:
         """Append one immutable batch. Never overwrites an existing file."""
@@ -136,13 +140,16 @@ class PointInTimeStore:
         if decision_time.tzinfo is None:
             raise ValueError("decision_time must be tz-aware (use UTC)")
 
-        df = self._read_all()
-        if df.empty:
-            return df
-
-        result = self._filter(df, decision_time, event_id)
-        if dedupe and not result.empty:
-            result = result.drop_duplicates(subset=CONTRACT_KEY, keep="last")
+        if dedupe:
+            df = self._deduped_all()
+            if df.empty:
+                return df.copy()  # never hand out the cached object itself
+            result = self._filter(df, decision_time, event_id)
+        else:
+            df = self._read_all()
+            if df.empty:
+                return df
+            result = self._filter(df, decision_time, event_id)
 
         if not result.empty and result["capture_time"].max() > decision_time:
             raise LeakageError(
@@ -158,8 +165,41 @@ class PointInTimeStore:
             mask &= df["event_id"] == event_id
         return df.loc[mask].reset_index(drop=True)
 
+    def _files(self) -> list[Path]:
+        return sorted(self.root.glob("**/*.parquet"))
+
+    def _deduped_all(self) -> pd.DataFrame:
+        """The whole store, deduped, read from disk only when the file listing
+        has changed since the last call on this instance.
+
+        **Why (2026-10-13):** every scanner in a monitor tick calls `read_as_of`,
+        and each call re-read all ~7,400 files (10s interactively, ~80s under
+        launchd's background priority) and re-deduped 7.2M rows. The tick had
+        grown to a ~17-min median against a 5-min schedule, and survival of
+        `prop_arb` alerts depends directly on that latency.
+
+        **Why the result is identical to an uncached read:** files are
+        immutable and only ever added (`write` refuses to overwrite), so an
+        unchanged listing means unchanged contents, and a capture landing
+        mid-tick changes the listing and forces a re-read. Deduping before
+        filtering instead of after gives the same rows: duplicates share every
+        CONTRACT_KEY column, `capture_time` and `event_id` included, so a
+        time/event filter always keeps or drops a duplicate group whole, and
+        both operations preserve file order for the `keep="last"` tie-break.
+        Callers never receive the cached frame itself -- `_filter` returns a copy.
+        """
+        files = tuple(self._files())
+        if files != self._cache_files or self._cache_frame is None:
+            df = self._read_files(list(files))
+            self._cache_frame = df.drop_duplicates(subset=CONTRACT_KEY, keep="last") if not df.empty else df
+            self._cache_files = files
+        return self._cache_frame
+
     def _read_all(self) -> pd.DataFrame:
-        files = sorted(self.root.glob("**/*.parquet"))
+        return self._read_files(self._files())
+
+    @staticmethod
+    def _read_files(files: list[Path]) -> pd.DataFrame:
         if not files:
             return pd.DataFrame(columns=_COLUMNS)
         frames = [pd.read_parquet(f) for f in files]
