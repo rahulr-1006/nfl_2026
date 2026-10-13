@@ -2,12 +2,26 @@ from pathlib import Path
 
 import pandas as pd
 
-from src.features.load_static import PBP_COLUMNS, home_spread_line
+from src.features.load_static import PBP_COLUMNS, home_spread_line, kickoffs_utc
 from src.store.schema import Market, Side
 from src.store.settlement import build_results_index, settle
 
 SCHEDULE_PATH = Path("data/static/schedules_2015_2025.parquet")
 PBP_PATH = Path("data/static/pbp_2015_2025.parquet")
+
+
+def test_kickoffs_utc_reads_nflverse_times_as_eastern():
+    """Regression guard: parsing gametime as UTC put TNF at 20:15 UTC, 4h before
+    the real 00:15 UTC kickoff, and the collector went sparse for the final hours.
+    The EST row checks the November DST switch moves the offset to 5h."""
+    schedule = pd.DataFrame({
+        "gameday": ["2026-10-01", "2026-11-08"],
+        "gametime": ["20:15", "09:30"],
+    })
+    assert kickoffs_utc(schedule).tolist() == [
+        pd.Timestamp("2026-10-02 00:15", tz="UTC"),
+        pd.Timestamp("2026-11-08 14:30", tz="UTC"),
+    ]
 
 
 def test_home_spread_line_negates():
