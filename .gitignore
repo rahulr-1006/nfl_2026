@@ -51,3 +51,6 @@ data/residual_sigma_cache.json
 # Dated backups of runtime/static state taken before risky operations.
 data/*.bak-*
 data/static/*.bak-*
+# graphify hook scratch files, written and removed on every rebuild.
+graphify-out/.pending_changes
+graphify-out/.rebuild.lock
