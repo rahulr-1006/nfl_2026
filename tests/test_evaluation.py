@@ -240,3 +240,39 @@ def test_degrading_sweep_still_disqualifies_even_with_everything_else_passing():
                                thresholds=(0.0, 0.4), min_bets=30)
     assert report["sweep_monotonic"] is False
     assert report["verdict"] == "no demonstrated edge"
+
+
+# --- opposite-side pricing (fixed 2026-10-13) --------------------------------
+
+
+def test_random_benchmark_does_not_pay_the_listed_price_to_the_opposite_side():
+    """At +200 with a fair 1/3, the listed side is zero EV and the opposite side
+    at its own fair price is zero EV too -- so the null mean must sit near 0,
+    not near price/2 - 1 = +50% as the old version produced."""
+    n = 2000
+    bets = _bets([1 / 3] * n, [3.0] * n, [False] * n)
+    result = random_bet_benchmark(bets, n_simulations=300)
+    assert abs(result["null_mean_roi"]) < 0.03
+    assert result["opposite_price_source"] == "fair (no-vig, conservative)"
+
+
+def test_random_benchmark_uses_the_real_opposite_price_when_given():
+    n = 2000
+    bets = _bets([0.5] * n, [2.0] * n, [False] * n)
+    bets["opposite_price_decimal"] = 1.8  # vig'd other side: -10% EV
+    result = random_bet_benchmark(bets, n_simulations=300)
+    # half the draws are 0 EV, half are -10% EV
+    assert result["null_mean_roi"] == pytest.approx(-0.05, abs=0.02)
+    assert result["opposite_price_source"] == "real"
+
+
+def test_random_benchmark_falls_back_to_fair_only_where_the_real_price_is_missing():
+    bets = _bets([0.5] * 4, [2.0] * 4, [True, False, True, False])
+    bets["opposite_price_decimal"] = [1.9, np.nan, 1.9, np.nan]
+    assert random_bet_benchmark(bets, n_simulations=10)["opposite_price_source"] == "real for 2/4, fair for the rest"
+
+
+def test_random_benchmark_p_value_is_the_complement_of_the_percentile():
+    result = random_bet_benchmark(_coinflip_bets(400, 2.0, 0.75, seed=2), n_simulations=300)
+    assert result["p_one_sided"] < 0.05
+    assert result["p_one_sided"] + result["percentile"] == pytest.approx(1.0)

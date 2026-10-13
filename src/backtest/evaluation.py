@@ -180,38 +180,66 @@ def sweep_is_monotonic(sweep: pd.DataFrame, metric: str = "roi", min_bets: int =
 def random_bet_benchmark(
     bets: pd.DataFrame, n_simulations: int = 1000, random_state: int | None = 0
 ) -> dict:
-    """The null model: bet the SAME events at the SAME prices, choosing sides at
-    random. Returns the null ROI distribution and the observed ROI's percentile
-    within it.
+    """The null model: bet the SAME events, choosing sides at random, each side
+    at ITS OWN price. Returns the null ROI distribution and the observed ROI's
+    percentile within it.
 
     This is what separates "my selection rule works" from "these games happened
     to be profitable." A strategy whose ROI sits mid-distribution has
     demonstrated nothing, however positive the raw number looks.
+
+    **The opposite side is paid the opposite side's price** (fixed 2026-10-13).
+    The old version paid the listed side's price to both sides, so at +200 the
+    "random" opposite side was a ~2/3 favourite paid at 3.0 -- a null mean near
+    `price/2 - 1` that no plus-money strategy could beat, and one that minus-money
+    strategies beat for free. Pass `opposite_price_decimal` (the real quote on the
+    other side, same book and capture) wherever it exists. Without it the
+    opposite side is priced at its no-vig fair odds, `1 / (1 - fair_prob)`: zero
+    EV, which is better than any real vig'd quote, so the null is HARDER to beat
+    than the truth -- conservative, never flattering. `opposite_price_source`
+    says which one was used.
+
+    `p_one_sided` is the share of null ROIs at or above the observed one: the
+    p-value for "beats the random-side null".
     """
     _validate_bets(bets)
     if bets.empty:
-        return {"observed_roi": None, "null_mean_roi": None, "percentile": None, "n_simulations": 0}
+        return {"observed_roi": None, "null_mean_roi": None, "percentile": None,
+                "p_one_sided": None, "n_simulations": 0, "opposite_price_source": None}
 
     rng = np.random.default_rng(random_state)
-    d = bets["price_decimal"].to_numpy()
+    d = bets["price_decimal"].to_numpy(dtype=float)
+    p = bets["fair_prob"].to_numpy(dtype=float)
     observed = float(_returns(bets).mean())
 
-    # A random side wins with probability `fair_prob` if taken, else (1 - fair_prob);
-    # simulating the coin flip directly is equivalent and keeps the price fixed.
-    p = bets["fair_prob"].to_numpy()
+    fair_opposite = 1.0 / (1.0 - p)
+    if "opposite_price_decimal" in bets.columns:
+        real = bets["opposite_price_decimal"].to_numpy(dtype=float)
+        if (real[~np.isnan(real)] <= 1).any():
+            raise ValueError("opposite_price_decimal must be > 1")
+        d_opp = np.where(np.isnan(real), fair_opposite, real)
+        n_real = int((~np.isnan(real)).sum())
+        source = "real" if n_real == len(bets) else f"real for {n_real}/{len(bets)}, fair for the rest"
+    else:
+        d_opp = fair_opposite
+        source = "fair (no-vig, conservative)"
+
     null = np.empty(n_simulations)
     for i in range(n_simulations):
         took_listed_side = rng.random(len(bets)) < 0.5
         win_prob = np.where(took_listed_side, p, 1 - p)
+        price = np.where(took_listed_side, d, d_opp)
         won = rng.random(len(bets)) < win_prob
-        null[i] = np.where(won, d - 1.0, -1.0).mean()
+        null[i] = np.where(won, price - 1.0, -1.0).mean()
 
     return {
         "observed_roi": observed,
         "null_mean_roi": float(null.mean()),
         "null_std_roi": float(null.std(ddof=1)),
         "percentile": float((null < observed).mean()),
+        "p_one_sided": float((null >= observed).mean()),
         "n_simulations": n_simulations,
+        "opposite_price_source": source,
     }
 
 
