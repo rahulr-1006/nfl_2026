@@ -62,6 +62,20 @@ STADIUM_COORDINATES: dict[str, tuple[float, float, str]] = {
     "LON00": (51.5560, -0.2795, "Europe/London"),  # Wembley Stadium
     "LON01": (51.4548, -0.3418, "Europe/London"),  # Twickenham Stadium
     "LON02": (51.6043, -0.0665, "Europe/London"),  # Tottenham Hotspur Stadium
+    # The 2026 international slate (added 2026-09-27). These five ids did not
+    # exist in the cached schedule until it was refreshed mid-season: the
+    # 2026-08-14 vintage carried NO international `stadium_id` at all and mapped
+    # every neutral-site game to the nominal home team's domestic venue, so
+    # `add_rest_travel_features` was computing a confidently wrong travel
+    # distance (SF->LA for a game in Melbourne) rather than a missing one.
+    # nflverse also issued MUN01 for the Munich venue already present as GER00;
+    # both are Allianz Arena and both are kept, since either id can appear
+    # depending on which schedule vintage a row came from.
+    "MAD01": (40.4531, -3.6883, "Europe/Madrid"),  # Santiago Bernabeu, Madrid
+    "MEL00": (-37.8199, 144.9834, "Australia/Melbourne"),  # Melbourne Cricket Ground
+    "MUN01": (48.2188, 11.6247, "Europe/Berlin"),  # Allianz Arena, Munich (see GER00)
+    "PAR00": (48.9244, 2.3601, "Europe/Paris"),  # Stade de France, Saint-Denis
+    "RIO00": (-22.9122, -43.2302, "America/Sao_Paulo"),  # Maracana Stadium, Rio de Janeiro
     "MEX00": (19.3029, -99.1505, "America/Mexico_City"),  # Estadio Azteca
     "MIA00": (25.9580, -80.2389, "America/New_York"),  # Sun Life/Hard Rock Stadium
     "MIN01": (44.9738, -93.2575, "America/Chicago"),  # U.S. Bank Stadium

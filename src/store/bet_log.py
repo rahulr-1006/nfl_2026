@@ -81,6 +81,8 @@ STRATEGIES = frozenset({
     "middle",          # line-movement middling
     "steam",           # synchronized cross-book movement
     "manual",          # placed on judgement, no scanner -- tracked separately on purpose
+    "h1_pinnacle_lag",  # pre-registered (preregistration_wk5-9.md), LOG-ONLY until scored 2026-11-10
+    "h1b_stale_price",  # pre-registered, LOG-ONLY until scored 2026-11-10
 })
 
 PINNACLE = "pinnacle"
@@ -192,16 +194,29 @@ def active_bets(path: Path = BET_LOG_PATH) -> list[LoggedBet]:
     # place a human can obtain it. The superseded row then survived and
     # (`fromisoformat` parses both spellings, so only the comparison was wrong.)
     # `settle_bets` counted its stake and P&L twice.
-    superseded: set[datetime] = set()
-    for b in bets:
+    # Matched by WHICH ROW corrects which, not by timestamp value alone (fixed
+    # 2026-09-27, found by the first end-to-end dry run of this workflow). A
+    # correction legitimately carries the SAME `placed_at` as the row it
+    # supersedes: `placed_at` is documented as the moment the bet was struck,
+    # not the moment it was typed, so fixing a mistyped stake on that same bet
+    # reuses that instant. The old `placed_at not in superseded` test then
+    # dropped the correction along with its target -- the bet vanished from
+    # `active_bets` entirely, so it was never settled, never counted in the
+    # bankroll and never reviewed. Silently losing a placed bet is strictly
+    # worse than the double-count this filter was written to prevent.
+    corrections: list[tuple[int, datetime]] = []
+    for i, b in enumerate(bets):
         if not b.corrects:
             continue
         try:
-            superseded.add(datetime.fromisoformat(b.corrects))
+            corrections.append((i, datetime.fromisoformat(b.corrects)))
         except ValueError:
             log.warning("bet at %s has an unparseable `corrects` value %r -- ignoring it, so "
                         "the row it meant to supersede stays live", b.placed_at, b.corrects)
-    return [b for b in bets if b.placed_at not in superseded]
+    return [
+        b for i, b in enumerate(bets)
+        if not any(j != i and target == b.placed_at for j, target in corrections)
+    ]
 
 
 def to_backtest_bets(
