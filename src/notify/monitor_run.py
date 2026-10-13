@@ -71,6 +71,8 @@ from src.signal.movement_scan import (
     middle_alert_key,
     steam_alert_key,
 )
+from src.signal.prereg_scan import PREREG_SHADOW_LOG_PATH, ReadOnceStore
+from src.signal.prereg_scan import run as prereg_run
 from src.signal.props_scan import (
     DEFAULT_ARB_MARGIN_THRESHOLD,
     DEFAULT_PROP_EV_THRESHOLD,
@@ -88,8 +90,9 @@ from src.store.pit_store import PointInTimeStore, kickoffs_from_store
 log = logging.getLogger(__name__)
 
 # Hard ceiling on how much this monitor will suggest staking across all
-# still-open alerts in one cycle. The bankroll is a fixed $100 with no reloads
-# (src/signal/sizing.py), and per-bet caps cannot see each other: ten separate
+# still-open alerts in one cycle. The bankroll is $100 with at most 2 manual
+# reloads ($300 total risk capital, decided 2026-10-04; paper sec. on sizing), and
+# per-bet caps cannot see each other: ten separate
 # 2%-of-bankroll suggestions is $20 of simultaneous exposure that no individual
 # `apply_bankroll_caps` call knows about. Props make this real rather than
 # theoretical -- a single slate can produce many prop alerts at once, unlike
@@ -200,6 +203,7 @@ def run(
     steam_edge_threshold: float = DEFAULT_STEAM_EDGE_THRESHOLD,
     max_exposure: float = DEFAULT_MAX_SUGGESTED_EXPOSURE,
     shadow_path: Path = SHADOW_LOG_PATH,
+    prereg_path: Path | None = None,
 ) -> int:
     """One scan-and-alert cycle across all five signals. Returns the number
     of alerts actually sent. Never raises for expected failure modes (no
@@ -347,6 +351,19 @@ def run(
         shadow_recheck(store, path=shadow_path)
     except Exception:
         log.exception("shadow log: re-check failed, continuing")
+
+    # Pre-registered H1/H1b (preregistration_wk5-9.md): LOGGED, NEVER TEXTED, and
+    # to their own file so no existing report shows holdout results before
+    # 2026-11-10. Last in the tick on purpose -- it adds a store read, and it must
+    # never delay or break a real alert. The path is derived from `shadow_path`
+    # so a test that redirects the shadow log redirects this one too.
+    prereg = prereg_path or shadow_path.with_name(PREREG_SHADOW_LOG_PATH.name)
+    try:
+        once = ReadOnceStore(store)
+        prereg_run(once, path=prereg)
+        shadow_recheck(once, path=prereg)
+    except Exception:
+        log.exception("prereg log-only scan failed, continuing")
 
     # Persist if anything changed -- alerts sent OR entries pruned. Saving only
     # on `all_sent` would leave the prune in memory and re-do it every cycle
