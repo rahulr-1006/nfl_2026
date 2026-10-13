@@ -1,4 +1,4 @@
-.PHONY: venv install test lint demo collect collect-once props-poll \
+.PHONY: venv install test lint demo collect collect-once props-poll prereg-score \
 	collector-service-install collector-service-uninstall collector-service-status \
 	monitor-scan-once monitor-service-install monitor-service-uninstall monitor-service-status \
 	middle-scan-once steam-scan-once \
@@ -168,6 +168,11 @@ clv-report:
 # Store-only, 0 credits.
 decision-report:
 	$(PY) -m src.clv.decision_report
+
+# H1/H1b against preregistration_wk5-9.md's pass bar. `--weeks holdout` refuses to
+# run before 2026-11-10; Train (weeks 1-4) is always allowed.
+prereg-score:
+	$(PY) -m src.clv.prereg_score --weeks $(or $(WEEKS),train)
 
 # Weekly in-season health check over the live bet log: CLV + drift CUSUM +
 # bettability -> continue/monitor/retire, segmented per strategy.
