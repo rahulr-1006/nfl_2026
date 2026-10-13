@@ -85,7 +85,7 @@ since retired, and `demo_pipeline.py`).
 ### store/ — foundation (all LIVE)
 | Module | Imported by | Reach | Notes |
 |---|---|---|---|
-| `pit_store.py` | 18 | **LIVE** | Most-depended-on module in the repo. The leakage guard. |
+| `pit_store.py` | 18 | **LIVE** | Most-depended-on module in the repo. The leakage guard. Since 2026-10-13 each instance caches the deduped full read, keyed on the file listing, so a monitor tick reads disk once instead of once per scanner (verified identical to an uncached read on the real store). |
 | `schema.py` | 12 | **LIVE** | `OddsSnapshot`/`Market`/`Side`. |
 | `settlement.py` | 2 | **LIVE** | Game-score grading. |
 | `prop_settlement.py` | 2 | **LIVE** | Player-stat grading + name reconciliation. |
@@ -129,7 +129,7 @@ since retired, and `demo_pipeline.py`).
 | `props_ev_backtest.py` | 1 | **LIVE** | Now also powers live props scanning. |
 | `correlated_props.py` | 0 | **MANUAL** | 11 public fns, 2 notebooks. `price_bucket_bet` is the gated entrypoint **no live scanner calls**. |
 | `team_total_props.py` | 0 | **UNDECIDED** | Validated edge, **not wired to anything**. Edge figures here previously read +6.6%/+14.1%; those came from the TRAIN fit and were corrected 2026-09-04 to the realized out-of-sample values (**rushing +2.8%, passing +7.1%** at 6.54% vig — only passing/underdog clears the 3% threshold). |
-| `validation.py` | 0 | **RESEARCH** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
+| `validation.py` | 0 | **MANUAL** | Leakage/FDR toolkit, used by 3 notebooks. Should be a hard dependency of any future claim. |
 | `evaluation.py` | 0 | **MANUAL** | Phase 2 (2026-08-23). Bettability metrics: threshold sweep, `proportion_bet`, bootstrap CIs, random-side null. Reproduced the props-EV null on 6,812 real bets. Any future edge claim should pass `evaluate_strategy`. |
 | `pinnacle_lag.py` | 1 | **LIVE** | 2026-10-04. Pre-registered H1/H1b: soft-book prop prices vs Pinnacle's devigged fair, scored on **closing EV** (`clv_probability` can't see the price paid). Frozen params live in `signal/prereg_scan.py`. `evaluation.random_bet_benchmark`'s opposite-side pricing bug (null mean ≈ price/2 − 1) was fixed 2026-10-13; pass `opposite_price_decimal` for a real-price null. |
 | `synthetic_market.py` | 0 | **RESEARCH** | Simulator for CLV validation. |
@@ -147,6 +147,7 @@ since retired, and `demo_pipeline.py`).
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
 | `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
+| `clv/prereg_score.py` | 0 | **MANUAL** | 2026-10-13. `make prereg-score [WEEKS=holdout]`: H1/H1b against the pre-registration's §3 pass bar. Refuses holdout weeks before 2026-11-10. `scripts/h1_train_grid.py` reproduces the frozen Train numbers. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
 | `features/load_static.py` | 1 | **LIVE** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
