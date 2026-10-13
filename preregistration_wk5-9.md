@@ -1,9 +1,10 @@
 # Pre-registration — 2026 Weeks 5–9 holdout
 
-**Status: DRAFT (2026-10-04).** It binds only once committed. The git commit
-timestamp is the proof that it was written before the holdout, so **commit it
-before Wed 2026-10-07 23:59 ET**, one day before the first Week 5 kickoff
-(Thu 10-08 20:15 ET).
+**Status: COMMITTED LATE (2026-10-13, deadline was 2026-10-07 23:59 ET).** Week 5
+had already been played when it was committed. See §6 for what that changes:
+the H1/H1b freeze stands on weaker evidence, and H2/H3 are out of this family.
+(Original instruction: commit before Wed 2026-10-07 23:59 ET, one day before the
+first Week 5 kickoff, Thu 10-08 20:15 ET.)
 
 Items marked **[DECIDE]** are yours to settle before committing. Everything
 else is a proposal you can edit freely until then, and not at all afterwards
@@ -318,7 +319,8 @@ deviation.
 
 | Date | Change | Reason | Changes bets? |
 |---|---|---|---|
-| | | | |
+| 2026-10-13 | **Committed 6 days late** (commit `85094e3`, 2026-10-13), after all of Week 5 was played. The text was not edited between 2026-10-04 19:09 ET (file mtime) and the commit. Supporting, not tamper-proof, evidence that H1/H1b were frozen before the holdout: `data/shadow_log_prereg.jsonl`'s first row is `alerted_at` 2026-10-04T23:24Z, and `logs/monitor.err.log` shows the frozen scan running at 2026-10-04 19:25 ET. Nobody scored the prereg log before the commit; only row counts were read. | The deadline was missed. The evidence the git timestamp should have supplied is now weaker, and the final report must say so. | No. H1/H1b parameters are unchanged (M=2pp, E=1%). |
+| 2026-10-13 | **H2 and H3 are dropped from the Weeks 5–9 confirmatory family.** The BH family is {H1, H1b}. H2's contract, H3's keep/drop and its `G` were still [DECIDE] when the holdout started, so settling them now would mean choosing after Week 5 had happened. Either can be registered against the Weeks 10–14 holdout. H4 stays exploratory. | Consequence of the late commit. | Yes for H2/H3 (no holdout bets are scored for them). None for H1/H1b. |
 
 ## 7. Build order (Train phase, 10-05 → 10-07)
 
