@@ -104,3 +104,18 @@ def test_opposite_prices_finds_the_other_side_at_the_same_book_line_and_capture(
          "book": "fanduel", "side": "under", "capture_time": t, "price_decimal": 1.95},
     ])
     assert opposite_prices(bets, snaps).tolist() == [1.83]
+
+
+def test_rushing_sensitivity_is_reported_but_never_changes_the_primary():
+    good = _frame(20, 2, close_ev=0.02)
+    rush = _frame(4, 1, close_ev=-0.20, prop_stat="rushing_yards", seed=2).assign(
+        event_id=[f"2026_05_R{i}_X" for i in range(4)])
+    legs = _legs([True] * 6)
+    alone = score_strategy(good, "h1b_stale_price", legs)
+    mixed = score_strategy(pd.concat([good, rush], ignore_index=True), "h1b_stale_price", legs)
+    assert mixed["conditions"] == alone["conditions"]
+    assert mixed["mean_close_ev"] == pytest.approx(alone["mean_close_ev"])
+    g = mixed["with_gated"]
+    assert g["n"] == 44 and g["games"] == 24
+    assert g["mean_close_ev"] < alone["mean_close_ev"]  # the bad rushing legs show up here only
+    assert g["gated_n_settled"] == 4

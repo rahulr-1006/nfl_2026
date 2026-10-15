@@ -336,4 +336,7 @@ deviation.
 run as `make prereg-score WEEKS=holdout` on or after 2026-11-10. It implements
 §3's conditions 1–6 line by line, applies the bad-quote and rushing-yards
 (calibration-gate) exclusions while reporting both groups separately, and
-refuses holdout weeks before the scoring date, with no override flag.
+refuses holdout weeks before the scoring date, with no override flag. Rushing
+yards stay out of the verdict, as §3 requires (confirmed 2026-10-15). The scorer also
+prints a rushing-inclusive closing EV and the rushing legs' realized ROI, labelled
+exploratory; neither feeds a condition. That is reporting only, not a deviation.
