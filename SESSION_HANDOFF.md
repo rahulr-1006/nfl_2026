@@ -18,7 +18,8 @@ been played). Both consequences are logged in §6: (1) the late commit itself,
 with the 10-04 evidence; (2) H2/H3 dropped from the Weeks 5–9 family, so the
 BH family is {H1, H1b}. Score on/after 11-10 with
 `make prereg-score WEEKS=holdout`. It refuses to run earlier. Its rushing-yards
-exclusion follows §3's calibration gate. Confirm you agree before 11-10.
+exclusion follows §3's calibration gate (confirmed 10-15; a rushing-inclusive
+number prints as an exploratory line that doesn't touch the verdict).
 `python -m scripts.h1_train_grid` reproduces the frozen Train numbers exactly.
 
 **Fixed today:**

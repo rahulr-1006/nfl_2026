@@ -20,7 +20,9 @@ reported separately rather than dropped:
 - **Rushing yards** (§3 calibration gate): Pinnacle's rushing-yards close
   failed the 2023-24 calibration gate (`analysis/train_results_2026-10-04.md`),
   and §3 says a stat that fails is not scored on closing EV. H1b's registered
-  Train numbers already exclude rushing.
+  Train numbers already exclude rushing. A rushing-inclusive closing EV and
+  the rushing legs' realized ROI are printed as an exploratory sensitivity
+  line (confirmed 2026-10-15); they never feed a condition or the verdict.
 
 Pass bar (§3, all required):
   1. n >= 30 bets from >= 15 distinct games
@@ -138,6 +140,25 @@ def _ev_bucket_roi(s: pd.DataFrame) -> pd.DataFrame:
     return out.agg(n="size", roi="mean").reset_index()
 
 
+def _with_gated_sensitivity(with_gated: pd.DataFrame, gated: pd.DataFrame) -> dict:
+    """Exploratory only -- never feeds a condition or the verdict.
+
+    The primary metric drops gate-failed stats because §3 says their closing EV
+    isn't a valid yardstick. This shows what the number would be with them back
+    in, plus the gated legs' realized ROI, which doesn't depend on the gate.
+    """
+    n, games = len(with_gated), with_gated["event_id"].nunique()
+    boot = clustered_bootstrap(with_gated["close_ev"], with_gated["event_id"], n_resamples=N_BOOT,
+                               random_state=SEED) if games >= 2 else None
+    settled = gated[gated["won"].notna()]
+    ret = np.where(settled["won"].astype(bool), settled["price_decimal"] - 1, -1.0)
+    return {
+        "n": n, "games": games, "mean_close_ev": float(with_gated["close_ev"].mean()) if n else None,
+        "ci_lo": boot and boot["ci_lo"], "ci_hi": boot and boot["ci_hi"],
+        "gated_n_settled": len(settled), "gated_realized_roi": float(ret.mean()) if len(settled) else None,
+    }
+
+
 def score_strategy(frame: pd.DataFrame, strategy: str, survival_legs: pd.DataFrame) -> dict:
     s = frame[frame["strategy"] == strategy]
     measurable = s[s["close_ev"].notna()]
@@ -173,6 +194,7 @@ def score_strategy(frame: pd.DataFrame, strategy: str, survival_legs: pd.DataFra
     out.update(survival=surv, survival_n=surv_n)
 
     out["ev_buckets"] = _ev_bucket_roi(primary)
+    out["with_gated"] = _with_gated_sensitivity(measurable[~bad], measurable[~bad & gated])
     out["conditions"] = {
         "1_n_and_games": n >= MIN_BETS and games >= MIN_GAMES,
         "2_mean_positive": bool(n) and out["mean_close_ev"] > 0,
@@ -240,6 +262,14 @@ def format_results(results: list[dict], weeks: Sequence[int]) -> str:
         ]
         for name, ok in r["conditions"].items():
             lines.append(f"    [{'x' if ok else ' '}] {name}")
+        g = r["with_gated"]
+        lines += [
+            (
+                f"  EXPLORATORY, not in verdict -- with rushing yards: n={g['n']} over {g['games']} games  "
+                f"close EV {_fmt(g['mean_close_ev'], True)} [{_fmt(g['ci_lo'], True)}, {_fmt(g['ci_hi'], True)}]"
+            ),
+            f"    rushing legs realized ROI {_fmt(g['gated_realized_roi'], True)} on {g['gated_n_settled']} settled",
+        ]
         if not r["ev_buckets"].empty:
             lines.append("  realized ROI by entry-EV bucket (must not invert):")
             for b in r["ev_buckets"].itertuples():
