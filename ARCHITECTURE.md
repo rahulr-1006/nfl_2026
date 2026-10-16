@@ -147,7 +147,7 @@ since retired, and `demo_pipeline.py`).
 | `notify/monitor_run.py` | — | **LIVE** | Alert entrypoint. |
 | `notify/sms.py` | 2 | **LIVE** | |
 | `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
-| `clv/prereg_score.py` | 0 | **MANUAL** | 2026-10-13. `make prereg-score [WEEKS=holdout]`: H1/H1b against the pre-registration's §3 pass bar. Refuses holdout weeks before 2026-11-10. `scripts/h1_train_grid.py` reproduces the frozen Train numbers. |
+| `clv/prereg_score.py` | 0 | **MANUAL** | 2026-10-13. `make prereg-score [WEEKS=holdout]`: H1/H1b against the pre-registration's §3 pass bar. Refuses holdout weeks before 2026-11-10. Rushing yards stay out of the verdict (§3 gate); a rushing-inclusive number prints as an exploratory line only. `scripts/h1_train_grid.py` reproduces the frozen Train numbers. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
 | `features/load_static.py` | 1 | **LIVE** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
