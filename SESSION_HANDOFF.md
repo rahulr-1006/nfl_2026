@@ -1,13 +1,13 @@
-# Session handoff — 2026-09-21 (updated 2026-10-04, 2026-10-13)
+# Session handoff — 2026-09-21 (updated 2026-10-04, 2026-10-13, 2026-10-15)
 
 ## 2026-10-13 update — read this first
 
-Everything is committed (main is ~30 commits ahead of origin, **not pushed**).
-1021 tests pass, ruff clean, 0 unreferenced modules.
+Everything is committed and **pushed** (10-15). 1022 tests pass, ruff clean,
+0 unreferenced modules.
 
 **Verified live state:** all 3 services up; no collection gap >3h since 9/21;
-0 tracebacks since 10-04; 79,204 paid credits left (≈51K/month pace); disk 93%
-(Spotify cache, not this repo). `bet_log.jsonl` still doesn't exist.
+0 tracebacks since 10-04; 79,204 paid credits left (≈51K/month pace); disk 84% after
+the user cleared the 20 GB Spotify cache on 10-15 (was 95%). `bet_log.jsonl` still doesn't exist.
 
 **Decision report 10-13:** nothing is GO. `moneyline_ev` NO (n=104),
 `prop_ev` NO (n=178), `steam` NO (n=61), `middle` HOLD (n=10),
@@ -21,6 +21,11 @@ BH family is {H1, H1b}. Score on/after 11-10 with
 exclusion follows §3's calibration gate (confirmed 10-15; a rushing-inclusive
 number prints as an exploratory line that doesn't touch the verdict).
 `python -m scripts.h1_train_grid` reproduces the frozen Train numbers exactly.
+
+**Next deadline: commit any Weeks 10–14 pre-registration before Thu 2026-11-12**
+(Week 10's first kickoff, two days after 11-10 scoring). H2/H3 can only be
+tested there (§6). Write it before 11-10 so the Weeks 5–9 result can't shape it;
+the git commit timestamp is the evidence, so commit the day it's written.
 
 **Fixed today:**
 1. `.env.bak-*` (both API keys plus the phone number) was not gitignored in a
@@ -44,7 +49,7 @@ number prints as an exploratory line that doesn't touch the verdict).
 that game's own stats row, so trades are safe by construction. 0 same-game
 name collisions in 2026.
 
-**Still open (your call):** push to origin; `team_total_scan` exposure cap;
+**Still open (your call):** `team_total_scan` exposure cap;
 whether "clear" must also require the CI to exclude zero; the paper §4.7 power
 analysis; notebooks have no smoke test, which is how two of them broke unnoticed.
 
@@ -78,7 +83,7 @@ tested (981 passed, ruff clean), staged, **not committed**:
    on DNS failures); existing log lines masked.
 5. **Disk filled 9/22-23** (`No space left on device`, 3 early-tier props polls
    lost after being paid for). Not this repo (store is 97 MB): the Spotify cache
-   is 20 GB. Still 94% full until cleared.
+   is 20 GB. Cleared 2026-10-15 (disk 84%).
 
 Services restarted 2026-10-04 15:28 ET to load 1-2.
 
