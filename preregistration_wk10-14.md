@@ -39,11 +39,13 @@ Unchanged and incorporated by reference (`preregistration_wk5-9.md`):
 holdout weeks for any hypothesis below before 12-15. Operational checks (uptime,
 credits, whether the scanner fires, survival) are allowed.
 
-**Known partial leak, disclosed now:** `make decision-report` will keep showing
-`moneyline_ev`'s `clv_probability` and beat rate across all weeks, including
-Weeks 10–14. That isn't the registered metric, but it's correlated with it.
-**[DECIDE]**: either filter Weeks 10–14 out of `decision-report` until 12-15
-(recommended; a small code change), or accept the leak and record it here.
+**Report seal (decided 2026-10-17):** `moneyline_ev` logs to the shared
+`data/shadow_log.jsonl`, so `decision-report` and `clv-report` would otherwise
+show H5's CLV week by week through the holdout. `src/clv/seals.py` withholds
+`moneyline_ev` alerts in Weeks 10–14 from every CLV number (the filter is in
+`shadow_clv.shadow_alerts_as_bets`) until 2026-12-15. `decision-report` prints how
+many alerts it is withholding. Survival stays visible, since it's an allowed
+operational check.
 
 ## 3. Exploration already done (disclosed)
 
@@ -91,7 +93,7 @@ Both branches are written now, so the 11-10 result picks one mechanically:
   family.
 - **FAILS:** dropped. No re-tuning and no new grid on Weeks 5–9.
 
-### H2 — Team-total correlation · [DECIDE]
+### H2 — Team-total correlation · DROPPED (decided 2026-10-17)
 
 The H2 edge is priced as a **same-game parlay**: underdog ML + team over, against
 a book that multiplies the vigged legs (`correlated_props.bucket_edge =
@@ -104,11 +106,11 @@ alone is mispriced.
   vig") is that prediction coming true, not a sign of a weak edge.
 - **(b) Book team-yards market: doesn't exist.** The Odds API's NFL
   `team_totals` / `alternate_team_totals` are points only (checked 2026-10-17).
-- **(c) Drop from the confirmatory family (recommended).** The mechanism is
+- **(c) Drop from the confirmatory family: CHOSEN.** The mechanism is
   replicated three times but can't be scored with data this pipeline collects:
   SGP prices aren't in the Odds API, and books' SGP engines price correlation
   themselves.
-- **Optional exploratory study (not in the family):** for the H2 underdog spots
+- **Not adopted, kept for later:** a manual study. For the H2 underdog spots
   in Weeks 10–14, record by hand DraftKings' SGP price for (dog ML + QB pass
   yards over) next to the two single-leg prices. If the SGP price is above
   `naive_parlay_price`, books aren't pricing the correlation and a bettable H2
@@ -138,7 +140,7 @@ family size is fixed once the 11-10 result is in and is recorded in §6 that day
    Weeks 10–14 before 12-15. Train (Weeks 1–5 played): 67 bets / 25 games,
    +5.34% [+2.82, +7.74], all six conditions pass. That is **in-sample**: it's
    the data that selected H5.
-2. **[DECIDE]** the `decision-report` leak (§2).
-3. **[DECIDE]** H2: (c) plus the optional manual SGP study, or something else.
+2. ~~Report leak~~ DONE 2026-10-17: sealed (§2).
+3. ~~H2~~ DECIDED 2026-10-17: dropped, option (c).
 4. After 11-10: record the H1/H1b branch and the family size in §6.
 5. Commit before 11-12 20:15 ET, earlier if possible.

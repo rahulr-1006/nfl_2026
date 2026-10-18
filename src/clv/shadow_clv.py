@@ -38,6 +38,7 @@ from pathlib import Path
 import pandas as pd
 
 from src.backtest.engine import BacktestBet
+from src.clv.seals import withheld
 from src.signal.shadow_log import SHADOW_LOG_PATH, load
 from src.store.bet_log import PINNACLE, LoggedBet, to_backtest_bets
 from src.store.pit_store import PointInTimeStore
@@ -49,7 +50,7 @@ NOTIONAL_STAKE = 1.0
 
 
 def shadow_alerts_as_bets(
-    path: Path = SHADOW_LOG_PATH, notional_stake: float = NOTIONAL_STAKE
+    path: Path = SHADOW_LOG_PATH, notional_stake: float = NOTIONAL_STAKE, now: datetime | None = None
 ) -> list[LoggedBet]:
     """Every alerted shadow leg as a notional `LoggedBet`.
 
@@ -73,11 +74,14 @@ def shadow_alerts_as_bets(
     detectable, and therefore the entry a human acting on the first text would
     have got. Keeping the best price would round the entry toward self-flattery,
     which is the one direction this project's tie-break rules forbid.
+
+    **Sealed alerts are skipped** (`clv.seals`, added 2026-10-17): H5's Weeks
+    10-14 `moneyline_ev` legs stay out of every CLV number until 2026-12-15.
     """
     seen: set[tuple[str, str]] = set()
     bets: list[LoggedBet] = []
     for o in sorted(load(path), key=lambda o: o.alerted_at):
-        if not o.is_alert or o.price_american is None:
+        if not o.is_alert or o.price_american is None or withheld(o.strategy, o.event_id, now):
             continue
         key = (o.alert_key, o.leg)
         if key in seen:
