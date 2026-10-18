@@ -1,6 +1,17 @@
-# Session handoff — 2026-09-21 (updated 2026-10-04, 2026-10-13, 2026-10-15)
+# Session handoff — 2026-09-21 (updated 2026-10-04, 2026-10-13, 2026-10-15, 2026-10-17)
 
-## 2026-10-13 update — read this first
+## 2026-10-17 update — Train re-run for Weeks 10–14
+
+`analysis/train_results_2026-10-17.md`, reproduced by `python -m scripts.train_wk10_14`.
+Split: 2023–24 = fit/calibrate, 2026 Weeks 1–5 = train, Weeks 10–14 = test,
+2025 untouched. **Prop legs in Weeks 5–9 stay sealed** until 11-10 (dropped before
+pricing). Findings: moneyline_ev longshots (>3.0) are the only unsealed candidate
+(+5.20% closing EV [+2.67, +7.63], 68 bets / 25 games), but the same rule on
+2023–24 realized −21.6% [−59.5, +20.8]. The H2 mechanism replicates a third
+time (passing underdog lift 1.337 [1.03, 1.72]), but there's still no bettable
+contract. steam, middle and prop_arb are dead. Schedule and player_stats were
+re-pulled 10-17.
+
 
 Everything is committed and **pushed** (10-15). 1022 tests pass, ruff clean,
 0 unreferenced modules.
