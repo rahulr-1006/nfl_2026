@@ -246,3 +246,20 @@ this sample can't stand for H2.
 7. **H2:** volume is fine, but option (a) was scoreable on only 16 of 53
    spots on Train (−5.6%, underpowered). Option (b) needs a new Odds API market;
    (c) keeps it unbettable. No recommendation from this data.
+
+## Addendum 2026-10-17: how close is the "close" for props?
+
+Measured on the store, Pinnacle player-markets (any line), last pre-kickoff capture:
+
+| Week | Markets | Median last capture | Share ≤20 min pre-kick | Median captures |
+|---|---|---|---|---|
+| 1–3 | ~540/wk | 67–81 min | 40% | 16–23 |
+| 4 | 553 | 11 min | 61% | 22 |
+| 5 (holdout) | 505 | 6 min | 96% | 59 |
+
+Every game got a final poll ~10 min before kickoff, but before the 10-04 change
+(yardage markets ride the 15-min arb tier) that poll only carried arb markets.
+So in Train, ~60% of player-markets' "close" was their last capture 1h+ out.
+That makes Train closing EV a measure against a semi-close. The usual effect is
+to shrink measured CLV toward zero, since the price has had less time to move,
+not to inflate it. The holdout weeks have a real close (96% within 20 min).
