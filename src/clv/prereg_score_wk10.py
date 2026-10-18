@@ -20,7 +20,6 @@ import argparse
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from zoneinfo import ZoneInfo
 
 import pandas as pd
 
@@ -28,6 +27,7 @@ from src.backtest.clv_portfolio import bets_to_frame
 from src.backtest.validation import benjamini_hochberg
 from src.clv.decision_report import first_recheck_frame
 from src.clv.prereg_score import ALPHA, BlindedError, _fmt, score_strategy, week_of
+from src.clv.seals import WK10_14_OPENS, WK10_14_WEEKS
 from src.clv.shadow_clv import shadow_alerts_as_bets
 from src.features.load_static import STATIC_DIR
 from src.signal.shadow_log import SHADOW_LOG_PATH
@@ -35,8 +35,8 @@ from src.store.bet_log import settle_bets, to_backtest_bets
 from src.store.pit_store import PointInTimeStore, kickoffs_from_store
 
 TRAIN_WEEKS = tuple(range(1, 10))
-HOLDOUT_WEEKS = (10, 11, 12, 13, 14)
-SCORE_NOT_BEFORE = datetime(2026, 12, 15, 0, 0, tzinfo=ZoneInfo("America/New_York"))
+HOLDOUT_WEEKS = WK10_14_WEEKS
+SCORE_NOT_BEFORE = WK10_14_OPENS  # one date, shared with the report seal
 
 H5 = "moneyline_ev"
 LONGSHOT_MIN_PRICE = 3.0  # strict: the gate passed for fair decimal > 3.0
@@ -65,11 +65,12 @@ def moneyline_opposite_prices(frame: pd.DataFrame, snapshots: pd.DataFrame) -> p
 
 
 def prepare_h5(store: PointInTimeStore, weeks: Sequence[int], as_of: datetime | None = None,
-               path: Path = SHADOW_LOG_PATH, static_dir: Path = STATIC_DIR) -> pd.DataFrame:
+               path: Path = SHADOW_LOG_PATH, static_dir: Path = STATIC_DIR,
+               now: datetime | None = None) -> pd.DataFrame:
     """H5's legs in `weeks`: earliest alert per (game, side), priced, settled,
     restricted to the > 3.0 region. Bad quotes are left in for `score_strategy`
     to exclude and count."""
-    logged = [b for b in shadow_alerts_as_bets(path) if b.strategy == H5 and week_of(b.event_id) in set(weeks)]
+    logged = [b for b in shadow_alerts_as_bets(path, now=now) if b.strategy == H5 and week_of(b.event_id) in set(weeks)]
     if not logged:
         return pd.DataFrame()
     priced = to_backtest_bets(logged, store, as_of=as_of)
@@ -90,7 +91,7 @@ def score(store: PointInTimeStore, weeks: Sequence[int], family_p: Sequence[floa
           as_of: datetime | None = None, now: datetime | None = None,
           path: Path = SHADOW_LOG_PATH, static_dir: Path = STATIC_DIR) -> dict:
     check_blind(weeks, now)
-    frame = prepare_h5(store, weeks, as_of, path, static_dir)
+    frame = prepare_h5(store, weeks, as_of, path, static_dir, now)
     if frame.empty:
         return {"strategy": H5, "n": 0, "conditions": {}, "verdict": "FAIL"}
     legs = first_recheck_frame(path)

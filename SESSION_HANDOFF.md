@@ -12,6 +12,14 @@ time (passing underdog lift 1.337 [1.03, 1.72]), but there's still no bettable
 contract. steam, middle and prop_arb are dead. Schedule and player_stats were
 re-pulled 10-17.
 
+**Weeks 10–14 prereg** (`preregistration_wk10-14.md`, draft committed): H5 =
+moneyline longshots >3.0, scored by `make prereg-score-wk10` (locked until
+12-15). H2 dropped: its edge is an SGP joint lift, and no market we collect
+prices that. `moneyline_ev` Weeks 10–14 are sealed out of decision-report and
+clv-report until 12-15 (`clv/seals.py`). Left to do: after 11-10, record the
+H1/H1b branch and family size in §6, then make the final commit before 11-12
+20:15 ET.
+
 
 Everything is committed and **pushed** (10-15). 1022 tests pass, ruff clean,
 0 unreferenced modules.

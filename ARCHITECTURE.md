@@ -149,6 +149,7 @@ since retired, and `demo_pipeline.py`).
 | `clv/metrics.py` | 3 | **LIVE** | The project's headline metric. |
 | `clv/prereg_score.py` | 0 | **MANUAL** | 2026-10-13. `make prereg-score [WEEKS=holdout]`: H1/H1b against the pre-registration's §3 pass bar. Refuses holdout weeks before 2026-11-10. Rushing yards stay out of the verdict (§3 gate); a rushing-inclusive number prints as an exploratory line only. `scripts/h1_train_grid.py` reproduces the frozen Train numbers. |
 | `clv/prereg_score_wk10.py` | 0 | **MANUAL** | 2026-10-17. `make prereg-score-wk10 [WEEKS=holdout]`: H5 (moneyline longshots >3.0) against `preregistration_wk10-14.md`. Refuses Weeks 10–14 before 2026-12-15. Kept separate so the Weeks 5–9 scorer is never edited after its commit. |
+| `clv/seals.py` | 2 | **MANUAL** | 2026-10-17. Withholds `moneyline_ev` Weeks 10–14 alerts from every CLV number (`shadow_alerts_as_bets`, so decision-report and clv-report) until 2026-12-15, the H5 scoring date. Survival is not sealed. |
 | `devig/convert.py` / `methods.py` | 4 / 2 | **LIVE** | |
 | `features/load_static.py` | 1 | **LIVE** | nflverse pulls. |
 | `features/player_status.py` | 1 | **RESEARCH** | Trade/injury lookup, no live consumer. |
