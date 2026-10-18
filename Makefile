@@ -4,7 +4,7 @@
 	middle-scan-once steam-scan-once \
 	props-collect props-collect-once \
 	props-service-install props-service-uninstall props-service-status clean shadow-report \
-	audit sync-arch mainline-timeseries team-total-scan-once \
+	audit sync-arch prereg-score-wk10 mainline-timeseries team-total-scan-once \
 	log-bet clv-report decision-report season-review
 
 VENV := .venv
@@ -173,6 +173,9 @@ decision-report:
 # run before 2026-11-10; Train (weeks 1-4) is always allowed.
 prereg-score:
 	$(PY) -m src.clv.prereg_score --weeks $(or $(WEEKS),train)
+
+prereg-score-wk10:
+	$(PY) -m src.clv.prereg_score_wk10 --weeks $(or $(WEEKS),train)
 
 # Weekly in-season health check over the live bet log: CLV + drift CUSUM +
 # bettability -> continue/monitor/retire, segmented per strategy.
