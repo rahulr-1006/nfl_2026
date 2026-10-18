@@ -131,9 +131,13 @@ family size is fixed once the 11-10 result is in and is recorded in §6 that day
 
 ## 7. Build order (before the commit)
 
-1. **Scorer:** extend `src/clv/prereg_score.py` to mainline moneyline (opposite
-   side at its real same-book quote, price-region filter) and date-lock Weeks
-   10–14 until 12-15. Test it on Train weeks.
+1. ~~Scorer~~ DONE 2026-10-17: `src/clv/prereg_score_wk10.py`, run as `make
+   prereg-score-wk10 [WEEKS=holdout]`. It's a separate module so the Weeks 5–9
+   scorer stays untouched. It reuses `score_strategy` (conditions 1–5), prices
+   the null's opposite side at the real same-book moneyline quote, and refuses
+   Weeks 10–14 before 12-15. Train (Weeks 1–5 played): 67 bets / 25 games,
+   +5.34% [+2.82, +7.74], all six conditions pass. That is **in-sample**: it's
+   the data that selected H5.
 2. **[DECIDE]** the `decision-report` leak (§2).
 3. **[DECIDE]** H2: (c) plus the optional manual SGP study, or something else.
 4. After 11-10: record the H1/H1b branch and the family size in §6.
