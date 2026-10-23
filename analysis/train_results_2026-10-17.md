@@ -91,3 +91,35 @@ H2 can't be registered until its contract is chosen (prereg §4 options a/b/c).
    11-10 and 11-12, so write both branches into the doc in advance.
 4. Drop steam, middle and prop_arb from any confirmatory family. Each one costs
    a BH slot for nothing.
+
+## Addendum 2026-10-19: from when the signal fires to the close, Weeks 1–6
+
+The same script re-run with Week 6 played (the Monday-night game wasn't closed yet,
+and Week 6 Sunday results weren't in the schedule pull, so realized results lag).
+No sealed numbers: props are Weeks 1–4 only. Each signal's closing EV is split
+into **edge when it fired** (entry EV against Pinnacle's fair then) plus
+**Pinnacle's move to the close** (`(p_close − p_entry) × price`). "Beat book
+close" means the bet's own book later offered a worse price.
+
+| Strategy | n / games | Edge at fire | Pinnacle move | Close EV [CI] | Beat book close |
+|---|---|---|---|---|---|
+| moneyline_ev >3.0 (H5) | 83 / 31 | +3.59% | **+1.22%** | **+4.81% [+2.5, +7.1]** | 76% |
+| moneyline_ev ≤3.0 | 37 / 23 | +3.71% | −2.45% | +1.26% [−4.3, +7.1] | 65% |
+| steam | 73 / 33 | −0.69% | −2.70% | −3.39% [−5.8, −0.9] | 38% |
+| prop_ev (Weeks 1–4) | 136 / 50 | +5.28% | −2.45% | +2.84% [+1.6, +4.1] | 73% |
+
+- **H5 is an early-opener effect.** 73 of 83 alerts fired more than 3 days before
+  kickoff: +5.34% [+2.8, +7.9]. The soft books open longshots too long, Pinnacle
+  drifts toward them, and the books cut their price. Across books the closing EV
+  ranged from +2.4% (BetMGM, William Hill) to +6.3% (BetRivers). Every bucket
+  closer to kickoff has n ≤ 6. **The rule stays as written.** Restricting it
+  to >3 days out would be fitting on Train for no gain, since the big bucket is
+  already almost all of it.
+- **Steam pays for the move.** Signals 1–6 hours out lost 12pp to Pinnacle
+  reversing (−10.1% close EV). It confirms the kill.
+- **prop_ev's edge at fire is partly a stale Pinnacle.** Signals more than 6
+  hours out lose ~4.3pp to Pinnacle's move. Within 6 hours of kickoff they hold
+  (+4.3%, n=51). That's Weeks 1–4 only. H1b's 11-10 holdout is the real test.
+- Practical for H5: alerts land mid-week, days before the game. You have time
+  to place them by hand, and the 64% survival at first re-check is the binding
+  constraint, not reaction speed.

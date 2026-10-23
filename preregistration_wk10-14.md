@@ -57,6 +57,12 @@ From `analysis/train_results_2026-10-17.md`:
   81 bets.** They won 16.0% against a 21.7% fair probability. That doesn't refute
   the closing-EV result (the CI is ±40pp), but it is the strongest evidence
   against H5 and is written here before the holdout.
+- 2026-10-19 update through Week 6: longshots >3.0 at +4.81% [+2.5, +7.1], 83
+  bets / 31 games. 73 of the 83 fired more than 3 days before kickoff. Their
+  edge was +3.6% when they fired, Pinnacle then moved +1.2pp toward the bet,
+  and the book's own price beat its close 76% of the time. Looked at by
+  time-to-kickoff and by book (`analysis/train_results_2026-10-17.md`,
+  addendum). **The rule was not changed** because of that look.
 - Team-total underdog passing lift 1.337 [1.034, 1.724], a third replication.
 - steam, middle and prop_arb are dead on Train. They are not registered.
 
