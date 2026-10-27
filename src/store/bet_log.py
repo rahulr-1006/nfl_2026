@@ -1,39 +1,18 @@
-"""Append-only record of bets actually placed, and the bridge from that record
-to `BacktestBet` so the existing CLV/review machinery can read live bets.
+"""Append-only log of bets actually placed, and the bridge to `BacktestBet`.
 
-**Why this exists: without it, CLV cannot be computed for a single real bet.**
-CLV needs an entry price, and until now nothing stored one. `BacktestBet` was
-constructed in exactly one place -- `BacktestEngine.run()`, a backtest -- and
-`data/alert_state.json` records only which alerts were *sent*, never what was
-staked, at what price, or at which book. Bets are placed manually across five
-books and nothing came back. That made `season_review`, `clv_portfolio`,
-`evaluation` and `drift/monitor` unreachable in practice: all four are
-downstream of an input that did not exist (audit, 2026-08-23).
+CLV needs an entry price, and this is the only place one is recorded for a
+real bet. Two rules keep the record trustworthy:
 
-## Two rules that make the record trustworthy
+1. Only record what a person knows at bet time. Fair probabilities, the close,
+   CLV and settlement are all derived later from the point-in-time store by
+   `to_backtest_bets`, so they can't be mistyped and can be recomputed.
+2. Never rewrite a row. A log that can be edited after the close can be edited
+   because of the close, which is exactly the bias CLV is meant to catch.
+   Corrections are new rows that point at the original via `corrects`.
 
-**1. Only type what a human can know at bet time.** Everything derived --
-entry fair probability, closing price, CLV, settlement -- is computed later
-from the point-in-time store by `to_backtest_bets`. Nothing derived is ever
-typed, so it cannot be mistyped, and it can always be recomputed if the
-methodology changes. That is the same separation `PointInTimeStore` already
-enforces between observed prices and modelled quantities.
-
-**2. Append-only, never rewritten.** A bet log that can be edited after the
-close is a bet log that can be edited *because* of the close, which is exactly
-the bias CLV exists to detect. Corrections are appended as new rows referencing
-the original via `corrects`, so the original stays visible.
-
-## Strategy attribution is explicit, not inferred
-
-`strategy` is a required field rather than something derived from `market`,
-because `season_review` segments on it to decide continue/monitor/retire, and
-market type does not identify the scanner: prop arbitrage and experimental prop
-EV are both `player_prop` but have opposite track records (arb is structural
-and validated; prop EV tested null on 6,812 bets). Pooling them would let one
-mask the other -- the same failure `clv_portfolio.clv_by_segment` was built to
-avoid. `alert_key` cross-references `data/alert_state.json` so a logged bet can
-be traced back to the alert that triggered it.
+`strategy` is required, not inferred from `market`: prop arbitrage and prop EV
+are both `player_prop` but have opposite track records, and `season_review`
+segments on strategy.
 """
 
 from __future__ import annotations
@@ -60,29 +39,25 @@ from src.store.prop_settlement import (
 from src.store.schema import Market, Side
 from src.store.settlement import Outcome, build_results_index, settle
 
-# Re-exported: `kickoffs_from_store` lives in pit_store (it reads the store's
-# own event_start_time and has no bet-specific logic), but settlement callers
-# import it from here alongside settle_bets.
+# Re-exported for settlement callers that import it alongside settle_bets.
 __all__ = ["kickoffs_from_store"]
 
 log = logging.getLogger(__name__)
 
 BET_LOG_PATH = Path("data/bet_log.jsonl")
 
-# The scanners that can produce a bet. Closed set on purpose: a free-text
-# strategy field silently fragments a segment ("prop_arb" vs "prop-arb" vs
-# "arb") and `season_review` would then review three tiny groups instead of one
-# real one, which is how a dying strategy hides.
+# Closed set on purpose: free text would split one strategy into several
+# spellings, and season_review would then review small fragments instead.
 STRATEGIES = frozenset({
     "prop_arb",        # cross-book prop arbitrage -- structural, validated
-    "prop_ev",         # anchored prop EV -- EXPERIMENTAL, tested null on 6,812 bets
+    "prop_ev",         # anchored prop EV -- experimental, tested null
     "moneyline_ev",    # moneyline vs devigged Pinnacle
     "team_total",      # team-total O/U vs moneyline, validated buckets only
     "middle",          # line-movement middling
     "steam",           # synchronized cross-book movement
     "manual",          # placed on judgement, no scanner -- tracked separately on purpose
-    "h1_pinnacle_lag",  # pre-registered (preregistration_wk5-9.md), LOG-ONLY until scored 2026-11-10
-    "h1b_stale_price",  # pre-registered, LOG-ONLY until scored 2026-11-10
+    "h1_pinnacle_lag",  # pre-registered (preregistration_wk5-9.md), log-only until scored
+    "h1b_stale_price",  # pre-registered, log-only until scored
 })
 
 PINNACLE = "pinnacle"
@@ -115,15 +90,10 @@ class LoggedBet(BaseModel):
 
     @model_validator(mode="after")
     def _market_and_side_agree(self) -> LoggedBet:
-        """Reject combinations that cannot be settled, at the point a human
-        types them.
+        """Reject bets that could never be settled, while the person typing them can fix it.
 
-        Without this, `--market player_prop --side home` is accepted by the CLI
-        and only fails much later inside settlement, where the person who could
-        have corrected it is no longer looking. Props additionally need
-        player/stat/line: those identify the CONTRACT, and a prop bet missing
-        them can never be graded -- it would sit in the log forever reporting
-        `outcome=None` with nothing saying why.
+        Props also need player, stat and line: without them the contract is
+        unidentifiable and the bet would sit ungraded forever.
         """
         over_under = {Side.OVER, Side.UNDER}
         home_away = {Side.HOME, Side.AWAY}
@@ -145,8 +115,7 @@ class LoggedBet(BaseModel):
     @field_validator("placed_at")
     @classmethod
     def _tz_aware(cls, v: datetime) -> datetime:
-        # A naive timestamp silently compares wrong against the store's UTC
-        # capture_time, which would corrupt every CLV number downstream.
+        # A naive timestamp compares wrong against the store's UTC capture_time.
         if v.tzinfo is None:
             raise ValueError("placed_at must be timezone-aware (use UTC)")
         return v
@@ -170,9 +139,7 @@ def log_bet(bet: LoggedBet, path: Path = BET_LOG_PATH) -> LoggedBet:
 
 
 def load_bet_log(path: Path = BET_LOG_PATH) -> list[LoggedBet]:
-    """Every logged bet, oldest first. Missing file is an empty log, not an
-    error -- this is read by unattended reporting.
-    """
+    """Every logged bet, oldest first. A missing file is an empty log, not an error."""
     if not path.exists():
         return []
     bets = [LoggedBet.model_validate_json(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
@@ -182,28 +149,16 @@ def load_bet_log(path: Path = BET_LOG_PATH) -> list[LoggedBet]:
 def active_bets(path: Path = BET_LOG_PATH) -> list[LoggedBet]:
     """Logged bets with superseded rows removed.
 
-    Corrections are appended, never edited in place, so the raw log holds both
-    the wrong row and its replacement. Everything downstream wants only the
-    live view; the raw log stays available via `load_bet_log` for auditing.
+    The raw log holds both a wrong row and its correction; downstream code
+    wants only the live view. `load_bet_log` still returns everything.
     """
     bets = load_bet_log(path)
 
-    # Compare as parsed instants, never as strings. Pydantic serialises
-    # `placed_at` as `...Z` while `.isoformat()` renders `...+00:00`, so string
-    # equality never matched a value copied out of the file -- which is the only
-    # place a human can obtain it. The superseded row then survived and
-    # (`fromisoformat` parses both spellings, so only the comparison was wrong.)
-    # `settle_bets` counted its stake and P&L twice.
-    # Matched by WHICH ROW corrects which, not by timestamp value alone (fixed
-    # 2026-09-27, found by the first end-to-end dry run of this workflow). A
-    # correction legitimately carries the SAME `placed_at` as the row it
-    # supersedes: `placed_at` is documented as the moment the bet was struck,
-    # not the moment it was typed, so fixing a mistyped stake on that same bet
-    # reuses that instant. The old `placed_at not in superseded` test then
-    # dropped the correction along with its target -- the bet vanished from
-    # `active_bets` entirely, so it was never settled, never counted in the
-    # bankroll and never reviewed. Silently losing a placed bet is strictly
-    # worse than the double-count this filter was written to prevent.
+    # Compare parsed instants, not strings: pydantic writes `...Z` while
+    # isoformat() writes `...+00:00`. Match by row index too, because a
+    # correction usually carries the same `placed_at` as the row it replaces
+    # (it's the time the bet was struck, not when it was typed). Matching on
+    # the timestamp alone would drop the correction along with its target.
     corrections: list[tuple[int, datetime]] = []
     for i, b in enumerate(bets):
         if not b.corrects:
@@ -227,21 +182,12 @@ def to_backtest_bets(
     as_of: datetime | None = None,
     residual_stds: Callable[[], tuple[float, float]] | None = None,
 ) -> list[BacktestBet]:
-    """Enrich logged bets with entry/closing fair probabilities and CLV, so
-    `season_review` / `clv_portfolio` / `evaluation` can consume them unchanged.
+    """Attach entry/closing fair probabilities and CLV to logged bets.
 
-    Reuses `engine.latest_fair_prob` rather than reimplementing devigging, so a
-    live bet and a backtested bet are scored by identical code -- if they
-    diverged, no live-vs-backtest comparison would mean anything.
-
-    A bet whose anchor never posted a two-sided quote gets `None` CLV rather
-    than a guess. That is common and correct early: Pinnacle does not quote
-    props until close to kickoff, and `_clv_series` drops unmeasurable bets.
-
-    `as_of` bounds which snapshots are visible, defaulting to now. It is a real
-    parameter rather than a hardcoded `now()` for the same reason every other
-    read path here takes one: pinning it is what lets a CLV number be
-    recomputed identically later instead of drifting with wall-clock.
+    Uses `engine.latest_fair_prob`, so live and backtested bets are scored by
+    the same code. A bet whose anchor never posted a two-sided quote gets
+    `None` CLV rather than a guess. `as_of` (default now) bounds which
+    snapshots are visible, so a CLV number can be reproduced later.
     """
     if not bets:
         return []
@@ -251,9 +197,7 @@ def to_backtest_bets(
     if snapshots.empty:
         log.warning("snapshot store is empty -- no CLV can be computed")
 
-    # Resolved once per call, and only if a spread/total bet actually needs it:
-    # `cached_residual_stds` reads the full play-by-play parquet on a cache miss,
-    # which no prop-only or moneyline-only run should ever pay for.
+    # Sigma is only needed for spread/total bets and is expensive on a cold cache.
     sigmas = _SigmaProvider(residual_stds)
 
     out: list[BacktestBet] = []
@@ -261,13 +205,8 @@ def to_backtest_bets(
         kickoff = _kickoff_for(snapshots, b.event_id)
         entry_fair = _anchor_fair_for_bet(snapshots, b, anchor_book, b.placed_at, devig_method, sigmas)
 
-        # "Close" = the last quote at or before kickoff -- a filter that EVERY row
-        # trivially satisfies while kickoff is still in the future, which would
-        # turn the current quote into a fake close and report CLV on a line that
-        # is still moving. `season_review` feeds these into the CUSUM drift
-        # detector and continue/monitor/retire verdicts, so a premature number
-        # there can retire a strategy on nothing. A bet is only closed once its
-        # game has actually started.
+        # Before kickoff, "the last quote before kickoff" is just the current
+        # quote. Only report a close once the game has started.
         closed = kickoff is not None and kickoff <= now_bound
         close_fair = _anchor_fair_for_bet(snapshots, b, anchor_book, kickoff, devig_method, sigmas) if closed else None
         close_dec = _close_price_decimal(snapshots, b, kickoff) if closed else None
@@ -288,7 +227,7 @@ def to_backtest_bets(
             clv_price=clv_price(b.price_decimal, close_dec) if close_dec is not None else None,
             clv_probability=clv_probability(entry_fair, close_fair)
             if entry_fair is not None and close_fair is not None else None,
-            outcome=None,   # settlement is a separate pass (src/store/settlement.py)
+            outcome=None,   # settled separately by settle_bets
             payout=None,
             player_name=b.player_name,
             prop_stat=b.prop_stat,
@@ -298,17 +237,11 @@ def to_backtest_bets(
 
 
 def _kickoff_for(snapshots: pd.DataFrame, event_id: str) -> datetime | None:
-    """The most recently OBSERVED kickoff for this event.
+    """The kickoff time from the most recent capture of this event.
 
-    **Latest-observed, not `.max()` (fixed 2026-09-08).** A game's scheduled time
-    can be revised: the store already holds one real case, 2026_01_NE_SEA moving
-    00:15 -> 00:20 UTC on 2026-09-02. `.max()` returned the largest VALUE, which
-    was right there only by luck. NFL flex scheduling moves games by hours, and
-    it moves them EARLIER as well as later -- when it does, `.max()` returns the
-    stale later time, the close window extends past real kickoff, and an in-play
-    quote silently becomes the "closing" line that every CLV number is measured
-    against. Ordering by capture_time asks the question we actually mean: what
-    does the market currently say the kickoff is?
+    Not `.max()`: schedules get revised, sometimes earlier. The largest value
+    could be a stale later time, which would let an in-play quote count as
+    the close.
     """
     if snapshots.empty:
         return None
@@ -321,12 +254,8 @@ def _kickoff_for(snapshots: pd.DataFrame, event_id: str) -> datetime | None:
 class _SigmaProvider:
     """Lazily resolves (sigma_margin, sigma_total), fetching at most once.
 
-    `middle_scan.cached_residual_stds` is disk- and process-cached, but on a
-    cold cache it fits Elo, QB Elo and two regressions off the full play-by-play
-    parquet. Wrapping it means a `to_backtest_bets` call over props or
-    moneylines alone -- which needs no sigma at all -- never pays that cost, and
-    a call over 500 spread bets pays it once rather than 500 times. It is
-    injectable so tests can pin sigma instead of fitting a model.
+    On a cold cache the fetch fits models on the full play-by-play data, so
+    prop- or moneyline-only calls should never trigger it. Injectable for tests.
     """
 
     def __init__(self, fetch: Callable[[], tuple[float, float]] | None) -> None:
@@ -355,17 +284,12 @@ def _anchor_fair_for_bet(
     devig_method: str,
     sigmas: _SigmaProvider,
 ) -> float | None:
-    """The anchor's fair probability **for this bet's own contract** at `as_of`.
+    """The anchor's fair probability for this bet's exact contract at `as_of`.
 
-    For a moneyline or a prop this is just `_fair_at`. For a spread or total it
-    cannot be, because the anchor may not be quoting the bet's line at all: read
-    the anchor at whatever line IT is on, then translate that probability onto
-    the bet's line (see `src/clv/line_adjust.py` for the method and its
-    assumptions). Demanding an exact line match instead returns either nothing
-    or a badly stale quote from whenever the anchor last sat on that number --
-    for 2026_01_NE_SEA's Under 44.5 that quote was 8h48m old and predated the
-    very steam move the alert fired on, making entry and close the same snapshot
-    and CLV an exact and meaningless 0.0000.
+    For spreads and totals the anchor may be on a different line. Rather than
+    wait for an exact line match (which returns nothing or a stale quote), read
+    the anchor's current line and translate it onto the bet's line via
+    `src/clv/line_adjust.py`.
     """
     if as_of is None or snapshots.empty:
         return None
@@ -393,9 +317,7 @@ def _anchor_fair_for_bet(
 def _anchor_line_at(
     snapshots: pd.DataFrame, bet: LoggedBet, book: str, as_of: datetime
 ) -> float | None:
-    """The line `book` was actually quoting this bet's market/side on, as of
-    `as_of` -- the line the translation starts from.
-    """
+    """The line `book` was quoting for this bet's market and side as of `as_of`."""
     rows = snapshots[
         (snapshots["event_id"] == bet.event_id)
         & (snapshots["book"] == book)
@@ -417,25 +339,16 @@ def _fair_at(
         snapshots, book=book, market=bet.market, side=bet.side, as_of=as_of,
         devig_method=devig_method, player_name=bet.player_name,
         prop_stat=bet.prop_stat, line=bet.line,
-        # This frame is the WHOLE store, unlike the engine's per-event slices.
-        # Omitting event_id here is what made mainline CLV silently unmeasurable
-        # for every logged bet (2026-09-08).
+        # This frame is the whole store, not a per-event slice.
         event_id=bet.event_id,
     )
 
 
 def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datetime) -> float | None:
-    """The bet's OWN book's last decimal price before kickoff -- price CLV asks
-    whether you beat the number you actually took, at the book you took it from.
+    """The bet's own book's last price before kickoff, on the same line.
 
-    The line filter applies to ANY market that carries a line, not just props
-    (fixed 2026-09-10, alongside the same bug in `engine._market_rows`). A
-    total or spread line MOVES, so without it the close for a bet on Under 44.5
-    is read off the same book's later Under 44.0 quote -- a different contract,
-    and a price CLV that compares nothing to nothing. Unlike `_market_rows`,
-    `rows` here is already narrowed to one side, so an exact match is correct
-    for spreads too: the mirrored-line problem only arises when both sides must
-    survive the filter together.
+    Lines move, so without the line filter the close for Under 44.5 could be
+    read off a later Under 44.0 quote, a different contract.
     """
     if snapshots.empty:
         return None
@@ -455,14 +368,11 @@ def _close_price_decimal(snapshots: pd.DataFrame, bet: LoggedBet, kickoff: datet
     return float(rows.loc[rows["capture_time"].idxmax(), "price_decimal"])
 
 
-
-
 def _grade(bet: BacktestBet, results: dict, stats_index: dict) -> Outcome | None:
     """One bet's outcome, or None if it cannot be graded yet.
 
-    None is returned rather than guessed for an unplayed game, an unmatched
-    player name, or a missing stat -- an ungraded bet must never be counted as
-    a loss, which would silently understate the bankroll.
+    Returns None for an unplayed game, an unmatched player or a missing stat.
+    An ungraded bet must never count as a loss.
     """
     if bet.market == Market.PLAYER_PROP:
         if bet.player_name is None or bet.prop_stat is None or bet.line is None:
@@ -488,18 +398,10 @@ def settle_bets(
 ) -> list[BacktestBet]:
     """Grade logged bets and track the realized bankroll.
 
-    Reuses `settlement.settle` / `prop_settlement.settle_prop` /
-    `engine.payout_for` unchanged -- settlement was written decoupled from the
-    store precisely so "both the eventual backtester and a real bet log can
-    reuse it", and a second implementation would let live and backtest P&L
-    disagree.
-
-    **Returned in kickoff order, not decision order.** `clv_portfolio.bankroll_path`
-    reads `bankroll_after` positionally and documents why: a strategy can decide
-    5 days out on a late game and 1 hour out on an early one, so only settlement
-    order describes the bankroll. Sorting by decision time here would reproduce a
-    bug already fixed once. Ungraded bets sort last and leave the bankroll
-    untouched -- they are unresolved, not losses.
+    Bets come back in kickoff order, not decision order, because
+    `clv_portfolio.bankroll_path` reads `bankroll_after` positionally and only
+    settlement order describes the bankroll. Ungraded bets sort last and leave
+    the bankroll untouched.
     """
     if not bets:
         return []
@@ -514,11 +416,7 @@ def settle_bets(
 
     graded = []
     for b in bets:
-        # One ungradeable bet must not abort settlement for every other bet --
-        # that would hide all real P&L behind a single bad row. Same discipline
-        # as `monitor_run._safe` and `props_scheduler.tick`. `outcome=None` is
-        # already a supported state (unplayed games produce it), so this needs
-        # no new semantics.
+        # One bad row must not abort settlement for every other bet.
         try:
             outcome = _grade(b, results, stats_index)
         except Exception:
@@ -544,16 +442,10 @@ STATIC_DIR = Path("data/static")
 
 
 def load_settlement_inputs(static_dir: Path = STATIC_DIR) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """(schedule, player_stats) for settlement, concatenated across every cached
-    vintage in `static_dir`.
+    """(schedule, player_stats) for settlement, merged across cached vintages.
 
-    Concatenates rather than picking a file because the cache holds overlapping
-    vintages (`schedules_2015_2024`, `schedules_2015_2025`, `schedules_2026_2026`)
-    and a bet can land in any of them. Duplicates are dropped keeping the LAST
-    occurrence, so a newer vintage supersedes an older one for the same game --
-    which also makes the superseded 2015-2024 files harmless rather than a
-    correctness risk. Missing files return empty frames: nothing is settled, and
-    that is reported, never guessed.
+    Files overlap, so later vintages win on duplicate keys. Missing files give
+    empty frames: nothing settles, and that's reported rather than guessed.
     """
     def _concat(pattern: str, key: list[str]) -> pd.DataFrame:
         frames = [pd.read_parquet(f) for f in sorted(static_dir.glob(pattern))]
@@ -586,22 +478,14 @@ def main() -> None:
     ap.add_argument("--prop-stat")
     ap.add_argument("--alert-key", help="key from data/alert_state.json, for traceability")
     ap.add_argument("--note")
-    # `placed_at` is the moment the BET was struck, not the moment it was typed.
-    # Bets are placed manually across five books and logged afterwards, and
-    # `_fair_at` uses this as the entry anchor -- defaulting it to now() measures
-    # entry fair probability against a later market than the one actually bet
-    # into, quietly biasing every CLV number.
+    # Bets are often logged after the fact. Entry fair probability is read at
+    # placed_at, so defaulting to now() would measure against a later market.
     ap.add_argument("--placed-at", help="ISO-8601 UTC time the bet was actually placed "
                                         "(default: now). Use this when logging after the fact.")
-    # Without this the documented append-only correction workflow is unreachable
-    # except by hand-editing the JSONL.
     ap.add_argument("--corrects", help="`placed_at` of an earlier row this supersedes "
                                        "(copy it from data/bet_log.jsonl)")
     ap.add_argument("--list", action="store_true", help="print the current log and exit")
-    # A separate log lets the whole loop be exercised end-to-end without writing
-    # a bet that was never actually placed into the real record -- the real log
-    # is append-only and feeds bankroll accounting, so polluting it is not
-    # something a later edit can cleanly undo.
+    # For dry runs: the real log is append-only and can't be cleaned up.
     ap.add_argument("--path", default=str(BET_LOG_PATH),
                     help=f"bet log to write/read (default {BET_LOG_PATH})")
     a = ap.parse_args()
@@ -613,9 +497,7 @@ def main() -> None:
                   f"{b.book} {b.price_american:+d} ${b.stake:.2f}")
         return
 
-    # Validated here rather than via argparse `required=True` so `--list` works
-    # on its own -- a listing command that demands the fields you are trying to
-    # look up is a command nobody runs.
+    # Checked here instead of required=True so `--list` works on its own.
     missing = [n for n in ("event_id", "market", "side", "book", "price", "stake", "strategy")
                if getattr(a, n) is None]
     if missing:

@@ -54,3 +54,9 @@ data/static/*.bak-*
 # graphify hook scratch files, written and removed on every rebuild.
 graphify-out/.pending_changes
 graphify-out/.rebuild.lock
+
+# Personal working notes, AI-tooling config and the graphify index stay local.
+notes/
+CLAUDE.md
+.claude/
+graphify-out/
