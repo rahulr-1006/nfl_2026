@@ -61,6 +61,7 @@ sampled densely inside the arb tier. So an out-of-window prop renders `n/a`, nev
 from __future__ import annotations
 
 import logging
+from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime
 from pathlib import Path
@@ -69,7 +70,7 @@ import numpy as np
 import pandas as pd
 
 from src.clv.metrics import bootstrap_ci
-from src.clv.seals import WK10_14_OPENS, withheld
+from src.clv.seals import seal_reason
 from src.clv.shadow_clv import shadow_clv_frame
 from src.signal.shadow_log import SHADOW_LOG_PATH, ShadowObservation, load
 from src.store.pit_store import PointInTimeStore
@@ -447,10 +448,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
     store = PointInTimeStore(root="data/snapshots")
     print(format_table(decision_table(store)))
-    sealed = sum(o.is_alert and withheld(o.strategy, o.event_id) for o in load(SHADOW_LOG_PATH))
-    if sealed:
-        print(f"  - {sealed} moneyline_ev alert(s) in Weeks 10-14 are withheld until "
-              f"{WK10_14_OPENS:%Y-%m-%d} (H5 holdout, preregistration_wk10-14.md); survival still counts them.")
+    sealed = Counter(seal_reason(o.strategy, o.event_id, o.market) for o in load(SHADOW_LOG_PATH) if o.is_alert)
+    sealed.pop(None, None)
+    for reason, n in sorted(sealed.items()):
+        print(f"  - {n} alert(s) withheld from CLV until their scoring date ({reason}, "
+              f"src/clv/seals.py); survival still counts them.")
 
 
 if __name__ == "__main__":

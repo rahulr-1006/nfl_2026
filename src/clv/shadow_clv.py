@@ -75,13 +75,14 @@ def shadow_alerts_as_bets(
     have got. Keeping the best price would round the entry toward self-flattery,
     which is the one direction this project's tie-break rules forbid.
 
-    **Sealed alerts are skipped** (`clv.seals`, added 2026-10-17): H5's Weeks
-    10-14 `moneyline_ev` legs stay out of every CLV number until 2026-12-15.
+    **Sealed alerts are skipped** (`clv.seals`): Weeks 5-9 player-prop legs until
+    2026-11-10 (H1/H1b) and H5's Weeks 10-14 `moneyline_ev` legs until 2026-12-15
+    stay out of every CLV number.
     """
     seen: set[tuple[str, str]] = set()
     bets: list[LoggedBet] = []
     for o in sorted(load(path), key=lambda o: o.alerted_at):
-        if not o.is_alert or o.price_american is None or withheld(o.strategy, o.event_id, now):
+        if not o.is_alert or o.price_american is None or withheld(o.strategy, o.event_id, now, o.market):
             continue
         key = (o.alert_key, o.leg)
         if key in seen:
