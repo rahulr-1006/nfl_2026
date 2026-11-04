@@ -55,6 +55,7 @@ def test_timezone_offset_london_vs_new_york_gap_during_the_nfl_season():
 # --- STADIUM_COORDINATES coverage ---
 
 
+@pytest.mark.static_data("schedules_2015_2025.parquet")
 def test_stadium_coordinates_covers_every_real_stadium_id_in_the_cached_schedule():
     schedule = pd.read_parquet("data/static/schedules_2015_2025.parquet")
     real_ids = set(schedule["stadium_id"].unique())
@@ -62,6 +63,7 @@ def test_stadium_coordinates_covers_every_real_stadium_id_in_the_cached_schedule
     assert missing == set(), f"STADIUM_COORDINATES is missing real stadium_id(s): {missing}"
 
 
+@pytest.mark.static_data("schedules_2026_2026.parquet")
 def test_stadium_coordinates_covers_every_real_stadium_id_in_the_live_2026_schedule():
     # The historical-only version of this check (above) doesn't guard the
     # file the LIVE pipeline actually runs on -- a missing entry here
@@ -75,6 +77,7 @@ def test_stadium_coordinates_covers_every_real_stadium_id_in_the_live_2026_sched
     assert missing == set(), f"STADIUM_COORDINATES is missing real live-2026 stadium_id(s): {missing}"
 
 
+@pytest.mark.static_data("schedules_2015_2025.parquet", "schedules_2026_2026.parquet")
 def test_stadium_coordinates_has_no_stale_unused_entries():
     # Guards the table from silently drifting out of sync with the data --
     # a stadium_id here that's no longer in the real schedule is a signal
@@ -132,6 +135,7 @@ def test_team_home_stadium_by_season_reflects_a_real_relocation():
     assert result[(result["team"] == "LA") & (result["season"] == 2020)].iloc[0]["stadium_id"] == "LAX01"
 
 
+@pytest.mark.static_data("schedules_2015_2025.parquet")
 def test_team_home_stadium_by_season_on_real_cached_data_finds_the_rams_relocation():
     # End-to-end check against the real 2015-2024 schedule, not a synthetic
     # fixture -- confirms the empirical-derivation approach actually works

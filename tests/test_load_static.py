@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
 from src.features.load_static import PBP_COLUMNS, home_spread_line, kickoffs_utc
 from src.store.schema import Market, Side
@@ -29,6 +30,7 @@ def test_home_spread_line_negates():
     assert home_spread_line(-3.0) == 3.0
 
 
+@pytest.mark.static_data("schedules_2015_2025.parquet")
 def test_home_spread_line_sign_convention_matches_an_efficient_market():
     """Regression guard for the sign-convention bug: feeding nflverse's raw
     spread_line into settle() without negating it produced a 58.9% home-ATS
@@ -56,6 +58,7 @@ def test_home_spread_line_sign_convention_matches_an_efficient_market():
     assert 0 < pushes / total < 0.05  # spreads land on 3/7 often enough to push a few percent of the time
 
 
+@pytest.mark.static_data("pbp_2015_2025.parquet")
 def test_cached_pbp_matches_trimmed_schema_and_covers_the_cached_seasons():
     """Regression guard for the trimmed-schema cache: src/model/features.py
     depends on exactly PBP_COLUMNS existing, so a schema drift here would

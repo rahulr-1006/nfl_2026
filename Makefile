@@ -4,7 +4,7 @@
 	middle-scan-once steam-scan-once \
 	props-collect props-collect-once \
 	props-service-install props-service-uninstall props-service-status clean shadow-report \
-	audit sync-arch prereg-score-wk10 mainline-timeseries team-total-scan-once \
+	data audit sync-arch prereg-score-wk10 mainline-timeseries team-total-scan-once \
 	log-bet clv-report decision-report season-review
 
 VENV := .venv
@@ -21,13 +21,18 @@ install: venv
 test:
 	$(PY) -m pytest -q
 
+# nflverse schedules, play-by-play, player stats etc. into data/static/ (not
+# tracked in git). Re-run weekly in season so the current season's results settle.
+data:
+	$(PY) -m src.features.load_static
+
 # Which src/ modules are actually reachable, and from what (launchd service,
 # make target, notebook, tests, or nothing). Run this before believing any
 # claim about what is or isn't wired -- see scripts/audit_integration.py.
 audit:
 	$(PY) scripts/audit_integration.py
 
-# Regenerate ARCHITECTURE.md's Reach column from the audit. Run after any
+# Regenerate docs/architecture.md's Reach column from the audit. Run after any
 # wiring change; idempotent, so it is safe to run any time.
 sync-arch:
 	$(PY) scripts/sync_architecture.py

@@ -130,7 +130,7 @@ ORDER = [
 
 
 def check_architecture_md() -> list[str]:
-    """Flag ARCHITECTURE.md rows marked ORPHAN that are not actually orphans.
+    """Flag docs/architecture.md rows marked ORPHAN that are not actually orphans.
 
     Only the ORPHAN claim is checked, deliberately. That column mixes *role*
     (LIB, ENTRY) with *reachability* (LIVE, ORPHAN), so most rows compare two
@@ -140,7 +140,7 @@ def check_architecture_md() -> list[str]:
     """
     import re
 
-    arch = REPO / "ARCHITECTURE.md"
+    arch = REPO / "docs" / "architecture.md"
     if not arch.exists():
         return []
     real = {m: c for c, m in classify()}
@@ -157,7 +157,7 @@ def check_architecture_md() -> list[str]:
             continue
         got = real[cands[0]]
         if not got.startswith(("TESTED ONLY", "UNREFERENCED")):
-            problems.append(f"ARCHITECTURE.md calls {path} ORPHAN, but it is {got}")
+            problems.append(f"docs/architecture.md calls {path} ORPHAN, but it is {got}")
     return problems
 
 
@@ -173,11 +173,11 @@ def main() -> None:
 
     problems = check_architecture_md()
     if problems:
-        print("\nARCHITECTURE.md DRIFT:")
+        print("\ndocs/architecture.md DRIFT:")
         for p in problems:
             print(f"    {p}")
     else:
-        print("\nARCHITECTURE.md: no ORPHAN-claim drift.")
+        print("\ndocs/architecture.md: no ORPHAN-claim drift.")
 
 
 if __name__ == "__main__":

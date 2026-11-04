@@ -1782,7 +1782,7 @@ charts, and the historical model/calibration pipeline) is runnable directly via
 ## Appendix B. Full devig derivations
 
 ## Appendix C. Glossary
-*CLV, vig, overround, Kelly fraction, Brier score, etc. — write for a recruiter audience, not just quants.*
+*CLV, vig, overround, Kelly fraction, Brier score, etc. — write for a non-specialist audience, not just quants.*
 
 ## References
 *[Miller & Davidow, Wong, Shin, Kelly, Pinnacle/Unabated resources, nflverse docs, etc. — add as cited.]*

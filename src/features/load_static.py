@@ -19,6 +19,7 @@ import nflreadpy as nfl
 import pandas as pd
 
 STATIC_DIR = Path("data/static")
+CURRENT_SEASON = 2026
 
 # nflverse publishes `gameday`/`gametime` as US/Eastern wall-clock time for every
 # game, international ones included. Parsing them with `utc=True` (the old code
@@ -281,3 +282,8 @@ if __name__ == "__main__":
     pfr_seasons = [s for s in seasons if s >= 2018]
     print(f"wrote {load_snap_counts(pfr_seasons)}")
     print(f"wrote {load_pfr_pass_rush_advstats(pfr_seasons)}")
+
+    # The in-progress season, separately: settlement and CLV need its results
+    # week by week, so this is the part to re-run during the season.
+    print(f"wrote {load_schedules([CURRENT_SEASON])}")
+    print(f"wrote {load_player_stats([CURRENT_SEASON])}")

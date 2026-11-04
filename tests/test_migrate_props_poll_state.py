@@ -1,13 +1,13 @@
 """`poll_count` is an index into a grid, so changing the grid moves every
 in-flight event. These pin the property that makes the migration correct:
 **the migrated index points at the same moment before kickoff, not the same
-ordinal.** See scripts/migrate_props_poll_state.py for the live case that
+ordinal.** See scripts/archive/migrate_props_poll_state.py for the live case that
 forced it (a game 5.88h out whose index suddenly meant 8.75h).
 """
 
 from __future__ import annotations
 
-from scripts.migrate_props_poll_state import (
+from scripts.archive.migrate_props_poll_state import (
     OLD_ARB_POLL_INTERVAL_HOURS,
     _build_targets,
     migrate_poll_count,

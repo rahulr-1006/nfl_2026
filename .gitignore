@@ -1,62 +1,46 @@
+# Python / tooling
 .venv/
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
 *.egg-info/
-.env
+.ipynb_checkpoints/
+**/.ipynb_checkpoints/
+.DS_Store
+
+# Secrets. Any .env variant (e.g. .env.bak-20260908) holds both Odds API keys and
+# the alert phone number; `.env` alone did not match the dated backups.
+.env*
+
+# Data. Odds snapshots are collected locally; nflverse data is rebuilt by `make data`.
 data/snapshots/**/*.parquet
 !data/snapshots/.gitkeep
 data/snapshots_preseason/**/*.parquet
 !data/snapshots_preseason/.gitkeep
+data/demo_snapshots/
+data/static/*.parquet
+
+# Runtime state written by the live services. Not source, and committing it would
+# make the working tree fight the running services on every pull.
 data/collect_state.json
 data/props_collect_state.json
 data/alert_state.json
-# Live CLV measurement record, written by the monitor every cycle -- runtime
-# state like the three above, not source. Committing it would also make the
-# working tree fight the running service on every pull.
 data/shadow_log.jsonl
-.DS_Store
-.ipynb_checkpoints/
-**/.ipynb_checkpoints/
-logs/
-graphify-out/cost.json
-graphify-out/cache/
-data/demo_snapshots/
-
-# graphify writes a dated backup of the curated graph on every `graphify update`.
-# They are byte-for-byte regenerable and were adding ~18MB across 8 directories,
-# more than the whole data/ tree. The CURRENT outputs stay tracked -- CLAUDE.md
-# routes codebase questions through graphify-out/graph.json, and
-# .graphify_labels.json holds LLM-curated community names that a rebuild does not
-# reproduce for free.
-graphify-out/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/
-# The graph itself is a derived artifact: `graphify update .` rebuilds it from the
-# AST with no LLM and no API cost. Tracking it buried every real diff -- commit
-# d4e31df was 213,391 insertions of which ~800 were the actual work, the rest
-# graph.json churning 23,939 lines and graph.html rewriting wholesale.
-graphify-out/graph.json
-graphify-out/graph.html
-# Absolute interpreter path for whoever last ran graphify -- machine-local, and
-# tracking it hands every other clone a path that does not exist there.
-graphify-out/.graphify_python
-
-# Any .env variant (e.g. .env.bak-20260908) holds both Odds API keys and the
-# alert phone number; `.env` alone did not match the dated backups.
-.env*
-# Runtime state written by the monitor, same reasoning as shadow_log.jsonl; it is
-# also the blinded H1/H1b holdout record (preregistration_wk5-9.md).
-data/shadow_log_prereg.jsonl
 data/residual_sigma_cache.json
+# Also the blinded H1/H1b holdout record (docs/preregistration_wk5-9.md).
+data/shadow_log_prereg.jsonl
+logs/
+
 # Dated backups of runtime/static state taken before risky operations.
 data/*.bak-*
 data/static/*.bak-*
-# graphify hook scratch files, written and removed on every rebuild.
-graphify-out/.pending_changes
-graphify-out/.rebuild.lock
 
-# Personal working notes, AI-tooling config and the graphify index stay local.
+# Personal working notes, AI-tooling config and the local code-graph index.
 notes/
 CLAUDE.md
 .claude/
 graphify-out/
+
+# Per-day cache of priced alert bets written by notebooks/alert_clv_analysis.ipynb.
+data/cache/
