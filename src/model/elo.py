@@ -171,3 +171,61 @@ def compute_team_elo_ratings(
         )
 
     return pd.DataFrame(rows)
+
+
+# A game's result is treated as known this long after kickoff. NFL games run
+# about 3h15m; 4h leaves room for overtime and a slow final score feed, and errs
+# toward treating a game as still unplayed (never the leaky direction).
+GAME_DURATION = pd.Timedelta(hours=4)
+
+
+def team_elo_as_of(
+    ratings: pd.DataFrame,
+    kickoffs: pd.Series,
+    team: str,
+    as_of: pd.Timestamp,
+    target_season: int,
+    target_kickoff: pd.Timestamp,
+    initial_rating: float = INITIAL_RATING,
+    season_reversion: float = DEFAULT_SEASON_REVERSION,
+) -> float:
+    """`team`'s rating using only games that had FINISHED by `as_of`.
+
+    `compute_team_elo_ratings`' `*_pre_elo` is the rating entering a game, which
+    assumes every earlier game is already known. An early price posted 5 days out
+    can predate the team's previous game (Monday night -> next week's lookahead
+    line), so the plain pre-game rating would contain a result the market hadn't
+    seen. This returns what was knowable at `as_of` instead:
+
+    - the team has a game that kicked off before `target_kickoff` but hadn't
+      finished by `as_of` -> the rating entering the EARLIEST such game, which is
+      exactly "all games finished by `as_of`" (and already carries any
+      season-start reversion);
+    - otherwise -> the post-game rating of its last finished game, reverted toward
+      `initial_rating` if `target_season` is a later season (the same reversion
+      `compute_team_elo_ratings` applies at a team's first game of a season);
+    - no finished game at all -> `initial_rating`.
+
+    `ratings` is `compute_team_elo_ratings`' output; `kickoffs` maps its
+    `game_id` to a UTC kickoff. Team names must already be canonical.
+    """
+    games = ratings[(ratings["home_team"] == team) | (ratings["away_team"] == team)]
+    ko = games["game_id"].map(kickoffs)
+    if ko.isna().any():
+        raise ValueError(f"missing kickoff for {games.loc[ko.isna(), 'game_id'].tolist()}")
+    is_home = games["home_team"] == team
+    pre = games["home_pre_elo"].where(is_home, games["away_pre_elo"])
+    post = games["home_post_elo"].where(is_home, games["away_post_elo"])
+
+    unfinished = (ko + GAME_DURATION > as_of) & (ko < target_kickoff)
+    if unfinished.any():
+        return float(pre[unfinished].loc[ko[unfinished].idxmin()])
+
+    finished = ko + GAME_DURATION <= as_of
+    if not finished.any():
+        return initial_rating
+    last = ko[finished].idxmax()
+    rating = float(post.loc[last])
+    if target_season > int(games.loc[last, "season"]):
+        rating = initial_rating + (rating - initial_rating) * (1 - season_reversion)
+    return rating

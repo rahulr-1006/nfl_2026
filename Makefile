@@ -5,7 +5,8 @@
 	props-collect props-collect-once \
 	props-service-install props-service-uninstall props-service-status clean shadow-report \
 	data audit sync-arch prereg-score-wk10 mainline-timeseries team-total-scan-once \
-	log-bet clv-report decision-report season-review
+	log-bet clv-report decision-report season-review \
+	opener-dev market-bias-dev prereg-score-opener prereg-score-2025
 
 VENV := .venv
 PY := $(VENV)/bin/python
@@ -181,6 +182,25 @@ prereg-score:
 
 prereg-score-wk10:
 	$(PY) -m src.clv.prereg_score_wk10 --weeks $(or $(WEEKS),train)
+
+# H6 development: Elo vs Pinnacle's T-120h moneyline on 2024 + 2026 Weeks 1-9.
+# Store-only, 0 credits. preregistration_opener_wk11-18.md §3.
+opener-dev:
+	$(PY) -m scripts.opener_dev
+
+# H6 holdout (Weeks 11-18). Refuses before 2027-01-12 ET.
+prereg-score-opener:
+	$(PY) -m src.clv.prereg_score_opener
+
+# H7/H8 development on 2015-2024 nflverse lines. Never reads 2025.
+market-bias-dev:
+	$(PY) -m scripts.market_bias_dev
+
+# H8 on 2025 at real Pinnacle closes. Refuses until
+# preregistration_2025_market_bias.md is FINAL; needs
+# `python -m scripts.pull_2025_wind_closes --spend` (~1,029 paid credits) first.
+prereg-score-2025:
+	$(PY) -m src.clv.prereg_score_2025
 
 # Weekly in-season health check over the live bet log: CLV + drift CUSUM +
 # bettability -> continue/monitor/retire, segmented per strategy.
