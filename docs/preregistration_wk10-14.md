@@ -1,10 +1,12 @@
 # Pre-registration — 2026 Weeks 10–14 holdout
 
-**Status: DRAFT (started 2026-10-17).** Commit the final version before
+**Status: FINAL (committed 2026-11-11; drafted from 2026-10-17).** Deadline was
 **Thu 2026-11-12 20:15 ET** (first Week 10 kickoff, `2026_10_WAS_NYG`). The target
-is **before Tue 11-10**, when the Weeks 5–9 result is scored, so that result
+was **before Tue 11-10**, when the Weeks 5–9 result is scored, so that result
 can't shape anything here except the two H1/H1b branches written out in advance
-in §4. Commit drafts as they change: an earlier git timestamp is stronger
+in §4. That target was missed by a day. The hypotheses and pass bar have been
+committed since 2026-10-17 (last content change 10-23). The only edits made after
+the Weeks 5–9 result are this status line, the §6 branch row and §7 step 4. Commit drafts as they change: an earlier git timestamp is stronger
 evidence, and the Weeks 5–9 doc lost its timestamp by sitting staged.
 
 Items marked **[DECIDE]** are yours. Everything else is a proposal you can edit
@@ -136,6 +138,7 @@ family size is fixed once the 11-10 result is in and is recorded in §6 that day
 
 | Date | Change | Reason | Changes bets? |
 |---|---|---|---|
+| 2026-11-11 | **H1/H1b branch: both FAILED Weeks 5–9, so both are dropped** per §4. No re-tuning, no new grid. Scored with `make prereg-score WEEKS=holdout` (result of record in `preregistration_wk5-9.md` §6, 11-11): each beat Pinnacle's close (H1 +2.22% [+1.62, +2.84]; H1b +1.31% [+0.90, +1.67]) and each failed condition 4, the random-side null on realized ROI. **Family size is fixed at 1: {H5}.** BH at q = 0.05 over one hypothesis is plain p < 0.05. | Recording the branch chosen mechanically by the 11-10 result, as §4/§5 require. | No |
 
 ## 7. Build order (before the commit)
 
@@ -148,5 +151,5 @@ family size is fixed once the 11-10 result is in and is recorded in §6 that day
    the data that selected H5.
 2. ~~Report leak~~ DONE 2026-10-17: sealed (§2).
 3. ~~H2~~ DECIDED 2026-10-17: dropped, option (c).
-4. After 11-10: record the H1/H1b branch and the family size in §6.
+4. ~~After 11-10~~ DONE 2026-11-11: H1/H1b both failed and were dropped; family = {H5} (§6).
 5. Commit before 11-12 20:15 ET, earlier if possible.
