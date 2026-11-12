@@ -108,3 +108,4 @@ here means "not confirmed", not "disproven."**
 
 | Date | Change | Reason | Changes bets? |
 |---|---|---|---|
+| 2026-11-11 | **Result of record: H8 FAIL.** 2025 closes bought after the FINAL commit (`4b16d0d`): 49/49 games, 1,029 credits. Scored once with `make prereg-score-2025`. At Pinnacle's close: n=48 (+1 push), ROI +4.44% [−23.70%, +31.94%], p=0.354, hit 54.2%. Random-side null −2.73%, p=0.327. Conditions 1–2 pass; 3–5 fail. Reported only: best execution book at Pinnacle's line +3.93% (n=37); nflverse line +1.22% (n=49). The point estimate matches the development estimate at real prices (+5.4%), and the test had the power stated in §4. That makes this "not confirmed", not "disproven". 2025 is now spent. | Recording the result. | No |
